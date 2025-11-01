@@ -111,3 +111,9 @@
     font-family: "Montserrat", sans-serif;
   }
 }
+
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(rgba(128, 128, 128, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 128, 128, 0.1) 1px, transparent 1px);
+}

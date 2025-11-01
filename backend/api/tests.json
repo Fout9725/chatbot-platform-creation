@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "Get all bots",
+      "method": "GET",
+      "path": "/bots",
+      "headers": {
+        "X-User-Id": "1"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create bot",
+      "method": "POST",
+      "path": "/bots",
+      "headers": {
+        "X-User-Id": "1"
+      },
+      "body": {
+        "name": "Test Bot",
+        "type": "visual"
+      },
+      "expectedStatus": 201,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Chat with assistant",
+      "method": "POST",
+      "path": "/assistant/chat",
+      "headers": {
+        "X-User-Id": "1"
+      },
+      "body": {
+        "message": "Помоги создать бота"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "response": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

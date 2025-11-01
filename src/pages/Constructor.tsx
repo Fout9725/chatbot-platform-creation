@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import BotConstructor from '@/components/BotConstructor';
-import VisualConstructor from '@/components/VisualConstructor';
+import AdvancedVisualConstructor from '@/components/AdvancedVisualConstructor';
 import InteractiveTutorial from '@/components/InteractiveTutorial';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +44,7 @@ const Constructor = () => {
                   {mode === 'professional' ? 'Pro' : 'Visual'}
                 </Badge>
                 <Link to="/">
-                  <Button variant="outline" size="sm">
+                  <Button type="button" disabled={false} variant="outline" size="sm">
                     <Icon name="Home" size={18} className="mr-2" />
                     На главную
                   </Button>
@@ -83,7 +83,7 @@ const Constructor = () => {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <VisualConstructor />
+              <AdvancedVisualConstructor />
             </div>
           )}
         </main>

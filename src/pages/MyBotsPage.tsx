@@ -26,7 +26,7 @@ const MyBotsPage = () => {
               </div>
             </div>
             <Link to="/">
-              <Button variant="outline" size="sm">
+              <Button type="button" disabled={false} variant="outline" size="sm">
                 <Icon name="Home" size={18} className="mr-2" />
                 На главную
               </Button>

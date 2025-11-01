@@ -14,6 +14,10 @@ import Constructor from "./pages/Constructor";
 import MyBotsPage from "./pages/MyBotsPage";
 import Documentation from "./components/Documentation";
 import NotFound from "./pages/NotFound";
+import PlanSelection from "./pages/PlanSelection";
+import Dashboard from "./pages/Dashboard";
+import PartnerProgram from "./pages/PartnerProgram";
+import AIAssistant from "./components/AIAssistant";
 
 const queryClient = new QueryClient();
 
@@ -33,9 +37,13 @@ const App = () => (
           <Route path="/constructor" element={<Constructor />} />
           <Route path="/my-bots" element={<MyBotsPage />} />
           <Route path="/docs" element={<Documentation />} />
+          <Route path="/plan-selection" element={<PlanSelection />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/partner" element={<PartnerProgram />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <AIAssistant />
       </BrowserRouter>
     </TooltipProvider>
     </ActiveBotsProvider>

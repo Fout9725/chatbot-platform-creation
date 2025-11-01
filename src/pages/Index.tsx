@@ -35,18 +35,18 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-2">
               <Link to="/docs">
-                <Button variant="ghost" size="sm" className="hidden md:flex">
+                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
                   <Icon name="BookOpen" size={18} className="mr-2" />
                   <span className="hidden lg:inline">Документация</span>
                 </Button>
               </Link>
               <Link to="/notifications">
-                <Button variant="ghost" size="sm" className="hidden md:flex">
+                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
                   <Icon name="Bell" size={18} className="mr-2" />
                   <span className="hidden lg:inline">Уведомления</span>
                 </Button>
               </Link>
-              <Button variant="outline" size="sm" onClick={() => setIsAuthOpen(true)}>
+              <Button type="button" disabled={false} variant="outline" size="sm" onClick={() => setIsAuthOpen(true)}>
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">Профиль</span>
               </Button>

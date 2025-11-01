@@ -86,7 +86,7 @@ const Notifications = () => {
               </div>
             </Link>
             <Link to="/">
-              <Button variant="ghost" size="sm">
+              <Button type="button" disabled={false} variant="ghost" size="sm">
                 <Icon name="ArrowLeft" size={18} className="mr-2" />
                 Назад
               </Button>
@@ -103,7 +103,7 @@ const Notifications = () => {
               {unreadCount > 0 ? `У вас ${unreadCount} непрочитанных` : 'Все уведомления прочитаны'}
             </p>
           </div>
-          <Button variant="outline" size="sm">
+          <Button type="button" disabled={false} variant="outline" size="sm">
             <Icon name="Check" size={16} className="mr-2" />
             Отметить все как прочитанные
           </Button>

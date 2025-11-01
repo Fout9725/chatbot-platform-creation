@@ -65,16 +65,16 @@ const BotDetails = () => {
       <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+            <Button type="button" disabled={false} variant="ghost" onClick={() => navigate('/')}>
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               Назад
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleSettings}>
+              <Button type="button" disabled={false} variant="outline" size="sm" onClick={handleSettings}>
                 <Icon name="Settings" size={16} className="mr-2" />
                 <span className="hidden sm:inline">Настройки</span>
               </Button>
-              <Button size="sm" onClick={handleStart}>
+              <Button type="button" disabled={false} size="sm" onClick={handleStart}>
                 <Icon name="Play" size={16} className="mr-2" />
                 <span className="hidden sm:inline">Запустить</span>
               </Button>
@@ -265,13 +265,13 @@ const BotDetails = () => {
                       {api.status === 'connected' ? (
                         <>
                           <Badge className="bg-green-500">Активно</Badge>
-                          <Button variant="outline" size="sm">
+                          <Button type="button" disabled={false} variant="outline" size="sm">
                             <Icon name="Settings" size={14} className="mr-1" />
                             Настроить
                           </Button>
                         </>
                       ) : (
-                        <Button size="sm" onClick={() => handleConnectAPI(api.name)}>
+                        <Button type="button" disabled={false} size="sm" onClick={() => handleConnectAPI(api.name)}>
                           <Icon name="Plus" size={14} className="mr-1" />
                           Подключить
                         </Button>

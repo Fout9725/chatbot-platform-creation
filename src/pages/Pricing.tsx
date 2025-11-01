@@ -101,11 +101,11 @@ const Pricing = () => {
       <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+            <Button type="button" disabled={false} variant="ghost" onClick={() => navigate('/')}>
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               На главную
             </Button>
-            <Button variant="outline" size="sm">
+            <Button type="button" disabled={false} variant="outline" size="sm">
               <Icon name="User" size={18} className="mr-2" />
               <span className="hidden sm:inline">Войти</span>
             </Button>
@@ -194,6 +194,8 @@ const Pricing = () => {
                 </div>
 
                 <Button
+                  type="button"
+                  disabled={false}
                   className={`w-full mt-4 ${
                     plan.popular
                       ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90'
