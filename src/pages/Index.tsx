@@ -6,10 +6,12 @@ import BotMarketplace from '@/components/BotMarketplace';
 import { Link } from 'react-router-dom';
 import BotConstructorModal from '@/components/modals/BotConstructorModal';
 import AuthModal from '@/components/modals/AuthModal';
+import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 const Index = () => {
   const [activeTab, setActiveTab] = useState('marketplace');
   const [isConstructorOpen, setIsConstructorOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -81,7 +83,7 @@ const Index = () => {
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => setIsConstructorOpen(true)}
+                  onClick={() => setIsModeModalOpen(true)}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Конструктор</span>
@@ -123,6 +125,11 @@ const Index = () => {
       <BotConstructorModal 
         isOpen={isConstructorOpen} 
         onClose={() => setIsConstructorOpen(false)} 
+      />
+      
+      <ConstructorModeModal 
+        isOpen={isModeModalOpen} 
+        onClose={() => setIsModeModalOpen(false)} 
       />
       
       <AuthModal 
