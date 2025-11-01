@@ -81,9 +81,14 @@ const Index = () => {
                 </TabsList>
                 
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => setIsModeModalOpen(true)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsModeModalOpen(true);
+                  }}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Конструктор</span>
@@ -91,9 +96,14 @@ const Index = () => {
                 </Button>
 
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => window.open('/my-bots', '_blank')}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.open('/my-bots', '_blank');
+                  }}
                 >
                   <Icon name="Folder" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Мои боты</span>
