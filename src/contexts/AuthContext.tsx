@@ -16,6 +16,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => void;
   logout: () => void;
   setUserActivatedBot: () => void;
+  setUserPlan: (plan: 'free' | 'optimal' | 'premium' | 'partner') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setUserPlan = (plan: 'free' | 'optimal' | 'premium' | 'partner') => {
+    if (user) {
+      setUser({ ...user, plan });
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -82,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, 
       register, 
       logout,
-      setUserActivatedBot
+      setUserActivatedBot,
+      setUserPlan
     }}>
       {children}
     </AuthContext.Provider>

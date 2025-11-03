@@ -1,19 +1,27 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Dashboard = () => {
-  const [userPlan] = useState(localStorage.getItem('user-plan') || 'free');
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [stats] = useState({
     totalBots: 3,
     activeUsers: 156,
     messagesThisMonth: 2453,
     earnings: 1250
   });
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const planNames: Record<string, string> = {
     free: 'Бесплатный',
@@ -36,7 +44,7 @@ const Dashboard = () => {
                   Личный кабинет
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Тариф: {planNames[userPlan]}
+                  Тариф: {user ? planNames[user.plan] : 'Бесплатный'}
                 </p>
               </div>
             </div>

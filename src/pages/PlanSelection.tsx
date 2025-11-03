@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const plans = [
   {
@@ -85,11 +87,25 @@ const plans = [
 
 const PlanSelection = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated, setUserPlan } = useAuth();
+  const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState<string>('optimal');
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlan(planId);
-    localStorage.setItem('user-plan', planId);
+    setUserPlan(planId as 'free' | 'optimal' | 'premium' | 'partner');
+    
+    const planName = plans.find(p => p.id === planId)?.name || 'тариф';
+    toast({
+      title: `Тариф ${planName} выбран! 🎉`,
+      description: 'Теперь вы можете использовать все возможности платформы',
+    });
     
     navigate('/dashboard');
   };

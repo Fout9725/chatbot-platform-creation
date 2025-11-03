@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,18 +7,39 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Profile = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
-  const [name, setName] = useState('Иван Петров');
-  const [email, setEmail] = useState('ivan@example.com');
-  const [company, setCompany] = useState('Tech Company');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/');
+    } else if (user) {
+      setName(user.name);
+      setEmail(user.email);
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSave = () => {
     toast({
       title: 'Профиль обновлен',
       description: 'Ваши данные успешно сохранены',
+    });
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+    toast({
+      title: 'Вы вышли из системы',
+      description: 'До встречи!',
     });
   };
 
@@ -38,8 +59,8 @@ const Profile = () => {
                 <p className="text-xs text-muted-foreground">Платформа для создания ИИ-агентов</p>
               </div>
             </Link>
-            <Link to="/">
-              <Button variant="ghost" size="sm">
+            <Link to="/dashboard">
+              <Button type="button" disabled={false} variant="ghost" size="sm">
                 <Icon name="ArrowLeft" size={18} className="mr-2" />
                 Назад
               </Button>
@@ -66,9 +87,19 @@ const Profile = () => {
                   <h3 className="font-semibold text-lg">{name}</h3>
                   <p className="text-sm text-muted-foreground">{email}</p>
                 </div>
-                <Button variant="outline" className="w-full">
+                <Button type="button" disabled={false} variant="outline" className="w-full">
                   <Icon name="Upload" size={16} className="mr-2" />
                   Изменить фото
+                </Button>
+                <Button 
+                  type="button" 
+                  disabled={false}
+                  variant="destructive" 
+                  className="w-full"
+                  onClick={handleLogout}
+                >
+                  <Icon name="LogOut" size={16} className="mr-2" />
+                  Выйти
                 </Button>
               </div>
             </CardContent>
@@ -118,7 +149,7 @@ const Profile = () => {
                       onChange={(e) => setCompany(e.target.value)}
                     />
                   </div>
-                  <Button onClick={handleSave} className="w-full">
+                  <Button type="button" disabled={false} onClick={handleSave} className="w-full">
                     <Icon name="Save" size={16} className="mr-2" />
                     Сохранить изменения
                   </Button>
@@ -137,7 +168,7 @@ const Profile = () => {
                     <Label htmlFor="confirm-password">Подтвердите пароль</Label>
                     <Input id="confirm-password" type="password" />
                   </div>
-                  <Button className="w-full">
+                  <Button type="button" disabled={false} className="w-full">
                     <Icon name="Shield" size={16} className="mr-2" />
                     Изменить пароль
                   </Button>

@@ -4,11 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import BotMarketplace from '@/components/BotMarketplace';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BotConstructorModal from '@/components/modals/BotConstructorModal';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
+import { useAuth } from '@/contexts/AuthContext';
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('marketplace');
   const [isConstructorOpen, setIsConstructorOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -16,6 +19,14 @@ const Index = () => {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+  };
+
+  const handleProfileClick = () => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      setIsAuthOpen(true);
+    }
   };
 
   return (
@@ -47,9 +58,9 @@ const Index = () => {
                   <span className="hidden lg:inline">Уведомления</span>
                 </Button>
               </Link>
-              <Button type="button" disabled={false} variant="outline" size="sm" onClick={() => setIsAuthOpen(true)}>
+              <Button type="button" disabled={false} variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
                 <Icon name="User" size={18} className="md:mr-2" />
-                <span className="hidden md:inline">Профиль</span>
+                <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
               </Button>
             </div>
           </div>
