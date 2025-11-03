@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import Icon from '@/components/ui/icon';
 
 interface AuthModalProps {
@@ -12,6 +15,9 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const navigate = useNavigate();
+  const { login, register } = useAuth();
+  const { toast } = useToast();
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -19,18 +25,73 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [name, setName] = useState('');
 
   const handleAuth = (method: string) => {
-    alert(`Авторизация через ${method}`);
-    onClose();
+    toast({
+      title: `Авторизация через ${method}`,
+      description: 'Функция в разработке',
+    });
   };
 
   const handleEmailAuth = () => {
-    alert('Письмо с подтверждением отправлено на ' + email);
+    if (!email || !password) {
+      toast({
+        title: 'Ошибка',
+        description: 'Заполните все поля',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    login(email, password);
+    toast({
+      title: 'Добро пожаловать! 👋',
+      description: `Вы успешно вошли в систему`,
+    });
     onClose();
+    navigate('/dashboard');
   };
 
   const handlePhoneAuth = () => {
-    alert('SMS с кодом отправлен на ' + phone);
+    if (!phone) {
+      toast({
+        title: 'Ошибка',
+        description: 'Введите номер телефона',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    toast({
+      title: 'SMS отправлено',
+      description: `Код подтверждения отправлен на ${phone}`,
+    });
+  };
+
+  const handleRegister = () => {
+    if (!name || !email || !password) {
+      toast({
+        title: 'Ошибка',
+        description: 'Заполните все поля',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (password.length < 8) {
+      toast({
+        title: 'Ошибка',
+        description: 'Пароль должен содержать минимум 8 символов',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    register(name, email, password);
+    toast({
+      title: 'Регистрация успешна! 🎉',
+      description: 'Выберите тарифный план для продолжения',
+    });
     onClose();
+    navigate('/plan-selection');
   };
 
   return (
@@ -56,6 +117,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
                   className="flex-1"
@@ -64,6 +127,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   Email
                 </Button>
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
                   className="flex-1"
@@ -115,9 +180,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               )}
 
               <Button 
+                type="button"
+                disabled={false}
                 onClick={authMethod === 'email' ? handleEmailAuth : handlePhoneAuth}
                 className="w-full"
-                disabled={authMethod === 'email' ? !email || !password : !phone}
               >
                 <Icon name="LogIn" size={16} className="mr-2" />
                 Войти
@@ -159,9 +225,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               </div>
 
               <Button
+                type="button"
+                disabled={false}
                 variant="link"
                 className="w-full text-sm"
-                onClick={() => alert('Ссылка для восстановления отправлена')}
+                onClick={() => toast({ title: 'Ссылка отправлена', description: 'Проверьте почту' })}
               >
                 Забыли пароль?
               </Button>
@@ -182,6 +250,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <div className="flex gap-2">
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
                   className="flex-1"
@@ -190,6 +260,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   Email
                 </Button>
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
                   className="flex-1"
@@ -236,9 +308,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               )}
 
               <Button 
-                onClick={authMethod === 'email' ? handleEmailAuth : handlePhoneAuth}
+                type="button"
+                disabled={false}
+                onClick={handleRegister}
                 className="w-full"
-                disabled={!name || (authMethod === 'email' ? !email || !password : !phone)}
               >
                 <Icon name="UserPlus" size={16} className="mr-2" />
                 Зарегистрироваться
@@ -257,6 +330,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <div className="grid grid-cols-3 gap-2">
                 <Button
+                  type="button"
+                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('Google')}
                   className="w-full"
@@ -264,6 +339,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   <Icon name="Chrome" size={20} />
                 </Button>
                 <Button
+                  type="button"
+                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('Яндекс')}
                   className="w-full"
@@ -271,6 +348,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   <span className="font-bold text-lg">Я</span>
                 </Button>
                 <Button
+                  type="button"
+                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('VK')}
                   className="w-full"

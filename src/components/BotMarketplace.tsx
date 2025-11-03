@@ -9,8 +9,10 @@ import PriceFilter from './marketplace/PriceFilter';
 import RatingFilter from './marketplace/RatingFilter';
 import PaymentModal from './modals/PaymentModal';
 import BotDetailsModal from './modals/BotDetailsModal';
+import AuthModal from './modals/AuthModal';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const BotMarketplace = () => {
   const navigate = useNavigate();
@@ -34,6 +36,8 @@ const BotMarketplace = () => {
   
   const { toast } = useToast();
   const { activateBot } = useActiveBots();
+  const { user, isAuthenticated, setUserActivatedBot } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const filteredBots = mockBots.filter((bot) => {
     const matchesCategory = selectedCategory === 'Все' || bot.category === selectedCategory;
@@ -57,9 +61,30 @@ const BotMarketplace = () => {
   };
   
   const handleTest = (id: number) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Требуется авторизация",
+        description: "Зарегистрируйтесь, чтобы активировать бота",
+        variant: 'destructive',
+      });
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (user?.hasActivatedBot) {
+      toast({
+        title: "Лимит активаций исчерпан",
+        description: "Вы можете активировать только одного бота после регистрации. Для большего количества ботов выберите тариф",
+        variant: 'destructive',
+      });
+      navigate('/pricing');
+      return;
+    }
+    
     const bot = mockBots.find(b => b.id === id);
     if (bot) {
       activateBot(id, bot.name);
+      setUserActivatedBot();
       toast({
         title: "Тестовый период активирован! 🎉",
         description: `Бот "${bot.name}" доступен для тестирования 3 дня. Статус: Активен`,
@@ -135,6 +160,11 @@ const BotMarketplace = () => {
         isOpen={detailsModal.isOpen}
         onClose={() => setDetailsModal({ ...detailsModal, isOpen: false })}
         bot={mockBots.find(b => b.id === detailsModal.botId)}
+      />
+      
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

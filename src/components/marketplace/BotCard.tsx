@@ -75,6 +75,8 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
       <CardFooter className="relative gap-2 flex-col">
         <div className="flex gap-2 w-full">
           <Button
+            type="button"
+            disabled={false}
             variant="outline"
             size="sm"
             className="flex-1 group/btn"
@@ -84,6 +86,8 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
             Подробнее
           </Button>
           <Button
+            type="button"
+            disabled={false}
             variant="secondary"
             size="sm"
             className="flex-1 group/btn"
@@ -95,6 +99,8 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
         </div>
         <div className="flex gap-2 w-full">
           <Button
+            type="button"
+            disabled={false}
             variant="outline"
             className="flex-1 group/btn"
             onClick={() => onRent(bot.id)}
@@ -103,6 +109,8 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
             Аренда
           </Button>
           <Button
+            type="button"
+            disabled={false}
             className="flex-1 group/btn bg-gradient-to-r from-primary to-secondary"
             onClick={() => onBuy(bot.id)}
           >

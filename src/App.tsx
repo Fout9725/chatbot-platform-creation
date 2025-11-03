@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ActiveBotsProvider } from "./contexts/ActiveBotsContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
@@ -23,11 +24,12 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ActiveBotsProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <AuthProvider>
+      <ActiveBotsProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/bot/:id" element={<BotDetails />} />
@@ -44,9 +46,10 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
         <AIAssistant />
-      </BrowserRouter>
-    </TooltipProvider>
-    </ActiveBotsProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+      </ActiveBotsProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
