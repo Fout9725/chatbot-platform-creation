@@ -13,6 +13,7 @@ import AdminMarketplaceTab from '@/components/admin/AdminMarketplaceTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
+import AdminUsersTab from '@/components/admin/AdminUsersTab';
 
 const AdminNew = () => {
   const navigate = useNavigate();
@@ -30,6 +31,14 @@ const AdminNew = () => {
     premium: 2990,
     partner: 4990
   });
+
+  const [users, setUsers] = useState([
+    { id: 'user-001', name: 'Иван Петров', email: 'ivan@example.com', plan: 'optimal' as const, role: 'user' as const, registeredAt: '15.03.2024', activeBots: 3, status: 'active' as const },
+    { id: 'user-002', name: 'Мария Сидорова', email: 'maria@example.com', plan: 'premium' as const, role: 'user' as const, registeredAt: '12.03.2024', activeBots: 7, status: 'active' as const },
+    { id: 'user-003', name: 'Алексей Иванов', email: 'alexey@example.com', plan: 'free' as const, role: 'user' as const, registeredAt: '10.03.2024', activeBots: 1, status: 'active' as const },
+    { id: 'user-004', name: 'Елена Козлова', email: 'elena@example.com', plan: 'partner' as const, role: 'admin' as const, registeredAt: '08.03.2024', activeBots: 12, status: 'active' as const },
+    { id: 'user-005', name: 'Дмитрий Смирнов', email: 'dmitry@example.com', plan: 'optimal' as const, role: 'user' as const, registeredAt: '05.03.2024', activeBots: 2, status: 'blocked' as const },
+  ]);
 
   if (!user || user.role !== 'admin') {
     return (
@@ -170,10 +179,14 @@ const AdminNew = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="stats">
               <Icon name="BarChart3" size={16} className="mr-2" />
               Статистика
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              <Icon name="Users" size={16} className="mr-2" />
+              Пользователи
             </TabsTrigger>
             <TabsTrigger value="bots">
               <Icon name="Bot" size={16} className="mr-2" />
@@ -199,6 +212,10 @@ const AdminNew = () => {
 
           <TabsContent value="stats" className="space-y-4">
             <AdminStatsTab platformStats={platformStats} />
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            <AdminUsersTab users={users} setUsers={setUsers} />
           </TabsContent>
 
           <TabsContent value="bots" className="space-y-4">

@@ -1,0 +1,248 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  plan: 'free' | 'optimal' | 'premium' | 'partner';
+  role: 'user' | 'admin';
+  registeredAt: string;
+  activeBots: number;
+  status: 'active' | 'blocked';
+}
+
+interface AdminUsersTabProps {
+  users: User[];
+  setUsers: (users: User[]) => void;
+}
+
+const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPlan = filterPlan === 'all' || user.plan === filterPlan;
+    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+    return matchesSearch && matchesPlan && matchesStatus;
+  });
+
+  const handleBlockUser = (userId: string) => {
+    setUsers(users.map(user => 
+      user.id === userId 
+        ? { ...user, status: user.status === 'active' ? 'blocked' : 'active' }
+        : user
+    ));
+    const user = users.find(u => u.id === userId);
+    toast({
+      title: user?.status === 'active' ? 'Пользователь заблокирован' : 'Пользователь разблокирован',
+      description: `${user?.name} ${user?.status === 'active' ? 'больше не может' : 'снова может'} использовать платформу`,
+    });
+  };
+
+  const handleChangePlan = (userId: string, newPlan: 'free' | 'optimal' | 'premium' | 'partner') => {
+    setUsers(users.map(user => 
+      user.id === userId ? { ...user, plan: newPlan } : user
+    ));
+    const user = users.find(u => u.id === userId);
+    toast({
+      title: 'Тариф изменён',
+      description: `${user?.name} переведён на тариф ${newPlan}`,
+    });
+  };
+
+  const handleChangeRole = (userId: string, newRole: 'user' | 'admin') => {
+    setUsers(users.map(user => 
+      user.id === userId ? { ...user, role: newRole } : user
+    ));
+    const user = users.find(u => u.id === userId);
+    toast({
+      title: 'Роль изменена',
+      description: `${user?.name} назначена роль ${newRole === 'admin' ? 'администратора' : 'пользователя'}`,
+    });
+  };
+
+  const getPlanBadgeVariant = (plan: string) => {
+    switch (plan) {
+      case 'free': return 'secondary';
+      case 'optimal': return 'default';
+      case 'premium': return 'default';
+      case 'partner': return 'default';
+      default: return 'secondary';
+    }
+  };
+
+  const getPlanName = (plan: string) => {
+    switch (plan) {
+      case 'free': return 'Бесплатный';
+      case 'optimal': return 'Оптимальный';
+      case 'premium': return 'Премиум';
+      case 'partner': return 'Партнёрский';
+      default: return plan;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Управление пользователями</CardTitle>
+        <CardDescription>
+          Всего пользователей: {users.length} • Активных: {users.filter(u => u.status === 'active').length}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              placeholder="Поиск по имени или email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <Select value={filterPlan} onValueChange={setFilterPlan}>
+            <SelectTrigger className="w-full md:w-[180px]">
+              <SelectValue placeholder="Тариф" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все тарифы</SelectItem>
+              <SelectItem value="free">Бесплатный</SelectItem>
+              <SelectItem value="optimal">Оптимальный</SelectItem>
+              <SelectItem value="premium">Премиум</SelectItem>
+              <SelectItem value="partner">Партнёрский</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full md:w-[180px]">
+              <SelectValue placeholder="Статус" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все статусы</SelectItem>
+              <SelectItem value="active">Активные</SelectItem>
+              <SelectItem value="blocked">Заблокированные</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-3">
+          {filteredUsers.map((user) => (
+            <div key={user.id} className="p-4 bg-muted rounded-lg space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg mt-1">
+                    <Icon name="User" className="text-primary" size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{user.name}</p>
+                      {user.role === 'admin' && (
+                        <Badge variant="destructive" className="text-xs">
+                          <Icon name="Shield" size={12} className="mr-1" />
+                          Админ
+                        </Badge>
+                      )}
+                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                        {user.status === 'active' ? 'Активен' : 'Заблокирован'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>ID: {user.id}</span>
+                      <span>•</span>
+                      <span>Ботов: {user.activeBots}</span>
+                      <span>•</span>
+                      <span>Регистрация: {user.registeredAt}</span>
+                    </div>
+                  </div>
+                </div>
+                <Badge variant={getPlanBadgeVariant(user.plan)}>
+                  {getPlanName(user.plan)}
+                </Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <Select 
+                  value={user.plan} 
+                  onValueChange={(value) => handleChangePlan(user.id, value as any)}
+                >
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Бесплатный</SelectItem>
+                    <SelectItem value="optimal">Оптимальный</SelectItem>
+                    <SelectItem value="premium">Премиум</SelectItem>
+                    <SelectItem value="partner">Партнёрский</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select 
+                  value={user.role} 
+                  onValueChange={(value) => handleChangeRole(user.id, value as any)}
+                >
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Пользователь</SelectItem>
+                    <SelectItem value="admin">Администратор</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button 
+                  type="button" 
+                  variant={user.status === 'active' ? 'outline' : 'default'}
+                  size="sm"
+                  onClick={() => handleBlockUser(user.id)}
+                  className="h-8 text-xs"
+                >
+                  <Icon name={user.status === 'active' ? 'Ban' : 'CheckCircle'} size={14} className="mr-1" />
+                  {user.status === 'active' ? 'Заблокировать' : 'Разблокировать'}
+                </Button>
+
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 text-xs"
+                >
+                  <Icon name="Mail" size={14} className="mr-1" />
+                  Написать
+                </Button>
+
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 text-xs text-destructive hover:text-destructive"
+                >
+                  <Icon name="Trash2" size={14} className="mr-1" />
+                  Удалить
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredUsers.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <Icon name="Users" size={48} className="mx-auto mb-3 opacity-20" />
+            <p>Пользователи не найдены</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default AdminUsersTab;
