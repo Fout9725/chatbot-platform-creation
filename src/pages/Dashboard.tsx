@@ -7,18 +7,21 @@ import Icon from '@/components/ui/icon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useActiveBots } from '@/contexts/ActiveBotsContext';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { activateBot, activeBots } = useActiveBots();
   const [searchParams] = useSearchParams();
-  const [stats] = useState({
-    totalBots: 3,
-    activeUsers: 156,
-    messagesThisMonth: 2453,
-    earnings: 1250
-  });
+  
+  const stats = {
+    totalBots: activeBots.length,
+    activeUsers: activeBots.filter(bot => bot.status === 'active').length,
+    messagesThisMonth: 0,
+    earnings: 0
+  };
   
   const userPlan = user?.plan || 'free';
 
@@ -30,11 +33,22 @@ const Dashboard = () => {
 
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');
+    const botId = searchParams.get('bot_id');
+    const botName = searchParams.get('bot_name');
+    
     if (paymentStatus === 'success') {
-      toast({
-        title: 'Оплата успешна! 🎉',
-        description: 'Ваш тариф будет обновлён в течение нескольких минут',
-      });
+      if (botId && botName) {
+        activateBot(parseInt(botId), decodeURIComponent(botName));
+        toast({
+          title: 'Покупка успешна! 🎉',
+          description: `Бот "${decodeURIComponent(botName)}" добавлен в ваш аккаунт`,
+        });
+      } else {
+        toast({
+          title: 'Оплата успешна! 🎉',
+          description: 'Ваш тариф будет обновлён в течение нескольких минут',
+        });
+      }
       navigate('/dashboard', { replace: true });
     } else if (paymentStatus === 'failed') {
       toast({
@@ -44,7 +58,7 @@ const Dashboard = () => {
       });
       navigate('/dashboard', { replace: true });
     }
-  }, [searchParams, toast, navigate]);
+  }, [searchParams, toast, navigate, activateBot]);
 
   const planNames: Record<string, string> = {
     free: 'Бесплатный',

@@ -151,6 +151,7 @@ const BotMarketplace = () => {
           isOpen={paymentModal.isOpen}
           onClose={() => setPaymentModal({ ...paymentModal, isOpen: false })}
           botName={selectedBot.name}
+          botId={selectedBot.id}
           mode={paymentModal.mode}
           price={paymentModal.mode === 'buy' ? selectedBot.price : Math.floor(selectedBot.price / 10)}
         />

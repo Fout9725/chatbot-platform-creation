@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
 
 interface MarketplaceBot {
   id: number;
@@ -18,6 +20,44 @@ interface AdminMarketplaceTabProps {
 }
 
 const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
+  const { toast } = useToast();
+  const [filterActive, setFilterActive] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'downloads' | 'rating'>('name');
+
+  const handleEditBot = (botId: number, botName: string) => {
+    toast({
+      title: 'Редактирование бота',
+      description: `Открыто редактирование "${botName}"`,
+    });
+  };
+
+  const handleDeleteBot = (botId: number, botName: string) => {
+    if (confirm(`Вы уверены, что хотите удалить бота "${botName}"?`)) {
+      toast({
+        title: 'Бот удалён',
+        description: `"${botName}" был удалён из маркетплейса`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleFilter = () => {
+    setFilterActive(!filterActive);
+    toast({
+      title: filterActive ? 'Фильтры отключены' : 'Фильтры включены',
+      description: filterActive ? 'Показываются все боты' : 'Показываются только активные боты',
+    });
+  };
+
+  const handleToggleSort = () => {
+    const nextSort = sortBy === 'name' ? 'downloads' : sortBy === 'downloads' ? 'rating' : 'name';
+    setSortBy(nextSort);
+    const sortNames = { name: 'по имени', downloads: 'по загрузкам', rating: 'по рейтингу' };
+    toast({
+      title: 'Сортировка изменена',
+      description: `Сортировка ${sortNames[nextSort]}`,
+    });
+  };
   return (
     <Card>
       <CardHeader>
@@ -45,10 +85,10 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
                 <Badge variant={bot.status === 'active' ? 'default' : 'secondary'}>
                   {bot.status === 'active' ? 'Активен' : 'На модерации'}
                 </Badge>
-                <Button type="button" variant="ghost" size="sm">
+                <Button type="button" variant="ghost" size="sm" onClick={() => handleEditBot(bot.id, bot.name)}>
                   <Icon name="Edit" size={16} />
                 </Button>
-                <Button type="button" variant="ghost" size="sm">
+                <Button type="button" variant="ghost" size="sm" onClick={() => handleDeleteBot(bot.id, bot.name)}>
                   <Icon name="Trash2" size={16} className="text-destructive" />
                 </Button>
               </div>
@@ -58,12 +98,31 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
 
         <Separator />
 
+        {marketplaceBots.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <Icon name="Store" size={48} className="mx-auto mb-3 opacity-20" />
+            <p>Ботов в маркетплейсе пока нет</p>
+          </div>
+        )}
+
         <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1">
+          <Button 
+            type="button" 
+            variant={filterActive ? 'default' : 'outline'} 
+            className="flex-1"
+            onClick={handleToggleFilter}
+            disabled={marketplaceBots.length === 0}
+          >
             <Icon name="Filter" size={16} className="mr-2" />
             Фильтры
           </Button>
-          <Button type="button" variant="outline" className="flex-1">
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="flex-1"
+            onClick={handleToggleSort}
+            disabled={marketplaceBots.length === 0}
+          >
             <Icon name="SortAsc" size={16} className="mr-2" />
             Сортировка
           </Button>

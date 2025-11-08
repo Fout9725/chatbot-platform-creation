@@ -1,31 +1,70 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
+import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   botName: string;
+  botId: number;
   mode: 'buy' | 'rent';
   price: number;
 }
 
-export default function PaymentModal({ isOpen, onClose, botName, mode, price }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, botName, botId, mode, price }: PaymentModalProps) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { activateBot } = useActiveBots();
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [email, setEmail] = useState('');
   const [processing, setProcessing] = useState(false);
 
   const handlePayment = async () => {
+    if (!email) {
+      toast({
+        title: 'Ошибка',
+        description: 'Укажите email для получения чека',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setProcessing(true);
-    setTimeout(() => {
-      alert('Оплата успешна! Бот добавлен в ваш аккаунт.');
+
+    try {
+      const paymentUrl = `https://intellectpro.pay.prodamus.ru/pl/pay`;
+      const params = new URLSearchParams({
+        products: `${botName} (${mode === 'buy' ? 'Покупка' : 'Аренда'})`,
+        order_sum: price.toString(),
+        customer_email: email,
+        customer_extra: JSON.stringify({
+          user_id: user?.id || '',
+          bot_id: botId,
+          bot_name: botName,
+          purchase_mode: mode
+        }),
+        urlReturn: `${window.location.origin}/dashboard?payment=success&bot_id=${botId}&bot_name=${encodeURIComponent(botName)}`,
+        urlNotification: `https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4`
+      });
+      
+      window.location.href = `${paymentUrl}?${params.toString()}`;
+    } catch (error: any) {
       setProcessing(false);
-      onClose();
-    }, 2000);
+      toast({
+        title: 'Ошибка оплаты',
+        description: error.message || 'Попробуйте позже',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
