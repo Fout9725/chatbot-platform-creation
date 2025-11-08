@@ -446,6 +446,27 @@ const BotBuilder = () => {
                       </ul>
                     </div>
 
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                        <Icon name="BookOpen" size={16} className="text-green-600" />
+                        Примеры промптов:
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="bg-white p-2 rounded border text-xs">
+                          <p className="font-medium text-green-700 mb-1">Ресторан:</p>
+                          <p className="text-muted-foreground">"Создай бота для приёма заказов еды. Показывает меню с категориями, принимает выбор блюд, уточняет адрес и время доставки, отправляет заказ в CRM"</p>
+                        </div>
+                        <div className="bg-white p-2 rounded border text-xs">
+                          <p className="font-medium text-green-700 mb-1">Техподдержка:</p>
+                          <p className="text-muted-foreground">"Бот для поддержки клиентов. Отвечает на частые вопросы из базы знаний, собирает заявки, передаёт сложные кейсы оператору"</p>
+                        </div>
+                        <div className="bg-white p-2 rounded border text-xs">
+                          <p className="font-medium text-green-700 mb-1">Запись на услуги:</p>
+                          <p className="text-muted-foreground">"Бот для салона красоты. Показывает услуги и цены, проверяет свободное время мастеров, записывает клиента, отправляет напоминание"</p>
+                        </div>
+                      </div>
+                    </div>
+
                     <Button
                       type="button"
                       className="w-full"

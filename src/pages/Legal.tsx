@@ -199,9 +199,9 @@ const Legal = () => {
               <div className="flex items-start gap-3">
                 <Icon name="Check" className="text-green-600 mt-1" size={20} />
                 <div>
-                  <p className="font-semibold">Поддерживаемые карты</p>
+                  <p className="font-semibold">Способы оплаты</p>
                   <p className="text-sm text-muted-foreground">
-                    Visa, Mastercard, МИР
+                    Банковские карты, СБП, Apple Pay, Google Pay
                   </p>
                 </div>
               </div>

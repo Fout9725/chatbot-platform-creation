@@ -24,11 +24,11 @@ interface PaymentModalProps {
 export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [paymentMethod, setPaymentMethod] = useState<'yookassa'>('yookassa');
+  const [paymentMethod, setPaymentMethod] = useState<'prodamus'>('prodamus');
   const [email, setEmail] = useState(user?.email || '');
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const YOOKASSA_API_URL = 'https://functions.poehali.dev/04aae05b-5f30-481c-829d-4fba1be87d94';
+  const PRODAMUS_PROJECT_ID = 'intellectpro';
 
   const handlePayment = async () => {
     if (!email) {
@@ -43,30 +43,20 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
     setIsProcessing(true);
 
     try {
-      const response = await fetch(YOOKASSA_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'create',
-          amount: plan.price,
-          currency: 'RUB',
-          description: `Оплата тарифа "${plan.name}"`,
-          return_url: `${window.location.origin}/dashboard?payment=success`,
-          email: email,
+      const paymentUrl = `https://intellectpro.pay.prodamus.ru/pl/pay`;
+      const params = new URLSearchParams({
+        products: `${plan.name}`,
+        order_sum: plan.price.toString(),
+        customer_email: email,
+        customer_extra: JSON.stringify({
           user_id: user?.id || '',
           plan_id: plan.id
-        })
+        }),
+        urlReturn: `${window.location.origin}/dashboard?payment=success`,
+        urlNotification: `${window.location.origin}/api/prodamus/webhook`
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.confirmation_url) {
-        window.location.href = data.confirmation_url;
-      } else {
-        throw new Error(data.error || 'Ошибка создания платежа');
-      }
+      
+      window.location.href = `${paymentUrl}?${params.toString()}`;
     } catch (error: any) {
       setIsProcessing(false);
       toast({
@@ -111,39 +101,43 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
 
           <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
             <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="yookassa">
-                <Icon name="Wallet" size={16} className="mr-2" />
-                ЮKassa
+              <TabsTrigger value="prodamus">
+                <Icon name="CreditCard" size={16} className="mr-2" />
+                Prodamus
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="yookassa" className="space-y-4 pt-4">
+            <TabsContent value="prodamus" className="space-y-4 pt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Оплата через ЮKassa</CardTitle>
+                  <CardTitle className="text-base">Оплата через Prodamus</CardTitle>
                   <CardDescription>
-                    Банковские карты, электронные кошельки, интернет-банкинг
+                    Банковские карты, СБП, Apple Pay, Google Pay
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
                       <Icon name="CreditCard" size={24} className="mb-1 text-primary" />
                       <span className="text-xs text-center">Карты</span>
                     </div>
                     <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="Wallet" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">ЮMoney</span>
+                      <Icon name="Smartphone" size={24} className="mb-1 text-primary" />
+                      <span className="text-xs text-center">СБП</span>
                     </div>
                     <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="Smartphone" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">QIWI</span>
+                      <Icon name="Apple" size={24} className="mb-1 text-primary" />
+                      <span className="text-xs text-center">Apple Pay</span>
+                    </div>
+                    <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+                      <Icon name="Wallet" size={24} className="mb-1 text-primary" />
+                      <span className="text-xs text-center">Google Pay</span>
                     </div>
                   </div>
                   <Alert>
                     <Icon name="Info" size={14} />
                     <AlertDescription className="text-xs">
-                      После нажатия "Оплатить" вы будете перенаправлены на безопасную страницу ЮKassa
+                      После нажатия "Оплатить" вы будете перенаправлены на безопасную страницу Prodamus
                     </AlertDescription>
                   </Alert>
                 </CardContent>

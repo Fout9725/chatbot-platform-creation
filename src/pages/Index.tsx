@@ -197,71 +197,49 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <Card className="mb-8 bg-gradient-to-r from-gray-50 to-white border-gray-200 animate-fade-in">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Icon name="Scale" size={24} className="text-gray-700" />
-              Юридическая информация
-            </CardTitle>
-            <CardDescription>
-              Правовые аспекты использования платформы ИнтеллектПро
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <a 
-                href="/docs/terms" 
-                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
-              >
-                <Icon name="FileText" size={20} className="text-primary mt-0.5" />
-                <div>
-                  <p className="font-semibold text-sm">Пользовательское соглашение</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Условия использования сервиса
-                  </p>
-                </div>
-              </a>
+        <div className="grid md:grid-cols-2 gap-4 mb-8 animate-fade-in">
+          <Card className="bg-gradient-to-r from-blue-50 to-white border-blue-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => navigate('/legal')}>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Icon name="Building" size={20} className="text-blue-600" />
+                Юридическая информация
+              </CardTitle>
+              <CardDescription>
+                Реквизиты ИП, договоры, политики
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  ИП Дмитриева О.А. • ИНН 263504091920
+                </p>
+                <Icon name="ExternalLink" size={18} className="text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
 
-              <a 
-                href="/docs/privacy" 
-                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
-              >
-                <Icon name="Shield" size={20} className="text-primary mt-0.5" />
-                <div>
-                  <p className="font-semibold text-sm">Политика конфиденциальности</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Защита персональных данных
+          {user?.role === 'admin' && (
+            <Card className="bg-gradient-to-r from-purple-50 to-white border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => navigate('/admin')}>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Icon name="Shield" size={20} className="text-purple-600" />
+                  Административная панель
+                </CardTitle>
+                <CardDescription>
+                  Управление платформой и контентом
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Статистика, боты, шаблоны, тарифы
                   </p>
+                  <Icon name="ArrowRight" size={18} className="text-purple-600" />
                 </div>
-              </a>
-
-              <a 
-                href="/docs/oferta" 
-                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
-              >
-                <Icon name="FileCheck" size={20} className="text-primary mt-0.5" />
-                <div>
-                  <p className="font-semibold text-sm">Публичная оферта</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Договор на оказание услуг
-                  </p>
-                </div>
-              </a>
-            </div>
-
-            <div className="mt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full"
-                onClick={() => navigate('/legal')}
-              >
-                <Icon name="Building" size={18} className="mr-2" />
-                Подробная юридическая информация и реквизиты
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex-1">
