@@ -194,7 +194,7 @@ const MyBots = () => {
           <h3 className="text-xl md:text-2xl font-bold">Мои ИИ-агенты</h3>
           <p className="text-sm md:text-base text-muted-foreground">Управляйте своими ИИ-агентами и ИИ-сотрудниками</p>
         </div>
-        <Button size="default" className="w-full sm:w-auto">
+        <Button size="default" className="w-full sm:w-auto" onClick={() => window.location.href = '/bot-builder'}>
           <Icon name="Plus" size={18} className="mr-2" />
           Создать ИИ-агента
         </Button>

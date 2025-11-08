@@ -8,6 +8,7 @@ interface User {
   registeredAt: Date;
   hasActivatedBot: boolean;
   sessionExpiry: number;
+  role?: 'admin' | 'user';
 }
 
 interface AuthContextType {

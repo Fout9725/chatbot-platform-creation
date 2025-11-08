@@ -20,6 +20,9 @@ import PlanSelection from "./pages/PlanSelection";
 import Dashboard from "./pages/Dashboard";
 import PartnerProgram from "./pages/PartnerProgram";
 import Partner from "./pages/Partner";
+import BotBuilder from "./pages/BotBuilder";
+import Legal from "./pages/Legal";
+import Admin from "./pages/Admin";
 import AIAssistant from "./components/AIAssistant";
 
 const queryClient = new QueryClient();
@@ -46,6 +49,9 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/partner-program" element={<PartnerProgram />} />
           <Route path="/partner" element={<Partner />} />
+          <Route path="/bot-builder" element={<BotBuilder />} />
+          <Route path="/legal" element={<Legal />} />
+          <Route path="/admin" element={<Admin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

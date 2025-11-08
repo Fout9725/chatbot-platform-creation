@@ -249,14 +249,16 @@ const Index = () => {
               </a>
             </div>
 
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-xs text-blue-800">
-                <strong>ИП Иванов Иван Иванович</strong> • ИНН: 123456789012 • ОГРНИП: 1234567890123
-                <br />
-                Адрес: 123456, Россия, Москва, ул. Примерная, д. 1
-                <br />
-                Email: legal@intellectpro.ru • Телефон: +7 (999) 123-45-67
-              </p>
+            <div className="mt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/legal')}
+              >
+                <Icon name="Building" size={18} className="mr-2" />
+                Подробная юридическая информация и реквизиты
+              </Button>
             </div>
           </CardContent>
         </Card>

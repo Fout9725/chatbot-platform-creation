@@ -51,6 +51,14 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {user?.role === 'admin' && (
+                <Link to="/admin">
+                  <Button type="button" variant="outline" size="sm" disabled={false}>
+                    <Icon name="Shield" size={18} className="mr-2" />
+                    Админ
+                  </Button>
+                </Link>
+              )}
               <Link to="/notifications">
                 <Button type="button" variant="outline" size="sm" disabled={false}>
                   <Icon name="Bell" size={18} className="mr-2" />
