@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import BotConstructorModal from '@/components/modals/BotConstructorModal';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
+import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
 import { useAuth } from '@/contexts/AuthContext';
 const Index = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const Index = () => {
   const [isConstructorOpen, setIsConstructorOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -40,9 +42,9 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  BotPlatform
+                  ИнтеллектПро
                 </h1>
-                <p className="text-xs text-muted-foreground">Платформа для создания ИИ-агентов</p>
+                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -187,10 +189,74 @@ const Index = () => {
                   Стать партнёром
                 </Button>
               </Link>
-              <Button type="button" disabled={false} variant="outline" size="lg" className="flex-1" onClick={() => setIsAuthOpen(true)}>
+              <Button type="button" disabled={false} variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-8 bg-gradient-to-r from-gray-50 to-white border-gray-200 animate-fade-in">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Icon name="Scale" size={24} className="text-gray-700" />
+              Юридическая информация
+            </CardTitle>
+            <CardDescription>
+              Правовые аспекты использования платформы ИнтеллектПро
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              <a 
+                href="/docs/terms" 
+                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
+              >
+                <Icon name="FileText" size={20} className="text-primary mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm">Пользовательское соглашение</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Условия использования сервиса
+                  </p>
+                </div>
+              </a>
+
+              <a 
+                href="/docs/privacy" 
+                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
+              >
+                <Icon name="Shield" size={20} className="text-primary mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm">Политика конфиденциальности</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Защита персональных данных
+                  </p>
+                </div>
+              </a>
+
+              <a 
+                href="/docs/oferta" 
+                className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all"
+              >
+                <Icon name="FileCheck" size={20} className="text-primary mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm">Публичная оферта</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Договор на оказание услуг
+                  </p>
+                </div>
+              </a>
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-800">
+                <strong>ИП Иванов Иван Иванович</strong> • ИНН: 123456789012 • ОГРНИП: 1234567890123
+                <br />
+                Адрес: 123456, Россия, Москва, ул. Примерная, д. 1
+                <br />
+                Email: legal@intellectpro.ru • Телефон: +7 (999) 123-45-67
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -275,6 +341,11 @@ const Index = () => {
       <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
+      />
+      
+      <EarningsCalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
       />
     </div>
   );

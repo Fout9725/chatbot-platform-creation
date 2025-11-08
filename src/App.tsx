@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ActiveBotsProvider } from "./contexts/ActiveBotsContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import SessionExpiryNotification from "./components/SessionExpiryNotification";
 import Index from "./pages/Index";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
@@ -18,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/PlanSelection";
 import Dashboard from "./pages/Dashboard";
 import PartnerProgram from "./pages/PartnerProgram";
+import Partner from "./pages/Partner";
 import AIAssistant from "./components/AIAssistant";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <SessionExpiryNotification />
           <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -41,7 +44,8 @@ const App = () => (
           <Route path="/docs" element={<Documentation />} />
           <Route path="/plan-selection" element={<PlanSelection />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/partner" element={<PartnerProgram />} />
+          <Route path="/partner-program" element={<PartnerProgram />} />
+          <Route path="/partner" element={<Partner />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

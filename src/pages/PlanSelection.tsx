@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import PaymentModal from '@/components/PaymentModal';
 
 const plans = [
   {
@@ -90,6 +91,8 @@ const PlanSelection = () => {
   const { user, isAuthenticated, setUserPlan } = useAuth();
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState<string>('optimal');
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentPlan, setPaymentPlan] = useState<any>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -98,16 +101,22 @@ const PlanSelection = () => {
   }, [isAuthenticated, navigate]);
 
   const handleSelectPlan = (planId: string) => {
+    const selectedPlanData = plans.find(p => p.id === planId);
+    if (!selectedPlanData) return;
+
     setSelectedPlan(planId);
-    setUserPlan(planId as 'free' | 'optimal' | 'premium' | 'partner');
-    
-    const planName = plans.find(p => p.id === planId)?.name || 'тариф';
-    toast({
-      title: `Тариф ${planName} выбран! 🎉`,
-      description: 'Теперь вы можете использовать все возможности платформы',
-    });
-    
-    navigate('/dashboard');
+
+    if (planId === 'free') {
+      setUserPlan('free');
+      toast({
+        title: `Тариф ${selectedPlanData.name} выбран! 🎉`,
+        description: 'Теперь вы можете использовать бесплатный функционал',
+      });
+      navigate('/dashboard');
+    } else {
+      setPaymentPlan(selectedPlanData);
+      setIsPaymentOpen(true);
+    }
   };
 
   return (
@@ -193,10 +202,12 @@ const PlanSelection = () => {
                   onClick={() => handleSelectPlan(plan.id)}
                   disabled={false}
                 >
-                  {selectedPlan === plan.id ? (
+                  {plan.price === 0 ? (
+                    'Начать бесплатно'
+                  ) : selectedPlan === plan.id ? (
                     <>
                       <Icon name="CheckCircle" size={18} className="mr-2" />
-                      Выбрано
+                      Оплатить
                     </>
                   ) : (
                     'Выбрать план'
@@ -268,6 +279,14 @@ const PlanSelection = () => {
           </Card>
         </div>
       </div>
+      
+      {paymentPlan && (
+        <PaymentModal
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          plan={paymentPlan}
+        />
+      )}
     </div>
   );
 };

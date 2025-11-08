@@ -16,6 +16,8 @@ const Dashboard = () => {
     messagesThisMonth: 2453,
     earnings: 1250
   });
+  
+  const userPlan = user?.plan || 'free';
 
   useEffect(() => {
     if (!isAuthenticated) {
