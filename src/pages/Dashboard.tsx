@@ -72,7 +72,7 @@ const Dashboard = () => {
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-3">
-              <CardDescription>Всего ботов</CardDescription>
+              <CardDescription>Всего ИИ-агентов</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">

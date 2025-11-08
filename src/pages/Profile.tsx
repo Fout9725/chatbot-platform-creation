@@ -54,9 +54,9 @@ const Profile = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  BotPlatform
+                  ИнтеллектПро
                 </h1>
-                <p className="text-xs text-muted-foreground">Платформа для создания ИИ-агентов</p>
+                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
               </div>
             </Link>
             <Link to="/dashboard">
@@ -182,11 +182,11 @@ const Profile = () => {
           <Card>
             <CardHeader className="pb-3">
               <Icon name="Bot" className="text-primary mb-2" size={24} />
-              <CardTitle className="text-lg">Мои боты</CardTitle>
+              <CardTitle className="text-lg">Мои ИИ-агенты</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">12</p>
-              <p className="text-sm text-muted-foreground">Активных ботов</p>
+              <p className="text-sm text-muted-foreground">Активных ИИ-агентов</p>
             </CardContent>
           </Card>
 

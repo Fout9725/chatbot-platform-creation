@@ -72,10 +72,10 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6 md:mb-8 animate-fade-in">
           <h2 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
-            Создавайте умных ботов за минуты
+            Создавайте умных ИИ-сотрудников за минуты
           </h2>
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-            Платформа для разработки чат-ботов, ИИ-агентов и ИИ-сотрудников для социальных сетей и бизнеса
+            Платформа для разработки ИИ-сотрудников и ИИ-агентов для социальных сетей и бизнеса
           </p>
         </div>
 
@@ -83,7 +83,7 @@ const Index = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 animate-fade-in">
           <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
             <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Активных ботов</CardDescription>
+              <CardDescription className="text-xs">Активных ИИ-агентов</CardDescription>
               <CardTitle className="text-2xl md:text-3xl font-bold text-primary">12,458</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
@@ -167,7 +167,7 @@ const Index = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-sm md:text-base">70% от продаж</p>
-                  <p className="text-xs text-muted-foreground">За каждого проданного бота</p>
+                  <p className="text-xs text-muted-foreground">За каждого проданного ИИ-агента</p>
                 </div>
               </div>
               

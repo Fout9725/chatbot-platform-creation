@@ -102,7 +102,7 @@ const BotMarketplace = () => {
       <div>
         <h2 className="text-xl md:text-2xl font-bold mb-2">Маркетплейс готовых решений</h2>
         <p className="text-sm md:text-base text-muted-foreground">
-          Выберите готового бота или создайте своего с нуля
+          Выберите готового ИИ-агента или создайте своего с нуля
         </p>
       </div>
 

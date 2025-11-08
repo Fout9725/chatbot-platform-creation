@@ -25,7 +25,7 @@ interface MyBot {
 const mockMyBots: MyBot[] = [
   {
     id: 1,
-    name: 'Мой продажный бот',
+    name: 'Продажный помощник',
     type: 'ИИ-агент',
     platform: 'Telegram',
     status: 'active',
@@ -37,7 +37,7 @@ const mockMyBots: MyBot[] = [
   {
     id: 2,
     name: 'Клиентский сервис',
-    type: 'Чат-бот',
+    type: 'ИИ-сотрудник',
     platform: 'WhatsApp',
     status: 'active',
     users: 156,
@@ -191,19 +191,19 @@ const MyBots = () => {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-xl md:text-2xl font-bold">Мои боты</h3>
-          <p className="text-sm md:text-base text-muted-foreground">Управляйте своими ИИ-агентами</p>
+          <h3 className="text-xl md:text-2xl font-bold">Мои ИИ-агенты</h3>
+          <p className="text-sm md:text-base text-muted-foreground">Управляйте своими ИИ-агентами и ИИ-сотрудниками</p>
         </div>
         <Button size="default" className="w-full sm:w-auto">
           <Icon name="Plus" size={18} className="mr-2" />
-          Создать бота
+          Создать ИИ-агента
         </Button>
       </div>
 
       {loading ? (
         <div className="text-center py-16">
           <Icon name="Loader2" size={48} className="mx-auto text-muted-foreground mb-4 animate-spin" />
-          <p className="text-muted-foreground">Загрузка ботов...</p>
+          <p className="text-muted-foreground">Загрузка ИИ-агентов...</p>
         </div>
       ) : bots.length === 0 ? (
         <div className="text-center py-16">

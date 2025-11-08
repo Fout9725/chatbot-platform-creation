@@ -18,8 +18,8 @@ const mockNotifications: Notification[] = [
   {
     id: 1,
     type: 'success',
-    title: 'Бот успешно запущен',
-    message: 'Ваш бот "Продажный помощник" начал работу',
+    title: 'ИИ-агент успешно запущен',
+    message: 'Ваш ИИ-агент "Продажный помощник" начал работу',
     time: '5 минут назад',
     read: false
   },
@@ -51,7 +51,7 @@ const mockNotifications: Notification[] = [
     id: 5,
     type: 'info',
     title: 'Новый пользователь',
-    message: 'К вашему боту подключился 100-й пользователь!',
+    message: 'К вашему ИИ-агенту подключился 100-й пользователь!',
     time: '2 дня назад',
     read: true
   }
@@ -80,9 +80,9 @@ const Notifications = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  BotPlatform
+                  ИнтеллектПро
                 </h1>
-                <p className="text-xs text-muted-foreground">Платформа для создания ИИ-агентов</p>
+                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
               </div>
             </Link>
             <Link to="/">
