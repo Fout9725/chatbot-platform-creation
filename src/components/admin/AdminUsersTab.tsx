@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
 
 interface User {
   id: string;
@@ -92,13 +93,52 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
     }
   };
 
+  const handleExportToExcel = () => {
+    const exportData = filteredUsers.map(user => ({
+      'ID': user.id,
+      'Имя': user.name,
+      'Email': user.email,
+      'Тариф': getPlanName(user.plan),
+      'Роль': user.role === 'admin' ? 'Администратор' : 'Пользователь',
+      'Дата регистрации': user.registeredAt,
+      'Активных ботов': user.activeBots,
+      'Статус': user.status === 'active' ? 'Активен' : 'Заблокирован'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Пользователи');
+    
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `users_export_${date}.xlsx`);
+    
+    toast({
+      title: 'Экспорт завершён',
+      description: `Экспортировано ${filteredUsers.length} пользователей`,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Управление пользователями</CardTitle>
-        <CardDescription>
-          Всего пользователей: {users.length} • Активных: {users.filter(u => u.status === 'active').length}
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle>Управление пользователями</CardTitle>
+            <CardDescription>
+              Всего пользователей: {users.length} • Активных: {users.filter(u => u.status === 'active').length}
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportToExcel}
+            className="flex items-center gap-2"
+          >
+            <Icon name="Download" size={16} />
+            Экспорт в Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col md:flex-row gap-3">
