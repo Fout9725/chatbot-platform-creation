@@ -33,11 +33,7 @@ const AdminNew = () => {
   });
 
   const [users, setUsers] = useState([
-    { id: 'user-001', name: 'Иван Петров', email: 'ivan@example.com', plan: 'optimal' as const, role: 'user' as const, registeredAt: '15.03.2024', activeBots: 3, status: 'active' as const },
-    { id: 'user-002', name: 'Мария Сидорова', email: 'maria@example.com', plan: 'premium' as const, role: 'user' as const, registeredAt: '12.03.2024', activeBots: 7, status: 'active' as const },
-    { id: 'user-003', name: 'Алексей Иванов', email: 'alexey@example.com', plan: 'free' as const, role: 'user' as const, registeredAt: '10.03.2024', activeBots: 1, status: 'active' as const },
-    { id: 'user-004', name: 'Елена Козлова', email: 'elena@example.com', plan: 'partner' as const, role: 'admin' as const, registeredAt: '08.03.2024', activeBots: 12, status: 'active' as const },
-    { id: 'user-005', name: 'Дмитрий Смирнов', email: 'dmitry@example.com', plan: 'optimal' as const, role: 'user' as const, registeredAt: '05.03.2024', activeBots: 2, status: 'blocked' as const },
+    { id: 'admin-001', name: 'Администратор', email: 'admin@intellectpro.ru', plan: 'partner' as const, role: 'admin' as const, registeredAt: '01.01.2024', activeBots: 0, status: 'active' as const },
   ]);
 
   if (!user || user.role !== 'admin') {
@@ -132,21 +128,17 @@ const AdminNew = () => {
   };
 
   const platformStats = {
-    totalUsers: 45892,
-    activeUsers: 32451,
-    totalBots: 12458,
-    activeBots: 8932,
-    totalRevenue: 2847350,
-    monthlyRevenue: 456780,
-    marketplaceBots: 47,
-    customTemplates: 23
+    totalUsers: 1,
+    activeUsers: 1,
+    totalBots: 0,
+    activeBots: 0,
+    totalRevenue: 0,
+    monthlyRevenue: 0,
+    marketplaceBots: 0,
+    customTemplates: 0
   };
 
-  const marketplaceBots = [
-    { id: 1, name: 'CRM Помощник', author: 'admin', downloads: 342, rating: 4.8, status: 'active' },
-    { id: 2, name: 'Email Автоответчик', author: 'moderator', downloads: 156, rating: 4.5, status: 'active' },
-    { id: 3, name: 'Продажный бот', author: 'partner_123', downloads: 89, rating: 4.2, status: 'pending' }
-  ];
+  const marketplaceBots: Array<{ id: number; name: string; author: string; downloads: number; rating: number; status: string }> = [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">

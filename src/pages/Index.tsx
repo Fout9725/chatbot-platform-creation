@@ -98,12 +98,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Активных ИИ-агентов</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-primary">12,458</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-primary">0</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="TrendingUp" size={12} className="text-green-500" />
-                +23% за месяц
+                <Icon name="Rocket" size={12} className="text-purple-500" />
+                Старт платформы
               </p>
             </CardContent>
           </Card>
@@ -111,12 +111,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Пользователей</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-blue-600">45,892</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-blue-600">1</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="TrendingUp" size={12} className="text-green-500" />
-                +18% за месяц
+                <Icon name="Sparkles" size={12} className="text-blue-500" />
+                Бета-версия
               </p>
             </CardContent>
           </Card>
@@ -124,12 +124,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-green-50 to-white border-green-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Сообщений/день</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-green-600">2.4М</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-green-600">0</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="TrendingUp" size={12} className="text-green-500" />
-                +31% за месяц
+                <Icon name="Zap" size={12} className="text-green-500" />
+                Скоро запуск
               </p>
             </CardContent>
           </Card>
@@ -137,12 +137,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Партнёров</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-orange-600">1,234</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-orange-600">0</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="TrendingUp" size={12} className="text-green-500" />
-                +45% за месяц
+                <Icon name="Users" size={12} className="text-orange-500" />
+                Открыт набор
               </p>
             </CardContent>
           </Card>
