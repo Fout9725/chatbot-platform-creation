@@ -72,6 +72,12 @@ const Index = () => {
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
               </Button>
+              {!isAuthenticated && (
+                <Button type="button" disabled={false} variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
+                  <Icon name="ShieldCheck" size={18} className="md:mr-2" />
+                  <span className="hidden md:inline">Админ</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
