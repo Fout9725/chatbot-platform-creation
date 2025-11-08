@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -22,12 +23,12 @@ interface PaymentModalProps {
 
 export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
   const { toast } = useToast();
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'yookassa' | 'sbp'>('card');
-  const [email, setEmail] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
+  const { user } = useAuth();
+  const [paymentMethod, setPaymentMethod] = useState<'yookassa'>('yookassa');
+  const [email, setEmail] = useState(user?.email || '');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const YOOKASSA_API_URL = 'https://functions.poehali.dev/04aae05b-5f30-481c-829d-4fba1be87d94';
 
   const handlePayment = async () => {
     if (!email) {
@@ -39,27 +40,41 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
       return;
     }
 
-    if (paymentMethod === 'card') {
-      if (!cardNumber || !cardExpiry || !cardCvc) {
-        toast({
-          title: 'Ошибка',
-          description: 'Заполните все данные карты',
-          variant: 'destructive',
-        });
-        return;
-      }
-    }
-
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(YOOKASSA_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create',
+          amount: plan.price,
+          currency: 'RUB',
+          description: `Оплата тарифа "${plan.name}"`,
+          return_url: `${window.location.origin}/dashboard?payment=success`,
+          email: email,
+          user_id: user?.id || '',
+          plan_id: plan.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.confirmation_url) {
+        window.location.href = data.confirmation_url;
+      } else {
+        throw new Error(data.error || 'Ошибка создания платежа');
+      }
+    } catch (error: any) {
       setIsProcessing(false);
       toast({
-        title: 'Оплата успешна! 🎉',
-        description: `Тариф "${plan.name}" активирован. Чек отправлен на ${email}`,
+        title: 'Ошибка оплаты',
+        description: error.message || 'Попробуйте позже',
+        variant: 'destructive',
       });
-      onClose();
-    }, 2000);
+    }
   };
 
   return (
@@ -95,67 +110,12 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
           </div>
 
           <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="card">
-                <Icon name="CreditCard" size={16} className="mr-2" />
-                Карта
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="yookassa">
                 <Icon name="Wallet" size={16} className="mr-2" />
                 ЮKassa
               </TabsTrigger>
-              <TabsTrigger value="sbp">
-                <Icon name="Smartphone" size={16} className="mr-2" />
-                СБП
-              </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="card" className="space-y-4 pt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Оплата банковской картой</CardTitle>
-                  <CardDescription>Visa, MasterCard, МИР</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label htmlFor="card-number">Номер карты</Label>
-                    <Input
-                      id="card-number"
-                      placeholder="1234 5678 9012 3456"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      maxLength={19}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="card-expiry">Срок действия</Label>
-                      <Input
-                        id="card-expiry"
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        maxLength={5}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="card-cvc">CVC</Label>
-                      <Input
-                        id="card-cvc"
-                        placeholder="123"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value)}
-                        maxLength={3}
-                        type="password"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="yookassa" className="space-y-4 pt-4">
               <Card>
@@ -184,39 +144,6 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
                     <Icon name="Info" size={14} />
                     <AlertDescription className="text-xs">
                       После нажатия "Оплатить" вы будете перенаправлены на безопасную страницу ЮKassa
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="sbp" className="space-y-4 pt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Система быстрых платежей (СБП)</CardTitle>
-                  <CardDescription>
-                    Оплата через мобильное приложение вашего банка
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Icon name="Smartphone" size={32} className="text-primary" />
-                      <div>
-                        <p className="font-semibold">Как оплатить:</p>
-                        <p className="text-xs text-muted-foreground">Быстро и без комиссии</p>
-                      </div>
-                    </div>
-                    <ol className="text-sm space-y-1 ml-4">
-                      <li>1. Нажмите "Оплатить"</li>
-                      <li>2. Откроется приложение вашего банка</li>
-                      <li>3. Подтвердите платёж</li>
-                    </ol>
-                  </div>
-                  <Alert className="bg-green-50 border-green-200">
-                    <Icon name="Check" size={14} className="text-green-600" />
-                    <AlertDescription className="text-xs text-green-800">
-                      <strong>Без комиссии!</strong> Платёж поступает моментально
                     </AlertDescription>
                   </Alert>
                 </CardContent>

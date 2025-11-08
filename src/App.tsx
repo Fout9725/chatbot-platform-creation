@@ -31,8 +31,8 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <SessionExpiryNotification />
           <BrowserRouter>
+        <SessionExpiryNotification />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/bot/:id" element={<BotDetails />} />

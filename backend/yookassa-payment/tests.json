@@ -1,0 +1,42 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": "",
+      "bodyMatcher": "exact"
+    },
+    {
+      "name": "Missing credentials error",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "create",
+        "amount": 990,
+        "description": "Test payment"
+      },
+      "expectedStatus": 500,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Invalid amount error",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "create",
+        "amount": 0,
+        "description": "Test payment"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "Invalid amount"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
