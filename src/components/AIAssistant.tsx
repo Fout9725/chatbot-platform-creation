@@ -69,20 +69,19 @@ const AIAssistant = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentMessage = inputMessage;
     setInputMessage('');
     setIsLoading(true);
 
-    await trackAction('chat_message', { message: inputMessage });
+    await trackAction('chat_message', { message: currentMessage });
 
     try {
-      const apiUrl = localStorage.getItem('api-url') || '/api';
-      const response = await fetch(`${apiUrl}/assistant/chat`, {
+      const response = await fetch('https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': '1'
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: inputMessage })
+        body: JSON.stringify({ message: currentMessage })
       });
 
       const data = await response.json();
@@ -96,7 +95,7 @@ const AIAssistant = () => {
     } catch (error) {
       const errorMessage: Message = {
         sender: 'assistant',
-        message: 'Произошла ошибка. Попробуйте позже.'
+        message: 'Произошла ошибка. Попробуйте позже или обратитесь в поддержку: https://t.me/+QgiLIa1gFRY4Y2Iy'
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -127,9 +126,9 @@ const AIAssistant = () => {
                 <Icon name="Bot" className="text-white" size={24} />
               </div>
               <div className="flex-1">
-                <CardTitle className="text-base">Нужна помощь?</CardTitle>
+                <CardTitle className="text-base">Есть вопросы?</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Я помогу разобраться с платформой
+                  ИИ-помощник ответит на всё о платформе
                 </p>
               </div>
               <Button
@@ -249,10 +248,24 @@ const AIAssistant = () => {
                 <div className="bg-gradient-to-br from-primary/10 to-secondary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Icon name="Sparkles" className="text-primary" size={32} />
                 </div>
-                <h3 className="font-semibold mb-2">Привет! Я ваш помощник</h3>
-                <p className="text-sm text-muted-foreground">
-                  Задайте мне вопрос о платформе
+                <h3 className="font-semibold mb-2">Привет! Я ваш помощник по ИнтеллектПро</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Отвечу на любые вопросы о платформе, тарифах и возможностях
                 </p>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p className="flex items-start gap-2">
+                    <Icon name="Check" size={14} className="mt-0.5 text-primary" />
+                    Помогу выбрать подходящий тариф
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <Icon name="Check" size={14} className="mt-0.5 text-primary" />
+                    Расскажу о партнёрской программе
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <Icon name="Check" size={14} className="mt-0.5 text-primary" />
+                    Объясню возможности платформы
+                  </p>
+                </div>
               </div>
             )}
             
