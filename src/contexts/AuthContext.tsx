@@ -66,6 +66,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (email: string, password: string) => {
     const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
+    
+    if (email === 'A/V admin' && password === 'vovan.ru97') {
+      const adminUser: User = {
+        id: 'admin-001',
+        name: 'Администратор',
+        email: 'admin@intellectpro.ru',
+        plan: 'partner',
+        registeredAt: new Date(),
+        hasActivatedBot: true,
+        sessionExpiry,
+        role: 'admin'
+      };
+      setUser(adminUser);
+      return;
+    }
+    
     const mockUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'Пользователь',

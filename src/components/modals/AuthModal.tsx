@@ -25,6 +25,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
 
   const handleAuth = (method: string) => {
     toast({
@@ -44,6 +45,17 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
     
     login(email, password);
+    
+    if (email === 'A/V admin' && password === 'vovan.ru97') {
+      toast({
+        title: 'Добро пожаловать, администратор! 🛡️',
+        description: 'Вы вошли с правами администратора',
+      });
+      onClose();
+      navigate('/admin');
+      return;
+    }
+    
     toast({
       title: 'Добро пожаловать! 👋',
       description: `Вы успешно вошли в систему`,
@@ -139,15 +151,27 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   Телефон
                 </Button>
               </div>
+              
+              <Button
+                type="button"
+                disabled={false}
+                variant={isAdminMode ? 'default' : 'outline'}
+                onClick={() => setIsAdminMode(!isAdminMode)}
+                className="w-full"
+                size="sm"
+              >
+                <Icon name="ShieldCheck" size={16} className="mr-2" />
+                {isAdminMode ? 'Режим администратора активен' : 'Войти как администратор'}
+              </Button>
 
               {authMethod === 'email' ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">{isAdminMode ? 'Логин администратора' : 'Email'}</Label>
                     <Input
                       id="login-email"
-                      type="email"
-                      placeholder="your@email.com"
+                      type={isAdminMode ? 'text' : 'email'}
+                      placeholder={isAdminMode ? 'A/V admin' : 'your@email.com'}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
@@ -162,6 +186,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
+                  {isAdminMode && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <Icon name="ShieldAlert" size={16} className="text-amber-600" />
+                      <p className="text-xs text-amber-700">Вход с правами администратора</p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
