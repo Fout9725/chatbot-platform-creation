@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [stats] = useState({
     totalBots: 3,
     activeUsers: 156,
@@ -24,6 +27,24 @@ const Dashboard = () => {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus === 'success') {
+      toast({
+        title: 'Оплата успешна! 🎉',
+        description: 'Ваш тариф будет обновлён в течение нескольких минут',
+      });
+      navigate('/dashboard', { replace: true });
+    } else if (paymentStatus === 'failed') {
+      toast({
+        title: 'Ошибка оплаты',
+        description: 'Платёж не был завершён. Попробуйте снова',
+        variant: 'destructive',
+      });
+      navigate('/dashboard', { replace: true });
+    }
+  }, [searchParams, toast, navigate]);
 
   const planNames: Record<string, string> = {
     free: 'Бесплатный',

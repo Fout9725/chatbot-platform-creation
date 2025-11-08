@@ -191,7 +191,7 @@ const Legal = () => {
                 <div>
                   <p className="font-semibold">Безопасные платежи</p>
                   <p className="text-sm text-muted-foreground">
-                    Все платежи проходят через ЮKassa — надёжную российскую платёжную систему
+                    Все платежи проходят через Prodamus — надёжную российскую платёжную систему
                   </p>
                 </div>
               </div>

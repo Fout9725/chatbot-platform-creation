@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "Handle OPTIONS request for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Handle successful payment webhook",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "order_id": "12345",
+        "order_num": "ORD-001",
+        "payment_status": "success",
+        "customer_email": "user@example.com",
+        "customer_extra": {
+          "user_id": "user123",
+          "plan_id": "optimal"
+        },
+        "order_sum": 990,
+        "products": ["Оптимальный тариф"]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "status": "received",
+        "payment_status": "success"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Reject GET method",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 405,
+      "expectedBody": {
+        "error": "Method not allowed"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

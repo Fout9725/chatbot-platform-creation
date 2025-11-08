@@ -53,7 +53,7 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
           plan_id: plan.id
         }),
         urlReturn: `${window.location.origin}/dashboard?payment=success`,
-        urlNotification: `${window.location.origin}/api/prodamus/webhook`
+        urlNotification: `https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4`
       });
       
       window.location.href = `${paymentUrl}?${params.toString()}`;

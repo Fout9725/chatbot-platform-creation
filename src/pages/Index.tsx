@@ -54,6 +54,14 @@ const Index = () => {
                   <span className="hidden lg:inline">Документация</span>
                 </Button>
               </Link>
+              {user?.role === 'admin' && (
+                <Link to="/admin">
+                  <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                    <Icon name="Shield" size={18} className="mr-2" />
+                    <span className="hidden lg:inline">Админ-панель</span>
+                  </Button>
+                </Link>
+              )}
               <Link to="/notifications">
                 <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
                   <Icon name="Bell" size={18} className="mr-2" />
