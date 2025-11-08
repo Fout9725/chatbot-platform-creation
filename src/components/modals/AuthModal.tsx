@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Icon from '@/components/ui/icon';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   const handleAuth = (method: string) => {
     toast({
@@ -47,7 +49,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       description: `Вы успешно вошли в систему`,
     });
     onClose();
-    navigate('/dashboard');
+    navigate('/plan-selection');
   };
 
   const handlePhoneAuth = () => {
@@ -229,7 +231,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 disabled={false}
                 variant="link"
                 className="w-full text-sm"
-                onClick={() => toast({ title: 'Ссылка отправлена', description: 'Проверьте почту' })}
+                onClick={() => setIsForgotPasswordOpen(true)}
               >
                 Забыли пароль?
               </Button>
@@ -366,6 +368,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </TabsContent>
         </Tabs>
       </DialogContent>
+      
+      <ForgotPasswordModal 
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
     </Dialog>
   );
 }

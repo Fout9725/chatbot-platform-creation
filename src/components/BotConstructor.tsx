@@ -13,6 +13,7 @@ import TelegramIntegration from '@/components/TelegramIntegration';
 import SocialMediaGuide from '@/components/SocialMediaGuide';
 import BotTraining from '@/components/BotTraining';
 import AITools from '@/components/AITools';
+import APIKeysManager from '@/components/APIKeysManager';
 
 interface ScenarioNode {
   id: string;
@@ -230,7 +231,7 @@ const BotConstructor = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="visual" className="w-full">
-              <TabsList className="grid w-full max-w-3xl grid-cols-4">
+              <TabsList className="grid w-full max-w-4xl grid-cols-5">
                 <TabsTrigger value="visual" className="text-xs md:text-sm">
                   <Icon name="Network" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
                   Визуально
@@ -242,6 +243,10 @@ const BotConstructor = () => {
                 <TabsTrigger value="ai-tools" className="text-xs md:text-sm">
                   <Icon name="Sparkles" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
                   AI Tools
+                </TabsTrigger>
+                <TabsTrigger value="integrations" className="text-xs md:text-sm">
+                  <Icon name="Key" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
+                  Интеграции
                 </TabsTrigger>
                 <TabsTrigger value="code" className="text-xs md:text-sm">
                   <Icon name="Code" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
@@ -339,6 +344,10 @@ const BotConstructor = () => {
 
               <TabsContent value="ai-tools" className="mt-6">
                 <AITools />
+              </TabsContent>
+
+              <TabsContent value="integrations" className="mt-6">
+                <APIKeysManager />
               </TabsContent>
 
               <TabsContent value="code" className="mt-6">
