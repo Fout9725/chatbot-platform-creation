@@ -8,15 +8,127 @@ Returns: HTTP response dict с обработкой команд и генера
 import json
 import os
 import requests
+import psycopg2
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
 HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
+
+def get_db_connection():
+    '''Подключение к PostgreSQL'''
+    if not DATABASE_URL:
+        print('DATABASE_URL not configured')
+        return None
+    return psycopg2.connect(DATABASE_URL)
+
+def get_or_create_user(telegram_id: int, username: Optional[str], first_name: str) -> Optional[Dict]:
+    '''Получение или создание пользователя в БД'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        
+        # Проверяем, есть ли пользователь
+        cur.execute(
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used FROM neurophoto_users WHERE telegram_id = %s",
+            (telegram_id,)
+        )
+        result = cur.fetchone()
+        
+        if result:
+            user_data = {
+                'telegram_id': result[0],
+                'username': result[1],
+                'first_name': result[2],
+                'free_generations': result[3],
+                'paid_generations': result[4],
+                'total_used': result[5]
+            }
+            cur.close()
+            conn.close()
+            return user_data
+        
+        # Создаём нового пользователя
+        cur.execute(
+            "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s)",
+            (telegram_id, username, first_name)
+        )
+        conn.commit()
+        
+        user_data = {
+            'telegram_id': telegram_id,
+            'username': username,
+            'first_name': first_name,
+            'free_generations': 3,
+            'paid_generations': 0,
+            'total_used': 0
+        }
+        
+        cur.close()
+        conn.close()
+        return user_data
+    except Exception as e:
+        print(f'Database error in get_or_create_user: {e}')
+        if conn:
+            conn.close()
+        return None
+
+def use_generation(telegram_id: int) -> bool:
+    '''Списание одной генерации у пользователя'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        
+        # Получаем текущие значения
+        cur.execute(
+            "SELECT free_generations, paid_generations FROM neurophoto_users WHERE telegram_id = %s",
+            (telegram_id,)
+        )
+        result = cur.fetchone()
+        
+        if not result:
+            cur.close()
+            conn.close()
+            return False
+        
+        free_gen, paid_gen = result
+        
+        # Списываем генерацию (сначала бесплатные, потом платные)
+        if free_gen > 0:
+            cur.execute(
+                "UPDATE neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+                (telegram_id,)
+            )
+        elif paid_gen > 0:
+            cur.execute(
+                "UPDATE neurophoto_users SET paid_generations = paid_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+                (telegram_id,)
+            )
+        else:
+            cur.close()
+            conn.close()
+            return False
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Database error in use_generation: {e}')
+        if conn:
+            conn.close()
+        return False
 
 @dataclass
 class User:
@@ -161,9 +273,16 @@ def get_styles_keyboard() -> Dict:
         ]
     }
 
-def handle_start(chat_id: int, first_name: str) -> None:
+def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) -> None:
     '''Обработка команды /start'''
-    welcome_text = f'''👋 Привет, *{first_name}*\!
+    user_data = get_or_create_user(chat_id, username, first_name)
+    
+    if user_data:
+        free_gen = user_data['free_generations']
+        paid_gen = user_data['paid_generations']
+        total_gen = free_gen + paid_gen
+        
+        welcome_text = f'''👋 Привет, *{first_name}*\!
 
 Я *Нейрофотосессия PRO* \- твой AI\-фотограф в Telegram\!
 
@@ -173,10 +292,24 @@ def handle_start(chat_id: int, first_name: str) -> None:
 \- Применяю 10\+ профессиональных стилей
 \- Генерирую HD качество
 
-🎁 *Бонус:*
-У тебя есть *3 бесплатные* генерации\!
+💳 *Твой баланс:*
+Доступно генераций: *{total_gen}*
+Бесплатных: {free_gen} \| Купленных: {paid_gen}
 
 Выбери действие ниже 👇'''
+    else:
+        welcome_text = f'''👋 Привет, *{first_name}*\!
+
+Я *Нейрофотосессия PRO* \- твой AI\-фотограф в Telegram\!
+
+🎨 *Что я умею:*
+\- Создаю фото из текстового описания
+\- Обрабатываю твои фотографии  
+\- Применяю 10\+ профессиональных стилей
+\- Генерирую HD качество
+
+Выбери действие ниже 👇'''
+    
     send_message(chat_id, welcome_text, get_start_keyboard())
 
 def handle_help(chat_id: int) -> None:
@@ -210,7 +343,7 @@ def handle_help(chat_id: int) -> None:
 *Вопросы?* Пиши @support\_bot'''
     send_message(chat_id, help_text, get_start_keyboard())
 
-def handle_callback(chat_id: int, data: str, message_id: int) -> None:
+def handle_callback(chat_id: int, data: str, message_id: int, username: Optional[str] = None, first_name: str = 'Друг') -> None:
     '''Обработка нажатий на кнопки'''
     if data == 'generate_text':
         text = '''🎨 *Генерация фото из текста*
@@ -238,7 +371,27 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
         send_message(chat_id, text, get_start_keyboard())
     
     elif data == 'bonuses':
-        text = '''🎁 *Твои бонусы*
+        user_data = get_or_create_user(chat_id, username, first_name)
+        
+        if user_data:
+            free_gen = user_data['free_generations']
+            paid_gen = user_data['paid_generations']
+            total_used = user_data['total_used']
+            
+            text = f'''🎁 *Твои бонусы*
+
+Бесплатных генераций: *{free_gen}*
+Купленных генераций: *{paid_gen}*
+Всего использовано: {total_used}
+
+💡 После использования бесплатных генераций можно:
+\- Купить пакет фото
+\- Пригласить друзей \(\+2 за друга\)
+\- Участвовать в конкурсах
+
+Используй бонусы с умом\! 🎯'''
+        else:
+            text = '''🎁 *Твои бонусы*
 
 Бесплатных генераций: *3*
 Купленных генераций: *0*
@@ -249,6 +402,7 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
 \- Участвовать в конкурсах
 
 Используй бонусы с умом\! 🎯'''
+        
         send_message(chat_id, text, get_start_keyboard())
     
     elif data == 'buy_package':
@@ -295,32 +449,61 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
 
 user_states = {}
 
-def handle_message(chat_id: int, text: str, first_name: str) -> None:
+def handle_message(chat_id: int, text: str, first_name: str, username: Optional[str] = None) -> None:
     '''Обработка текстовых сообщений'''
     if text.startswith('/start'):
-        handle_start(chat_id, first_name)
+        handle_start(chat_id, first_name, username)
         return
     
     if text.startswith('/help'):
         handle_help(chat_id)
         return
     
-    send_message(chat_id, '🎨 Генерирую твое фото... Это займет 20-40 секунд')
+    # Получаем данные пользователя
+    user_data = get_or_create_user(chat_id, username, first_name)
+    
+    if not user_data:
+        send_message(chat_id, '❌ Ошибка подключения к базе данных\\. Попробуй позже\\.')
+        return
+    
+    # Проверяем баланс
+    free_gen = user_data['free_generations']
+    paid_gen = user_data['paid_generations']
+    total_gen = free_gen + paid_gen
+    
+    if total_gen <= 0:
+        no_gen_text = '''❌ *У тебя закончились генерации\\!*
+
+💎 Купи пакет фото для продолжения:
+\- Мини \\(5 фото\\) \\- 299₽
+\- Стандарт \\(10 фото\\) \\- 499₽
+\- Профи \\(20 фото\\) \\- 799₽
+
+Для покупки свяжись с @support\\_bot'''
+        send_message(chat_id, no_gen_text, get_start_keyboard())
+        return
+    
+    send_message(chat_id, '🎨 Генерирую твое фото\\.\\.\\. Это займет 20\\-40 секунд')
     send_chat_action(chat_id, 'upload_photo')
     
     image_bytes = generate_image(text, 'portrait')
     
     if image_bytes:
-        caption = f'✨ *Готово!*\n\n_{text[:100]}_' if len(text) <= 100 else f'✨ *Готово!*\n\n_{text[:100]}..._'
-        send_photo_bytes(chat_id, image_bytes, caption)
-        send_message(chat_id, '🎉 Фото готово! Хочешь создать еще?', get_start_keyboard())
+        # Списываем генерацию
+        if use_generation(chat_id):
+            remaining = total_gen - 1
+            caption = f'✨ *Готово\\!*\n\nОсталось генераций: {remaining}'
+            send_photo_bytes(chat_id, image_bytes, caption)
+            send_message(chat_id, '🎉 Фото готово\\! Хочешь создать еще?', get_start_keyboard())
+        else:
+            send_message(chat_id, '❌ Ошибка списания генерации\\. Попробуй еще раз\\.')
     else:
-        error_text = '''❌ Не удалось сгенерировать фото\.
+        error_text = '''❌ Не удалось сгенерировать фото\\.
 
 *Возможные причины:*
-\- Модель загружается \(попробуй через минуту\)
-\- API недоступен \(попробуй позже\)
-\- Промпт содержит запрещенный контент
+\\- Модель загружается \\(попробуй через минуту\\)
+\\- API недоступен \\(попробуй позже\\)
+\\- Промпт содержит запрещенный контент
 
 Попробуй еще раз или купи пакет 💎'''
         send_message(chat_id, error_text, get_start_keyboard())
@@ -361,16 +544,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         chat_id = message['chat']['id']
         text = message.get('text', '')
         first_name = message['from'].get('first_name', 'Friend')
+        username = message['from'].get('username', None)
         
-        handle_message(chat_id, text, first_name)
+        handle_message(chat_id, text, first_name, username)
     
     elif 'callback_query' in update:
         callback = update['callback_query']
         chat_id = callback['message']['chat']['id']
         data = callback['data']
         message_id = callback['message']['message_id']
+        first_name = callback['from'].get('first_name', 'Friend')
+        username = callback['from'].get('username', None)
         
-        handle_callback(chat_id, data, message_id)
+        handle_callback(chat_id, data, message_id, username, first_name)
     
     return {
         'statusCode': 200,
