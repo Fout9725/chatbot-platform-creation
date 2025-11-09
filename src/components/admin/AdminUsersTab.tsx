@@ -29,9 +29,11 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const syncUsers = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
         const data = await response.json();
@@ -51,11 +53,18 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
         }
       } catch (error) {
         console.error('Ошибка синхронизации пользователей:', error);
+        toast({
+          title: 'Ошибка синхронизации',
+          description: 'Не удалось загрузить пользователей из базы данных',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
     syncUsers();
-  }, [setUsers]);
+  }, [setUsers, toast]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -201,8 +210,19 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
           </Select>
         </div>
 
-        <div className="space-y-3">
-          {filteredUsers.map((user) => (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="relative">
+              <Icon name="Loader2" size={48} className="animate-spin text-primary" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="font-medium">Синхронизация пользователей...</p>
+              <p className="text-sm text-muted-foreground">Загружаем данные из базы</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredUsers.map((user) => (
             <div key={user.id} className="p-4 bg-muted rounded-lg space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
@@ -299,9 +319,10 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
-        {filteredUsers.length === 0 && (
+        {!isLoading && filteredUsers.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <Icon name="Users" size={48} className="mx-auto mb-3 opacity-20" />
             <p>Пользователи не найдены</p>
