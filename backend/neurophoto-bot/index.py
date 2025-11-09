@@ -16,7 +16,7 @@ TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
 HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-ADMIN_IDS = [1508333931]
+ADMIN_IDS = [1508333931, 285675692]
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -330,8 +330,8 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
-    '''Генерация изображения через Hugging Face Serverless API (100% бесплатно)'''
+def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
+    '''Генерация изображения через Hugging Face Inference API (100% бесплатно)'''
     if not HUGGINGFACE_API_KEY:
         print('HUGGINGFACE_API_KEY not configured')
         return None
@@ -352,34 +352,59 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
     try:
         headers = {
             'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-use-cache': 'false'
         }
         
         payload = {
             'inputs': full_prompt,
             'parameters': {
                 'num_inference_steps': 4,
-                'guidance_scale': 0
+                'guidance_scale': 0.0,
+                'width': 1024,
+                'height': 1024
             }
         }
         
+        # Используем новый URL API
+        api_url = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
+        
+        print(f'Generating image with prompt: {full_prompt[:100]}...')
+        
         response = requests.post(
-            HUGGINGFACE_API,
+            api_url,
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=120
         )
+        
+        print(f'Hugging Face response status: {response.status_code}')
         
         if response.status_code == 200:
             image_bytes = response.content
-            
-            upload_url = f'{get_telegram_api()}/sendPhoto'
-            files = {'photo': ('image.png', image_bytes, 'image/png')}
-            data = {'chat_id': 'temp'}
-            
+            print(f'Image generated successfully, size: {len(image_bytes)} bytes')
             return image_bytes
         else:
             print(f'Hugging Face API error: {response.status_code}, {response.text}')
+            
+            # Если модель загружается, попробуем еще раз через 20 секунд
+            if response.status_code == 503:
+                print('Model is loading, retrying in 20 seconds...')
+                import time
+                time.sleep(20)
+                
+                response = requests.post(
+                    api_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                )
+                
+                if response.status_code == 200:
+                    image_bytes = response.content
+                    print(f'Image generated on retry, size: {len(image_bytes)} bytes')
+                    return image_bytes
+            
             return None
             
     except Exception as e:
