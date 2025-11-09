@@ -720,5 +720,17 @@ export const mockBots: Bot[] = [
     users: 180,
     icon: 'Gavel',
     features: ['Иски', 'Заседания', 'Апелляции']
+  },
+  {
+    id: 61,
+    name: 'Нейрофотосессия',
+    description: 'AI-генерация профессиональных фотографий с помощью нейросетей',
+    category: 'Креатив',
+    price: 75000,
+    rentPrice: 6500,
+    rating: 4.9,
+    users: 1540,
+    icon: 'Camera',
+    features: ['Генерация фото', 'FLUX & Stable Diffusion', 'Профессиональное качество', 'OpenRouter API']
   }
 ];

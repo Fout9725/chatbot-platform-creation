@@ -33,4 +33,4 @@ export interface Bot {
   personality?: string;
 }
 
-export const categories = ['Все', 'Продажи', 'Поддержка', 'HR', 'Маркетинг', 'Финансы', 'Сервис'];
+export const categories = ['Все', 'Продажи', 'Поддержка', 'HR', 'Маркетинг', 'Финансы', 'Сервис', 'Креатив', 'Юриспруденция'];
