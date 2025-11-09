@@ -46,9 +46,10 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general">Основное</TabsTrigger>
             <TabsTrigger value="behavior">Поведение</TabsTrigger>
+            <TabsTrigger value="integrations">Интеграции</TabsTrigger>
             <TabsTrigger value="schedule">Расписание</TabsTrigger>
             <TabsTrigger value="advanced">Продвинутые</TabsTrigger>
           </TabsList>
@@ -150,6 +151,76 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
                 value={botSettings.maxMessagesPerDay}
                 onChange={(e) => setBotSettings({ ...botSettings, maxMessagesPerDay: parseInt(e.target.value) })}
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4 mt-4">
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-100 p-2 rounded-lg">
+                    <Icon name="Send" size={24} className="text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">Telegram</h4>
+                    <p className="text-sm text-muted-foreground">Подключите бота к Telegram</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-token">Bot Token</Label>
+                  <Input
+                    id="telegram-token"
+                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                  />
+                  <p className="text-xs text-muted-foreground">Получите токен у @BotFather в Telegram</p>
+                </div>
+                <Button className="w-full">
+                  <Icon name="Link" size={16} className="mr-2" />
+                  Подключить Telegram
+                </Button>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3 opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 p-2 rounded-lg">
+                    <Icon name="MessageCircle" size={24} className="text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">WhatsApp</h4>
+                    <p className="text-sm text-muted-foreground">Подключите бота к WhatsApp Business</p>
+                  </div>
+                </div>
+                <Input placeholder="API токен" disabled />
+                <Button disabled className="w-full">Скоро доступно</Button>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3 opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-100 p-2 rounded-lg">
+                    <Icon name="Facebook" size={24} className="text-blue-700" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">VKontakte</h4>
+                    <p className="text-sm text-muted-foreground">Подключите бота к сообществу ВК</p>
+                  </div>
+                </div>
+                <Input placeholder="API токен" disabled />
+                <Button disabled className="w-full">Скоро доступно</Button>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3 opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="bg-pink-100 p-2 rounded-lg">
+                    <Icon name="Instagram" size={24} className="text-pink-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">Instagram</h4>
+                    <p className="text-sm text-muted-foreground">Подключите бота к Instagram Direct</p>
+                  </div>
+                </div>
+                <Input placeholder="API токен" disabled />
+                <Button disabled className="w-full">Скоро доступно</Button>
+              </div>
             </div>
           </TabsContent>
 

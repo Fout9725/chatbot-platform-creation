@@ -7,6 +7,7 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
 import { mockBots } from './marketplace/mockBots';
+import BotSettingsModal from './modals/BotSettingsModal';
 
 interface MyBot {
   id: number;
@@ -74,6 +75,11 @@ const MyBots = () => {
   const { activeBots, deactivateBot } = useActiveBots();
   const [bots, setBots] = useState<MyBot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsModal, setSettingsModal] = useState<{ isOpen: boolean; botId: number; botName: string }>({ 
+    isOpen: false, 
+    botId: 0, 
+    botName: '' 
+  });
 
   useEffect(() => {
     loadBots();
@@ -310,7 +316,11 @@ const MyBots = () => {
                     <Icon name="BarChart3" size={16} className="mr-2" />
                     Статистика
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSettingsModal({ isOpen: true, botId: bot.id, botName: bot.name })}
+                  >
                     <Icon name="Settings" size={16} />
                   </Button>
                 </>
@@ -320,6 +330,12 @@ const MyBots = () => {
         ))}
         </div>
       )}
+
+      <BotSettingsModal
+        isOpen={settingsModal.isOpen}
+        onClose={() => setSettingsModal({ isOpen: false, botId: 0, botName: '' })}
+        botName={settingsModal.botName}
+      />
     </div>
   );
 };

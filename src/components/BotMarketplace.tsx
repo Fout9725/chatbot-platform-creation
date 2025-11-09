@@ -70,21 +70,13 @@ const BotMarketplace = () => {
       setIsAuthModalOpen(true);
       return;
     }
-
-    if (user?.hasActivatedBot) {
-      toast({
-        title: "Лимит активаций исчерпан",
-        description: "Вы можете активировать только одного бота после регистрации. Для большего количества ботов выберите тариф",
-        variant: 'destructive',
-      });
-      navigate('/pricing');
-      return;
-    }
     
     const bot = mockBots.find(b => b.id === id);
     if (bot) {
       activateBot(id, bot.name);
-      setUserActivatedBot();
+      if (!user?.hasActivatedBot) {
+        setUserActivatedBot();
+      }
       toast({
         title: "Тестовый период активирован! 🎉",
         description: `Бот "${bot.name}" доступен для тестирования 3 дня. Статус: Активен`,

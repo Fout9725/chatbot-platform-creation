@@ -11,10 +11,12 @@ import requests
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4')
 TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY', '')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 TELEGRAM_API = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
 TOGETHER_API = 'https://api.together.xyz/v1/images/generations'
+OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions'
 
 @dataclass
 class User:
@@ -53,10 +55,7 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
     })
 
 def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
-    '''Генерация изображения через Together AI (FLUX)'''
-    if not TOGETHER_API_KEY:
-        return None
-    
+    '''Генерация изображения через OpenRouter AI или Together AI (FLUX)'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail',
         'fashion': 'fashion photography, editorial style, vogue magazine',
@@ -70,30 +69,64 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    try:
-        response = requests.post(
-            TOGETHER_API,
-            headers={
-                'Authorization': f'Bearer {TOGETHER_API_KEY}',
-                'Content-Type': 'application/json'
-            },
-            json={
-                'model': 'black-forest-labs/FLUX.1-schnell-Free',
-                'prompt': full_prompt,
-                'width': 1024,
-                'height': 1024,
-                'steps': 4,
-                'n': 1
-            },
-            timeout=60
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            if 'data' in data and len(data['data']) > 0:
-                return data['data'][0]['url']
-    except Exception as e:
-        print(f'Error generating image: {e}')
+    if OPENROUTER_API_KEY:
+        try:
+            response = requests.post(
+                OPENROUTER_API,
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://poehali.dev',
+                    'X-Title': 'Нейрофотосессия PRO'
+                },
+                json={
+                    'model': 'openai/dall-e-3',
+                    'messages': [{
+                        'role': 'user',
+                        'content': full_prompt
+                    }]
+                },
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    content = data['choices'][0]['message']['content']
+                    if 'https://' in content:
+                        start = content.find('https://')
+                        end = content.find(' ', start)
+                        if end == -1:
+                            end = len(content)
+                        return content[start:end].strip()
+        except Exception as e:
+            print(f'Error generating image via OpenRouter: {e}')
+    
+    if TOGETHER_API_KEY:
+        try:
+            response = requests.post(
+                TOGETHER_API,
+                headers={
+                    'Authorization': f'Bearer {TOGETHER_API_KEY}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'black-forest-labs/FLUX.1-schnell-Free',
+                    'prompt': full_prompt,
+                    'width': 1024,
+                    'height': 1024,
+                    'steps': 4,
+                    'n': 1
+                },
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and len(data['data']) > 0:
+                    return data['data'][0]['url']
+        except Exception as e:
+            print(f'Error generating image via Together: {e}')
     
     return None
 
