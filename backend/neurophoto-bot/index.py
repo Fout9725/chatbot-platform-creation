@@ -11,12 +11,14 @@ import requests
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4')
+TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY', '')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
-TELEGRAM_API = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
+OPENROUTER_API_KEY = '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'
 TOGETHER_API = 'https://api.together.xyz/v1/images/generations'
 OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions'
+
+def get_telegram_api() -> str:
+    return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
 
 @dataclass
 class User:
@@ -36,7 +38,7 @@ def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -
         data['reply_markup'] = json.dumps(reply_markup)
     
     try:
-        response = requests.post(f'{TELEGRAM_API}/sendMessage', json=data, timeout=10)
+        response = requests.post(f'{get_telegram_api()}/sendMessage', json=data, timeout=10)
         print(f'sendMessage response: {response.status_code}, {response.text}')
     except Exception as e:
         print(f'Error sending message: {e}')
@@ -49,11 +51,11 @@ def send_photo(chat_id: int, photo_url: str, caption: str = '') -> None:
         'caption': caption,
         'parse_mode': 'Markdown'
     }
-    requests.post(f'{TELEGRAM_API}/sendPhoto', json=data)
+    requests.post(f'{get_telegram_api()}/sendPhoto', json=data)
 
 def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
     '''Отправка статуса (печатает, загружает фото и т.д.)'''
-    requests.post(f'{TELEGRAM_API}/sendChatAction', json={
+    requests.post(f'{get_telegram_api()}/sendChatAction', json={
         'chat_id': chat_id,
         'action': action
     })
@@ -410,7 +412,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             handle_callback(chat_id, data, message_id)
             
-            requests.post(f'{TELEGRAM_API}/answerCallbackQuery', json={
+            requests.post(f'{get_telegram_api()}/answerCallbackQuery', json={
                 'callback_query_id': callback['id']
             })
         
