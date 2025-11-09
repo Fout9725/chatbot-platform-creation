@@ -46,9 +46,10 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="general">Основное</TabsTrigger>
             <TabsTrigger value="behavior">Поведение</TabsTrigger>
+            <TabsTrigger value="knowledge">База знаний</TabsTrigger>
             <TabsTrigger value="integrations">Интеграции</TabsTrigger>
             <TabsTrigger value="schedule">Расписание</TabsTrigger>
             <TabsTrigger value="advanced">Продвинутые</TabsTrigger>
@@ -102,6 +103,92 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
                   <SelectItem value="Asia/Tokyo">Токио (UTC+9)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="knowledge" className="space-y-4 mt-4">
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Icon name="BookOpen" size={20} />
+                  Собственная база знаний
+                </h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Загрузите документы, статьи или FAQ для обучения бота
+                </p>
+                <div className="space-y-3">
+                  <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                    <Icon name="Upload" size={32} className="mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">Загрузить файлы</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOC, TXT, CSV (макс. 10MB)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input placeholder="Или вставьте текст напрямую..." />
+                    <Button size="sm">
+                      <Icon name="Plus" size={16} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Icon name="Globe" size={20} />
+                  Внешние источники знаний
+                </h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Подключите внешние API, веб-сайты или базы данных
+                </p>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="website-url">URL веб-сайта</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="website-url"
+                        placeholder="https://example.com"
+                      />
+                      <Button size="sm">
+                        <Icon name="Link" size={16} className="mr-1" />
+                        Добавить
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Бот автоматически извлечёт информацию с сайта</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="api-endpoint">API endpoint</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="api-endpoint"
+                        placeholder="https://api.example.com/data"
+                      />
+                      <Button size="sm">
+                        <Icon name="Plug" size={16} className="mr-1" />
+                        Подключить
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="database-url">База данных</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="database-url"
+                        placeholder="postgresql://..."
+                      />
+                      <Button size="sm">
+                        <Icon name="Database" size={16} className="mr-1" />
+                        Подключить
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <h4 className="font-semibold mb-3">Загруженные источники</h4>
+                <p className="text-sm text-muted-foreground">Источники знаний пока не добавлены</p>
+              </div>
             </div>
           </TabsContent>
 

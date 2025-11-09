@@ -14,6 +14,7 @@ import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
+import AdminBotBuilderTab from '@/components/admin/AdminBotBuilderTab';
 
 const AdminNew = () => {
   const navigate = useNavigate();
@@ -171,7 +172,7 @@ const AdminNew = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="stats">
               <Icon name="BarChart3" size={16} className="mr-2" />
               Статистика
@@ -187,6 +188,10 @@ const AdminNew = () => {
             <TabsTrigger value="marketplace">
               <Icon name="Store" size={16} className="mr-2" />
               Маркетплейс
+            </TabsTrigger>
+            <TabsTrigger value="builder">
+              <Icon name="Wrench" size={16} className="mr-2" />
+              Конструктор
             </TabsTrigger>
             <TabsTrigger value="templates">
               <Icon name="Library" size={16} className="mr-2" />
@@ -224,6 +229,10 @@ const AdminNew = () => {
 
           <TabsContent value="marketplace" className="space-y-4">
             <AdminMarketplaceTab marketplaceBots={marketplaceBots} />
+          </TabsContent>
+
+          <TabsContent value="builder" className="space-y-4">
+            <AdminBotBuilderTab />
           </TabsContent>
 
           <TabsContent value="templates" className="space-y-4">

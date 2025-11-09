@@ -1,4 +1,5 @@
 {
+  "email-notifications": "https://functions.poehali.dev/0da74e3e-9774-49d3-a9d3-3f4045408269",
   "prodamus-webhook": "https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4",
   "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f",
   "yookassa-payment": "https://functions.poehali.dev/04aae05b-5f30-481c-829d-4fba1be87d94",

@@ -73,6 +73,19 @@ const BotMarketplace = () => {
     
     const bot = mockBots.find(b => b.id === id);
     if (bot) {
+      const existingBot = JSON.parse(localStorage.getItem('activeBots') || '[]')
+        .find((b: any) => b.botId === id);
+      
+      if (existingBot) {
+        toast({
+          title: "Бот уже активирован",
+          description: `Бот "${bot.name}" уже есть в разделе "Мои боты"`,
+          variant: 'default',
+        });
+        navigate('/my-bots');
+        return;
+      }
+      
       activateBot(id, bot.name);
       if (!user?.hasActivatedBot) {
         setUserActivatedBot();

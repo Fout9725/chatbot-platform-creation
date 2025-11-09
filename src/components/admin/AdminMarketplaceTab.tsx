@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { mockBots } from '../marketplace/mockBots';
 
 interface MarketplaceBot {
   id: number;
@@ -23,6 +24,17 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
   const { toast } = useToast();
   const [filterActive, setFilterActive] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'downloads' | 'rating'>('name');
+  
+  const allBots = mockBots.map(bot => ({
+    id: bot.id,
+    name: bot.name,
+    author: 'Шаблон',
+    downloads: bot.users,
+    rating: bot.rating,
+    status: 'active'
+  }));
+  
+  const displayBots = marketplaceBots.length > 0 ? marketplaceBots : allBots;
 
   const handleEditBot = (botId: number, botName: string) => {
     toast({
@@ -68,7 +80,7 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          {marketplaceBots.map((bot) => (
+          {displayBots.map((bot) => (
             <div key={bot.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
@@ -98,7 +110,7 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
 
         <Separator />
 
-        {marketplaceBots.length === 0 && (
+        {displayBots.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <Icon name="Store" size={48} className="mx-auto mb-3 opacity-20" />
             <p>Ботов в маркетплейсе пока нет</p>
@@ -111,7 +123,7 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
             variant={filterActive ? 'default' : 'outline'} 
             className="flex-1"
             onClick={handleToggleFilter}
-            disabled={marketplaceBots.length === 0}
+            disabled={displayBots.length === 0}
           >
             <Icon name="Filter" size={16} className="mr-2" />
             Фильтры
@@ -121,7 +133,7 @@ const AdminMarketplaceTab = ({ marketplaceBots }: AdminMarketplaceTabProps) => {
             variant="outline" 
             className="flex-1"
             onClick={handleToggleSort}
-            disabled={marketplaceBots.length === 0}
+            disabled={displayBots.length === 0}
           >
             <Icon name="SortAsc" size={16} className="mr-2" />
             Сортировка
