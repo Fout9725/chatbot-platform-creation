@@ -14,8 +14,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => void;
-  register: (name: string, email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   setUserActivatedBot: () => void;
   setUserPlan: (plan: 'free' | 'optimal' | 'premium' | 'partner') => void;
@@ -43,6 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    if (user && user.id) {
+      fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role || 'user',
+          plan: user.plan
+        })
+      }).catch(error => {
+        console.error('Ошибка синхронизации пользователя при загрузке:', error);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (user) {
       localStorage.setItem('user', JSON.stringify(user));
     } else {
@@ -64,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [user]);
 
-  const login = (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
     
     if (email === 'A/V admin' && password === 'vovan.ru97') {
@@ -78,6 +96,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionExpiry,
         role: 'admin'
       };
+      
+      try {
+        await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            role: adminUser.role,
+            plan: adminUser.plan
+          })
+        });
+      } catch (error) {
+        console.error('Ошибка синхронизации админа с БД:', error);
+      }
+      
       setUser(adminUser);
       return;
     }
@@ -91,6 +126,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasActivatedBot: false,
       sessionExpiry
     };
+    
+    try {
+      await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+          role: 'user',
+          plan: mockUser.plan
+        })
+      });
+    } catch (error) {
+      console.error('Ошибка синхронизации пользователя с БД:', error);
+    }
+    
     setUser(mockUser);
   };
 

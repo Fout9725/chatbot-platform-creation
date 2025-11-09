@@ -34,7 +34,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     });
   };
 
-  const handleEmailAuth = () => {
+  const handleEmailAuth = async () => {
     if (!email || !password) {
       toast({
         title: 'Ошибка',
@@ -44,7 +44,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
     
-    login(email, password);
+    await login(email, password);
     
     if (email === 'A/V admin' && password === 'vovan.ru97') {
       toast({
@@ -80,7 +80,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     });
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!name || !email || !password) {
       toast({
         title: 'Ошибка',
@@ -99,7 +99,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
     
-    register(name, email, password);
+    await register(name, email, password);
     toast({
       title: 'Регистрация успешна! 🎉',
       description: 'Выберите тарифный план для продолжения',
