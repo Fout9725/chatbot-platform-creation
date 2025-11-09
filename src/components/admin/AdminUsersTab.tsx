@@ -30,41 +30,58 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
-  useEffect(() => {
-    const syncUsers = async () => {
+  const syncUsers = async (isManual = false) => {
+    if (isManual) {
+      setIsSyncing(true);
+    } else {
       setIsLoading(true);
-      try {
-        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
-        const data = await response.json();
+    }
+    
+    try {
+      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+      const data = await response.json();
+      
+      if (data.users && data.users.length > 0) {
+        const dbUsers: User[] = data.users.map((u: any) => ({
+          id: u.id.toString(),
+          name: u.name || 'Пользователь',
+          email: u.email,
+          plan: u.plan || 'free',
+          role: u.role || 'user',
+          registeredAt: u.created_at ? new Date(u.created_at).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
+          activeBots: 0,
+          status: 'active'
+        }));
+        setUsers(dbUsers);
         
-        if (data.users && data.users.length > 0) {
-          const dbUsers: User[] = data.users.map((u: any) => ({
-            id: u.id.toString(),
-            name: u.name || 'Пользователь',
-            email: u.email,
-            plan: u.plan || 'free',
-            role: u.role || 'user',
-            registeredAt: u.created_at ? new Date(u.created_at).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
-            activeBots: 0,
-            status: 'active'
-          }));
-          setUsers(dbUsers);
+        if (isManual) {
+          toast({
+            title: 'Синхронизация завершена',
+            description: `Загружено ${dbUsers.length} пользователей из базы данных`,
+          });
         }
-      } catch (error) {
-        console.error('Ошибка синхронизации пользователей:', error);
-        toast({
-          title: 'Ошибка синхронизации',
-          description: 'Не удалось загрузить пользователей из базы данных',
-          variant: 'destructive'
-        });
-      } finally {
+      }
+    } catch (error) {
+      console.error('Ошибка синхронизации пользователей:', error);
+      toast({
+        title: 'Ошибка синхронизации',
+        description: 'Не удалось загрузить пользователей из базы данных',
+        variant: 'destructive'
+      });
+    } finally {
+      if (isManual) {
+        setIsSyncing(false);
+      } else {
         setIsLoading(false);
       }
-    };
-    
+    }
+  };
+  
+  useEffect(() => {
     syncUsers();
-  }, [setUsers, toast]);
+  }, []);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -164,16 +181,29 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
               Всего пользователей: {users.length} • Активных: {users.filter(u => u.status === 'active').length}
             </CardDescription>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportToExcel}
-            className="flex items-center gap-2"
-          >
-            <Icon name="Download" size={16} />
-            Экспорт в Excel
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => syncUsers(true)}
+              disabled={isSyncing}
+              className="flex items-center gap-2"
+            >
+              <Icon name={isSyncing ? "Loader2" : "RefreshCw"} size={16} className={isSyncing ? "animate-spin" : ""} />
+              {isSyncing ? 'Синхронизация...' : 'Синхронизировать'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportToExcel}
+              className="flex items-center gap-2"
+            >
+              <Icon name="Download" size={16} />
+              Экспорт в Excel
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
