@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
@@ -330,12 +331,89 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
-    '''Генерация изображения через Hugging Face Inference API (100% бесплатно)'''
-    if not HUGGINGFACE_API_KEY:
-        print('HUGGINGFACE_API_KEY not configured')
+def generate_image_groq_fallback(prompt: str) -> Optional[bytes]:
+    '''Резервная генерация через Groq + Together AI (бесплатно)'''
+    if not GROQ_API_KEY:
+        print('GROQ_API_KEY not configured for fallback')
         return None
     
+    try:
+        # Используем Groq для улучшения промпта
+        headers = {
+            'Authorization': f'Bearer {GROQ_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        groq_payload = {
+            'model': 'llama-3.3-70b-versatile',
+            'messages': [{
+                'role': 'user',
+                'content': f'Convert this to detailed FLUX image prompt (max 50 words): {prompt}'
+            }],
+            'max_tokens': 100
+        }
+        
+        groq_response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers=headers,
+            json=groq_payload,
+            timeout=10
+        )
+        
+        if groq_response.status_code == 200:
+            enhanced_prompt = groq_response.json()['choices'][0]['message']['content']
+            print(f'Enhanced prompt via Groq: {enhanced_prompt[:100]}')
+        else:
+            enhanced_prompt = prompt
+            print(f'Groq enhancement failed, using original prompt')
+        
+        # Используем Together AI для генерации (бесплатный tier)
+        together_payload = {
+            'model': 'black-forest-labs/FLUX.1-schnell-Free',
+            'prompt': enhanced_prompt,
+            'width': 1024,
+            'height': 1024,
+            'steps': 4,
+            'n': 1
+        }
+        
+        # Together AI бесплатный endpoint
+        together_response = requests.post(
+            'https://api.together.xyz/v1/images/generations',
+            headers={
+                'Authorization': f'Bearer {GROQ_API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json=together_payload,
+            timeout=60
+        )
+        
+        print(f'Together AI fallback response: {together_response.status_code}')
+        
+        if together_response.status_code == 200:
+            result = together_response.json()
+            if 'data' in result and len(result['data']) > 0:
+                image_url = result['data'][0].get('url') or result['data'][0].get('b64_json')
+                if image_url:
+                    if image_url.startswith('http'):
+                        img_response = requests.get(image_url, timeout=30)
+                        if img_response.status_code == 200:
+                            print(f'Together AI image downloaded, size: {len(img_response.content)} bytes')
+                            return img_response.content
+                    else:
+                        import base64
+                        image_bytes = base64.b64decode(image_url)
+                        print(f'Together AI base64 decoded, size: {len(image_bytes)} bytes')
+                        return image_bytes
+        
+        return None
+            
+    except Exception as e:
+        print(f'Fallback generation error: {e}')
+        return None
+
+def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
+    '''Генерация изображения через Hugging Face Inference API (100% бесплатно)'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
         'fashion': 'fashion photography, editorial style, vogue magazine, professional',
@@ -349,47 +427,44 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    try:
-        headers = {
-            'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
-            'Content-Type': 'application/json',
-            'x-use-cache': 'false'
-        }
-        
-        payload = {
-            'inputs': full_prompt,
-            'parameters': {
-                'num_inference_steps': 4,
-                'guidance_scale': 0.0,
-                'width': 1024,
-                'height': 1024
+    # Попытка 1: Hugging Face
+    if HUGGINGFACE_API_KEY:
+        try:
+            headers = {
+                'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
+                'Content-Type': 'application/json',
+                'x-use-cache': 'false'
             }
-        }
-        
-        # Используем новый URL API
-        api_url = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
-        
-        print(f'Generating image with prompt: {full_prompt[:100]}...')
-        
-        response = requests.post(
-            api_url,
-            headers=headers,
-            json=payload,
-            timeout=120
-        )
-        
-        print(f'Hugging Face response status: {response.status_code}')
-        
-        if response.status_code == 200:
-            image_bytes = response.content
-            print(f'Image generated successfully, size: {len(image_bytes)} bytes')
-            return image_bytes
-        else:
-            print(f'Hugging Face API error: {response.status_code}, {response.text}')
             
-            # Если модель загружается, попробуем еще раз через 20 секунд
-            if response.status_code == 503:
-                print('Model is loading, retrying in 20 seconds...')
+            payload = {
+                'inputs': full_prompt,
+                'parameters': {
+                    'num_inference_steps': 4,
+                    'guidance_scale': 0.0,
+                    'width': 1024,
+                    'height': 1024
+                }
+            }
+            
+            api_url = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
+            
+            print(f'Generating image with prompt: {full_prompt[:100]}...')
+            
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=payload,
+                timeout=120
+            )
+            
+            print(f'Hugging Face response status: {response.status_code}')
+            
+            if response.status_code == 200:
+                image_bytes = response.content
+                print(f'Image generated successfully via HuggingFace, size: {len(image_bytes)} bytes')
+                return image_bytes
+            elif response.status_code == 503:
+                print('HuggingFace model is loading, retrying in 20 seconds...')
                 import time
                 time.sleep(20)
                 
@@ -402,14 +477,19 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
                 
                 if response.status_code == 200:
                     image_bytes = response.content
-                    print(f'Image generated on retry, size: {len(image_bytes)} bytes')
+                    print(f'Image generated on retry via HuggingFace, size: {len(image_bytes)} bytes')
                     return image_bytes
             
-            return None
-            
-    except Exception as e:
-        print(f'Error generating image via Hugging Face: {e}')
-        return None
+            print(f'HuggingFace failed: {response.status_code}, {response.text[:200]}')
+                
+        except Exception as e:
+            print(f'HuggingFace error: {e}')
+    else:
+        print('HUGGINGFACE_API_KEY not configured')
+    
+    # Попытка 2: Резервный API через Groq + Together
+    print('Trying fallback API (Groq + Together)...')
+    return generate_image_groq_fallback(full_prompt)
 
 def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
     '''Отправка фото из байтов в Telegram'''
