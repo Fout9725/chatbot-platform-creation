@@ -16,6 +16,7 @@ TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
 HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+ADMIN_IDS = [1508333931]
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -126,6 +127,165 @@ def use_generation(telegram_id: int) -> bool:
         return True
     except Exception as e:
         print(f'Database error in use_generation: {e}')
+        if conn:
+            conn.close()
+        return False
+
+def get_all_stats() -> Optional[Dict]:
+    '''Получение общей статистики по боту'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        
+        # Общее количество пользователей
+        cur.execute("SELECT COUNT(*) FROM neurophoto_users")
+        total_users = cur.fetchone()[0]
+        
+        # Всего генераций
+        cur.execute("SELECT SUM(total_used) FROM neurophoto_users")
+        total_generations = cur.fetchone()[0] or 0
+        
+        # Активных пользователей (использовали хотя бы раз)
+        cur.execute("SELECT COUNT(*) FROM neurophoto_users WHERE total_used > 0")
+        active_users = cur.fetchone()[0]
+        
+        # Новые пользователи за сегодня
+        cur.execute("SELECT COUNT(*) FROM neurophoto_users WHERE DATE(created_at) = CURRENT_DATE")
+        new_today = cur.fetchone()[0]
+        
+        # Топ-5 активных пользователей
+        cur.execute("""
+            SELECT telegram_id, first_name, username, total_used 
+            FROM neurophoto_users 
+            ORDER BY total_used DESC 
+            LIMIT 5
+        """)
+        top_users = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            'total_users': total_users,
+            'total_generations': total_generations,
+            'active_users': active_users,
+            'new_today': new_today,
+            'top_users': top_users
+        }
+    except Exception as e:
+        print(f'Database error in get_all_stats: {e}')
+        if conn:
+            conn.close()
+        return None
+
+def add_generations(telegram_id: int, free_count: int = 0, paid_count: int = 0) -> bool:
+    '''Добавление генераций пользователю'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        
+        if free_count > 0:
+            cur.execute(
+                "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
+                (free_count, telegram_id)
+            )
+        
+        if paid_count > 0:
+            cur.execute(
+                "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
+                (paid_count, telegram_id)
+            )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Database error in add_generations: {e}')
+        if conn:
+            conn.close()
+        return False
+
+def get_user_by_id(telegram_id: int) -> Optional[Dict]:
+    '''Получение информации о пользователе по ID'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at FROM neurophoto_users WHERE telegram_id = %s",
+            (telegram_id,)
+        )
+        result = cur.fetchone()
+        
+        if result:
+            user_data = {
+                'telegram_id': result[0],
+                'username': result[1],
+                'first_name': result[2],
+                'free_generations': result[3],
+                'paid_generations': result[4],
+                'total_used': result[5],
+                'created_at': result[6]
+            }
+            cur.close()
+            conn.close()
+            return user_data
+        
+        cur.close()
+        conn.close()
+        return None
+    except Exception as e:
+        print(f'Database error in get_user_by_id: {e}')
+        if conn:
+            conn.close()
+        return None
+
+def get_all_user_ids() -> list:
+    '''Получение всех telegram_id для рассылки'''
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT telegram_id FROM neurophoto_users")
+        ids = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return ids
+    except Exception as e:
+        print(f'Database error in get_all_user_ids: {e}')
+        if conn:
+            conn.close()
+        return []
+
+def reset_user(telegram_id: int) -> bool:
+    '''Сброс счетчика пользователя'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE neurophoto_users SET free_generations = 3, paid_generations = 0, total_used = 0 WHERE telegram_id = %s",
+            (telegram_id,)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Database error in reset_user: {e}')
         if conn:
             conn.close()
         return False
@@ -458,6 +618,131 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     if text.startswith('/help'):
         handle_help(chat_id)
         return
+    
+    # Админ-команды
+    if chat_id in ADMIN_IDS:
+        if text.startswith('/stats'):
+            stats = get_all_stats()
+            if stats:
+                top_users_text = '\n'.join([
+                    f"{i+1}\\. {user[1]} \\(@{user[2] or 'none'}\\) \\- {user[3]} генераций"
+                    for i, user in enumerate(stats['top_users'])
+                ])
+                
+                stats_text = f'''📊 *Статистика бота*
+
+👥 Всего пользователей: *{stats['total_users']}*
+✅ Активных: *{stats['active_users']}*
+🆕 Новых сегодня: *{stats['new_today']}*
+🎨 Всего генераций: *{stats['total_generations']}*
+
+🏆 *Топ\\-5 пользователей:*
+{top_users_text}'''
+                send_message(chat_id, stats_text)
+            else:
+                send_message(chat_id, '❌ Ошибка получения статистики')
+            return
+        
+        elif text.startswith('/addgen '):
+            try:
+                parts = text.split()
+                if len(parts) >= 3:
+                    target_id = int(parts[1])
+                    count = int(parts[2])
+                    gen_type = parts[3] if len(parts) > 3 else 'paid'
+                    
+                    if gen_type == 'free':
+                        success = add_generations(target_id, free_count=count)
+                    else:
+                        success = add_generations(target_id, paid_count=count)
+                    
+                    if success:
+                        send_message(chat_id, f'✅ Добавлено {count} генераций пользователю {target_id}')
+                        send_message(target_id, f'🎁 Администратор начислил тебе *{count}* генераций\\!')
+                    else:
+                        send_message(chat_id, '❌ Ошибка добавления генераций')
+                else:
+                    send_message(chat_id, '❌ Использование: /addgen <telegram\\_id> <количество> <free/paid>')
+            except ValueError:
+                send_message(chat_id, '❌ Неверный формат\\. Использование: /addgen <telegram\\_id> <количество> <free/paid>')
+            return
+        
+        elif text.startswith('/userinfo '):
+            try:
+                target_id = int(text.split()[1])
+                user_info = get_user_by_id(target_id)
+                
+                if user_info:
+                    reg_date = user_info['created_at'].strftime('%d.%m.%Y') if user_info['created_at'] else 'N/A'
+                    reg_date_escaped = reg_date.replace('.', '\\.')
+                    
+                    info_text = f'''👤 *Информация о пользователе*
+
+ID: `{user_info['telegram_id']}`
+Имя: {user_info['first_name']}
+Username: @{user_info['username'] or 'none'}
+Бесплатных: {user_info['free_generations']}
+Купленных: {user_info['paid_generations']}
+Использовано: {user_info['total_used']}
+Регистрация: {reg_date_escaped}'''
+                    send_message(chat_id, info_text)
+                else:
+                    send_message(chat_id, '❌ Пользователь не найден')
+            except (ValueError, IndexError):
+                send_message(chat_id, '❌ Использование: /userinfo <telegram\\_id>')
+            return
+        
+        elif text.startswith('/broadcast '):
+            broadcast_text = text.replace('/broadcast ', '', 1)
+            user_ids = get_all_user_ids()
+            
+            if user_ids:
+                success_count = 0
+                for user_id in user_ids:
+                    try:
+                        send_message(user_id, broadcast_text)
+                        success_count += 1
+                    except Exception as e:
+                        print(f'Failed to send to {user_id}: {e}')
+                
+                send_message(chat_id, f'✅ Рассылка завершена\\. Отправлено: {success_count}/{len(user_ids)}')
+            else:
+                send_message(chat_id, '❌ Нет пользователей для рассылки')
+            return
+        
+        elif text.startswith('/reset '):
+            try:
+                target_id = int(text.split()[1])
+                if reset_user(target_id):
+                    send_message(chat_id, f'✅ Счетчик пользователя {target_id} сброшен')
+                    send_message(target_id, '🔄 Администратор сбросил твой счетчик\\. У тебя снова *3 бесплатные* генерации\\!')
+                else:
+                    send_message(chat_id, '❌ Ошибка сброса счетчика')
+            except (ValueError, IndexError):
+                send_message(chat_id, '❌ Использование: /reset <telegram\\_id>')
+            return
+        
+        elif text == '/admin':
+            admin_text = '''🛡️ *Админ\\-панель*
+
+*Доступные команды:*
+
+📊 /stats \\- общая статистика бота
+
+👤 /userinfo <id> \\- информация о пользователе
+_Пример: /userinfo 123456789_
+
+🎁 /addgen <id> <число> <тип> \\- добавить генерации
+_Пример: /addgen 123456789 10 paid_
+_Тип: free или paid_
+
+💬 /broadcast <текст> \\- отправить сообщение всем
+_Пример: /broadcast Привет всем\\!_
+
+🔄 /reset <id> \\- сбросить счетчик пользователя
+_Пример: /reset 123456789_'''
+            send_message(chat_id, admin_text)
+            return
     
     # Получаем данные пользователя
     user_data = get_or_create_user(chat_id, username, first_name)
