@@ -75,39 +75,6 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    if OPENROUTER_API_KEY:
-        try:
-            response = requests.post(
-                OPENROUTER_API,
-                headers={
-                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://poehali.dev',
-                    'X-Title': 'Нейрофотосессия PRO'
-                },
-                json={
-                    'model': 'openai/dall-e-3',
-                    'messages': [{
-                        'role': 'user',
-                        'content': full_prompt
-                    }]
-                },
-                timeout=60
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'choices' in data and len(data['choices']) > 0:
-                    content = data['choices'][0]['message']['content']
-                    if 'https://' in content:
-                        start = content.find('https://')
-                        end = content.find(' ', start)
-                        if end == -1:
-                            end = len(content)
-                        return content[start:end].strip()
-        except Exception as e:
-            print(f'Error generating image via OpenRouter: {e}')
-    
     if TOGETHER_API_KEY:
         try:
             response = requests.post(
@@ -131,8 +98,46 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
                 data = response.json()
                 if 'data' in data and len(data['data']) > 0:
                     return data['data'][0]['url']
+            else:
+                print(f'Together API error: {response.status_code}, {response.text}')
         except Exception as e:
             print(f'Error generating image via Together: {e}')
+    
+    if OPENROUTER_API_KEY:
+        try:
+            response = requests.post(
+                OPENROUTER_API,
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'HTTP-Referer': 'https://poehali.dev',
+                    'X-Title': 'Neurophoto PRO'
+                },
+                json={
+                    'model': 'black-forest-labs/flux-1.1-pro',
+                    'prompt': full_prompt,
+                    'max_tokens': 512
+                },
+                timeout=90
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    content = data['choices'][0].get('message', {}).get('content', '')
+                    if 'https://' in content:
+                        start = content.find('https://')
+                        end = content.find(' ', start)
+                        if end == -1:
+                            end = len(content)
+                        url = content[start:end].strip()
+                        if url.endswith(')'):
+                            url = url[:-1]
+                        return url
+            else:
+                print(f'OpenRouter API error: {response.status_code}, {response.text}')
+        except Exception as e:
+            print(f'Error generating image via OpenRouter: {e}')
     
     return None
 

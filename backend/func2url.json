@@ -1,6 +1,5 @@
 {
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
-  "openrouter-chat": "https://functions.poehali.dev/56de8fa4-fe58-4822-8061-245825ffba85",
   "email-notifications": "https://functions.poehali.dev/0da74e3e-9774-49d3-a9d3-3f4045408269",
   "prodamus-webhook": "https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4",
   "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f",
