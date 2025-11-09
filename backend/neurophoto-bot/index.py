@@ -331,85 +331,28 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image_groq_fallback(prompt: str) -> Optional[bytes]:
-    '''Резервная генерация через Groq + Together AI (бесплатно)'''
-    if not GROQ_API_KEY:
-        print('GROQ_API_KEY not configured for fallback')
-        return None
-    
+def generate_image_pollinations_fallback(prompt: str) -> Optional[bytes]:
+    '''Резервная генерация через Pollinations AI (100% бесплатно, без API ключа)'''
     try:
-        # Используем Groq для улучшения промпта
-        headers = {
-            'Authorization': f'Bearer {GROQ_API_KEY}',
-            'Content-Type': 'application/json'
-        }
+        import urllib.parse
         
-        groq_payload = {
-            'model': 'llama-3.3-70b-versatile',
-            'messages': [{
-                'role': 'user',
-                'content': f'Convert this to detailed FLUX image prompt (max 50 words): {prompt}'
-            }],
-            'max_tokens': 100
-        }
+        encoded_prompt = urllib.parse.quote(prompt)
+        pollinations_url = f'https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux&seed=-1&nologo=true&enhance=true'
         
-        groq_response = requests.post(
-            'https://api.groq.com/openai/v1/chat/completions',
-            headers=headers,
-            json=groq_payload,
-            timeout=10
-        )
+        print(f'Trying Pollinations AI fallback: {pollinations_url[:100]}...')
         
-        if groq_response.status_code == 200:
-            enhanced_prompt = groq_response.json()['choices'][0]['message']['content']
-            print(f'Enhanced prompt via Groq: {enhanced_prompt[:100]}')
-        else:
-            enhanced_prompt = prompt
-            print(f'Groq enhancement failed, using original prompt')
+        response = requests.get(pollinations_url, timeout=60)
         
-        # Используем Together AI для генерации (бесплатный tier)
-        together_payload = {
-            'model': 'black-forest-labs/FLUX.1-schnell-Free',
-            'prompt': enhanced_prompt,
-            'width': 1024,
-            'height': 1024,
-            'steps': 4,
-            'n': 1
-        }
+        print(f'Pollinations AI response: {response.status_code}')
         
-        # Together AI бесплатный endpoint
-        together_response = requests.post(
-            'https://api.together.xyz/v1/images/generations',
-            headers={
-                'Authorization': f'Bearer {GROQ_API_KEY}',
-                'Content-Type': 'application/json'
-            },
-            json=together_payload,
-            timeout=60
-        )
-        
-        print(f'Together AI fallback response: {together_response.status_code}')
-        
-        if together_response.status_code == 200:
-            result = together_response.json()
-            if 'data' in result and len(result['data']) > 0:
-                image_url = result['data'][0].get('url') or result['data'][0].get('b64_json')
-                if image_url:
-                    if image_url.startswith('http'):
-                        img_response = requests.get(image_url, timeout=30)
-                        if img_response.status_code == 200:
-                            print(f'Together AI image downloaded, size: {len(img_response.content)} bytes')
-                            return img_response.content
-                    else:
-                        import base64
-                        image_bytes = base64.b64decode(image_url)
-                        print(f'Together AI base64 decoded, size: {len(image_bytes)} bytes')
-                        return image_bytes
+        if response.status_code == 200 and response.content:
+            print(f'Image generated via Pollinations, size: {len(response.content)} bytes')
+            return response.content
         
         return None
             
     except Exception as e:
-        print(f'Fallback generation error: {e}')
+        print(f'Pollinations fallback error: {e}')
         return None
 
 def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
@@ -427,7 +370,15 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    # Попытка 1: Hugging Face
+    # Попытка 1: Pollinations AI (100% бесплатно, без API ключа)
+    print(f'Generating image with prompt: {full_prompt[:100]}...')
+    pollinations_result = generate_image_pollinations_fallback(full_prompt)
+    
+    if pollinations_result:
+        return pollinations_result
+    
+    # Попытка 2: Hugging Face (резерв)
+    print('Pollinations failed, trying Hugging Face as fallback...')
     if HUGGINGFACE_API_KEY:
         try:
             headers = {
@@ -446,12 +397,8 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
                 }
             }
             
-            api_url = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
-            
-            print(f'Generating image with prompt: {full_prompt[:100]}...')
-            
             response = requests.post(
-                api_url,
+                'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
                 headers=headers,
                 json=payload,
                 timeout=120
@@ -469,7 +416,7 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
                 time.sleep(20)
                 
                 response = requests.post(
-                    api_url,
+                    'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
                     headers=headers,
                     json=payload,
                     timeout=120
@@ -484,12 +431,9 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
                 
         except Exception as e:
             print(f'HuggingFace error: {e}')
-    else:
-        print('HUGGINGFACE_API_KEY not configured')
     
-    # Попытка 2: Резервный API через Groq + Together
-    print('Trying fallback API (Groq + Together)...')
-    return generate_image_groq_fallback(full_prompt)
+    print('Both APIs failed')
+    return None
 
 def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
     '''Отправка фото из байтов в Telegram'''
