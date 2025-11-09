@@ -35,7 +35,11 @@ def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -
     if reply_markup:
         data['reply_markup'] = json.dumps(reply_markup)
     
-    requests.post(f'{TELEGRAM_API}/sendMessage', json=data)
+    try:
+        response = requests.post(f'{TELEGRAM_API}/sendMessage', json=data, timeout=10)
+        print(f'sendMessage response: {response.status_code}, {response.text}')
+    except Exception as e:
+        print(f'Error sending message: {e}')
 
 def send_photo(chat_id: int, photo_url: str, caption: str = '') -> None:
     '''Отправка фото в Telegram'''
@@ -356,6 +360,10 @@ def handle_text_message(chat_id: int, text: str, first_name: str) -> None:
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     method: str = event.get('httpMethod', 'POST')
+    
+    print(f'Received request: method={method}')
+    print(f'Event body: {event.get("body", "{}")}')
+    print(f'TELEGRAM_TOKEN configured: {bool(TELEGRAM_TOKEN)}')
     
     if method == 'OPTIONS':
         return {
