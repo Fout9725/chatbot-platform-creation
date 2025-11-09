@@ -1,5 +1,5 @@
 '''
-Business: Telegram-бот для создания AI-фотосессий через FLUX и Stable Diffusion
+Business: Telegram-бот для создания AI-фотосессий через Hugging Face Serverless API (бесплатно)
 Args: event - dict with httpMethod (POST для webhook), body (JSON от Telegram)
       context - object with request_id, function_name, etc.
 Returns: HTTP response dict с обработкой команд и генерацией изображений
@@ -12,10 +12,8 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
-TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY', '')
-OPENROUTER_API_KEY = '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'
-TOGETHER_API = 'https://api.together.xyz/v1/images/generations'
-OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions'
+HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
+HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -61,85 +59,75 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
     })
 
 def generate_image(prompt: str, style: str = 'portrait') -> Optional[str]:
-    '''Генерация изображения через OpenRouter AI или Together AI (FLUX)'''
+    '''Генерация изображения через Hugging Face Serverless API (100% бесплатно)'''
+    if not HUGGINGFACE_API_KEY:
+        print('HUGGINGFACE_API_KEY not configured')
+        return None
+    
     style_prompts = {
-        'portrait': 'professional portrait photo, studio lighting, high detail',
-        'fashion': 'fashion photography, editorial style, vogue magazine',
-        'business': 'professional business portrait, corporate, confident',
-        'art': 'artistic portrait, dramatic lighting, cinematic',
-        'urban': 'urban street photography, city background',
-        'nature': 'natural outdoor portrait, soft natural light',
-        'concept': 'conceptual art portrait, creative, unique',
-        'creative': 'creative photography, innovative style'
+        'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
+        'fashion': 'fashion photography, editorial style, vogue magazine, professional',
+        'business': 'professional business portrait, corporate, confident, formal',
+        'art': 'artistic portrait, dramatic lighting, cinematic, creative',
+        'urban': 'urban street photography, city background, modern style',
+        'nature': 'natural outdoor portrait, soft natural light, beautiful scenery',
+        'concept': 'conceptual art portrait, creative, unique, artistic vision',
+        'creative': 'creative photography, innovative style, artistic approach'
     }
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    if TOGETHER_API_KEY:
-        try:
-            response = requests.post(
-                TOGETHER_API,
-                headers={
-                    'Authorization': f'Bearer {TOGETHER_API_KEY}',
-                    'Content-Type': 'application/json'
-                },
-                json={
-                    'model': 'black-forest-labs/FLUX.1-schnell-Free',
-                    'prompt': full_prompt,
-                    'width': 1024,
-                    'height': 1024,
-                    'steps': 4,
-                    'n': 1
-                },
-                timeout=60
-            )
+    try:
+        headers = {
+            'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'inputs': full_prompt,
+            'parameters': {
+                'num_inference_steps': 4,
+                'guidance_scale': 0
+            }
+        }
+        
+        response = requests.post(
+            HUGGINGFACE_API,
+            headers=headers,
+            json=payload,
+            timeout=90
+        )
+        
+        if response.status_code == 200:
+            image_bytes = response.content
             
-            if response.status_code == 200:
-                data = response.json()
-                if 'data' in data and len(data['data']) > 0:
-                    return data['data'][0]['url']
-            else:
-                print(f'Together API error: {response.status_code}, {response.text}')
-        except Exception as e:
-            print(f'Error generating image via Together: {e}')
-    
-    if OPENROUTER_API_KEY:
-        try:
-            response = requests.post(
-                OPENROUTER_API,
-                headers={
-                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                    'Content-Type': 'application/json; charset=utf-8',
-                    'HTTP-Referer': 'https://poehali.dev',
-                    'X-Title': 'Neurophoto PRO'
-                },
-                json={
-                    'model': 'black-forest-labs/flux-1.1-pro',
-                    'prompt': full_prompt,
-                    'max_tokens': 512
-                },
-                timeout=90
-            )
+            upload_url = f'{get_telegram_api()}/sendPhoto'
+            files = {'photo': ('image.png', image_bytes, 'image/png')}
+            data = {'chat_id': 'temp'}
             
-            if response.status_code == 200:
-                data = response.json()
-                if 'choices' in data and len(data['choices']) > 0:
-                    content = data['choices'][0].get('message', {}).get('content', '')
-                    if 'https://' in content:
-                        start = content.find('https://')
-                        end = content.find(' ', start)
-                        if end == -1:
-                            end = len(content)
-                        url = content[start:end].strip()
-                        if url.endswith(')'):
-                            url = url[:-1]
-                        return url
-            else:
-                print(f'OpenRouter API error: {response.status_code}, {response.text}')
-        except Exception as e:
-            print(f'Error generating image via OpenRouter: {e}')
-    
-    return None
+            return image_bytes
+        else:
+            print(f'Hugging Face API error: {response.status_code}, {response.text}')
+            return None
+            
+    except Exception as e:
+        print(f'Error generating image via Hugging Face: {e}')
+        return None
+
+def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
+    '''Отправка фото из байтов в Telegram'''
+    try:
+        url = f'{get_telegram_api()}/sendPhoto'
+        files = {'photo': ('generated.png', image_bytes, 'image/png')}
+        data = {
+            'chat_id': chat_id,
+            'caption': caption,
+            'parse_mode': 'Markdown'
+        }
+        response = requests.post(url, files=files, data=data, timeout=30)
+        print(f'sendPhoto response: {response.status_code}')
+    except Exception as e:
+        print(f'Error sending photo bytes: {e}')
 
 def get_start_keyboard() -> Dict:
     '''Клавиатура для главного меню'''
@@ -184,7 +172,7 @@ def handle_start(chat_id: int, first_name: str) -> None:
 • Создаю фото из текстового описания
 • Обрабатываю твои фотографии
 • Применяю 10+ профессиональных стилей
-• Генерирую HD качество (1024x1024)
+• Генерирую HD качество
 
 🎁 *Бонус:*
 У тебя есть *3 бесплатные* генерации!
@@ -245,30 +233,31 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
         text = '''
 📸 *Обработка твоего фото*
 
-Загрузи свою фотографию, и я применю AI-обработку:
+Загрузи свою фотографию, и я применю к ней профессиональные эффекты!
+
+*Доступные эффекты:*
 • Улучшение качества
 • Изменение стиля
-• Смена фона
 • Профессиональная ретушь
+• Художественные фильтры
 
-*Отправь фото:*
+Отправь фото 👇
         '''
-        send_message(chat_id, text)
+        send_message(chat_id, text, get_start_keyboard())
     
     elif data == 'bonuses':
         text = '''
 🎁 *Твои бонусы*
 
-🆓 Бесплатные генерации: *3 шт.*
-💰 Реферальный баланс: *0₽*
+Бесплатных генераций: *3*
+Купленных генераций: *0*
 
-*Как получить больше?*
-• Пригласи друга - получи 20% от его покупок
-• Купи пакет фотосессий
-• Участвуй в акциях
+💡 После использования бесплатных генераций можно:
+• Купить пакет фото
+• Пригласить друзей (+2 за друга)
+• Участвовать в конкурсах
 
-🔗 Твоя реферальная ссылка:
-`https://t.me/neurophoto_bot?start=ref123`
+Используй бонусы с умом! 🎯
         '''
         send_message(chat_id, text, get_start_keyboard())
     
@@ -276,38 +265,34 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
         text = '''
 💎 *Пакеты фотосессий*
 
-📦 *Мини* - 299₽
+*Мини* - 299₽
 • 5 генераций
 • HD качество
 • Все стили
 
-📦 *Стандарт* - 499₽ ⭐
+*Стандарт* - 499₽ 🔥
 • 10 генераций
 • HD качество
 • Все стили
-• Приоритетная очередь
+• Приоритетная обработка
 
-📦 *Профи* - 799₽
+*Профи* - 799₽ ⭐
 • 20 генераций
-• Ultra HD качество
+• HD качество
 • Все стили
-• Без очереди
-• Сохранение истории
+• Приоритетная обработка
+• Эксклюзивные стили
 
-💳 *Оплата:*
-• Telegram Stars
-• Банковская карта
-• СБП
+Для покупки свяжись с @support_bot
         '''
-        keyboard = {
-            'inline_keyboard': [
-                [{'text': '💳 Купить Мини (299₽)', 'callback_data': 'pay_mini'}],
-                [{'text': '💳 Купить Стандарт (499₽)', 'callback_data': 'pay_standard'}],
-                [{'text': '💳 Купить Профи (799₽)', 'callback_data': 'pay_pro'}],
-                [{'text': '⬅️ Назад', 'callback_data': 'back_menu'}]
-            ]
-        }
-        send_message(chat_id, text, keyboard)
+        send_message(chat_id, text, get_start_keyboard())
+    
+    elif data == 'help':
+        handle_help(chat_id)
+    
+    elif data == 'back_menu':
+        text = 'Выбери действие 👇'
+        send_message(chat_id, text, get_start_keyboard())
     
     elif data.startswith('style_'):
         style = data.replace('style_', '')
@@ -321,116 +306,91 @@ def handle_callback(chat_id: int, data: str, message_id: int) -> None:
 "Портрет девушки 25 лет, длинные волосы, улыбка"
         '''
         send_message(chat_id, text)
-    
-    elif data == 'back_menu':
-        handle_start(chat_id, 'пользователь')
-    
-    elif data == 'help':
-        handle_help(chat_id)
 
-def handle_text_message(chat_id: int, text: str, first_name: str) -> None:
-    '''Обработка текстового сообщения как промпта'''
-    if len(text) < 10:
-        send_message(chat_id, '⚠️ Опиши фото подробнее (минимум 10 символов)')
+user_states = {}
+
+def handle_message(chat_id: int, text: str, first_name: str) -> None:
+    '''Обработка текстовых сообщений'''
+    if text.startswith('/start'):
+        handle_start(chat_id, first_name)
+        return
+    
+    if text.startswith('/help'):
+        handle_help(chat_id)
         return
     
     send_message(chat_id, '🎨 Генерирую твое фото... Это займет 20-40 секунд')
     send_chat_action(chat_id, 'upload_photo')
     
-    image_url = generate_image(text, 'portrait')
+    image_bytes = generate_image(text, 'portrait')
     
-    if image_url:
-        caption = f'✨ Твоя AI-фотосессия готова!\n\n📝 Промпт: {text[:100]}...'
-        send_photo(chat_id, image_url, caption)
-        
-        send_message(chat_id, '''
-🎉 Фото готово!
-
-*Что дальше?*
-• Создай еще фото (осталось 2 бесплатных)
-• Попробуй другой стиль
-• Купи пакет для больше генераций
-
-Выбери действие:
-        ''', get_start_keyboard())
+    if image_bytes:
+        caption = f'✨ *Готово!*\n\n_{text[:100]}_' if len(text) <= 100 else f'✨ *Готово!*\n\n_{text[:100]}..._'
+        send_photo_bytes(chat_id, image_bytes, caption)
+        send_message(chat_id, '🎉 Фото готово! Хочешь создать еще?', get_start_keyboard())
     else:
-        send_message(chat_id, '''
+        error_text = '''
 ❌ Не удалось сгенерировать фото.
 
 *Возможные причины:*
-• Закончились бесплатные генерации
-• Проблема с API (попробуй через минуту)
+• Модель загружается (попробуй через минуту)
+• API недоступен (попробуй позже)
 • Промпт содержит запрещенный контент
 
 Попробуй еще раз или купи пакет 💎
-        ''', get_start_keyboard())
+        '''
+        send_message(chat_id, error_text, get_start_keyboard())
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    method: str = event.get('httpMethod', 'POST')
-    
-    print(f'Received request: method={method}')
-    print(f'Event body: {event.get("body", "{}")}')
-    print(f'TELEGRAM_TOKEN configured: {bool(TELEGRAM_TOKEN)}')
+    method: str = event.get('httpMethod', 'GET')
     
     if method == 'OPTIONS':
         return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
             'body': ''
         }
     
-    if method != 'POST':
-        return {
-            'statusCode': 405,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': 'Method not allowed'})
-        }
+    print(f'Received request: method={method}')
+    
+    body_str = event.get('body', '{}')
+    print(f'Event body: {body_str}')
     
     try:
-        body = json.loads(event.get('body', '{}'))
-        
-        if 'message' in body:
-            message = body['message']
-            chat_id = message['chat']['id']
-            first_name = message['from'].get('first_name', 'пользователь')
-            
-            if 'text' in message:
-                text = message['text']
-                
-                if text == '/start':
-                    handle_start(chat_id, first_name)
-                elif text == '/help':
-                    handle_help(chat_id)
-                else:
-                    handle_text_message(chat_id, text, first_name)
-        
-        elif 'callback_query' in body:
-            callback = body['callback_query']
-            chat_id = callback['message']['chat']['id']
-            message_id = callback['message']['message_id']
-            data = callback['data']
-            
-            handle_callback(chat_id, data, message_id)
-            
-            requests.post(f'{get_telegram_api()}/answerCallbackQuery', json={
-                'callback_query_id': callback['id']
-            })
-        
+        update = json.loads(body_str)
+    except json.JSONDecodeError:
         return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Invalid JSON'})
         }
+    
+    print(f'TELEGRAM_TOKEN configured: {bool(TELEGRAM_TOKEN)}')
+    
+    if 'message' in update:
+        message = update['message']
+        chat_id = message['chat']['id']
+        text = message.get('text', '')
+        first_name = message['from'].get('first_name', 'Friend')
         
-    except Exception as e:
-        print(f'Error: {e}')
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': str(e)})
-        }
+        handle_message(chat_id, text, first_name)
+    
+    elif 'callback_query' in update:
+        callback = update['callback_query']
+        chat_id = callback['message']['chat']['id']
+        data = callback['data']
+        message_id = callback['message']['message_id']
+        
+        handle_callback(chat_id, data, message_id)
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'isBase64Encoded': False,
+        'body': json.dumps({'ok': True})
+    }

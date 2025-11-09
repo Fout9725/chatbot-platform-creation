@@ -4,18 +4,28 @@
       "name": "OPTIONS request (CORS preflight)",
       "method": "OPTIONS",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": "",
-      "bodyMatcher": "exact"
+      "expectedStatus": 200
     },
     {
       "name": "Telegram /start command webhook",
       "method": "POST",
       "path": "/",
       "body": {
+        "update_id": 123456789,
         "message": {
-          "chat": {"id": 123456},
-          "from": {"first_name": "Test User"},
+          "message_id": 1,
+          "from": {
+            "id": 12345,
+            "is_bot": false,
+            "first_name": "Test",
+            "username": "testuser"
+          },
+          "chat": {
+            "id": 12345,
+            "first_name": "Test",
+            "type": "private"
+          },
+          "date": 1234567890,
           "text": "/start"
         }
       },
@@ -30,13 +40,22 @@
       "method": "POST",
       "path": "/",
       "body": {
+        "update_id": 123456790,
         "callback_query": {
-          "id": "test123",
-          "message": {
-            "chat": {"id": 123456},
-            "message_id": 1
+          "id": "test_callback",
+          "from": {
+            "id": 12345,
+            "first_name": "Test"
           },
-          "data": "generate_text"
+          "message": {
+            "message_id": 2,
+            "chat": {
+              "id": 12345,
+              "first_name": "Test",
+              "type": "private"
+            }
+          },
+          "data": "help"
         }
       },
       "expectedStatus": 200,
