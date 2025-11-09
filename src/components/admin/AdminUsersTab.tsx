@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,33 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  
+  useEffect(() => {
+    const syncUsers = async () => {
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        const data = await response.json();
+        
+        if (data.users && data.users.length > 0) {
+          const dbUsers: User[] = data.users.map((u: any) => ({
+            id: u.id.toString(),
+            name: u.name || 'Пользователь',
+            email: u.email,
+            plan: u.plan || 'free',
+            role: u.role || 'user',
+            registeredAt: u.created_at ? new Date(u.created_at).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
+            activeBots: 0,
+            status: 'active'
+          }));
+          setUsers(dbUsers);
+        }
+      } catch (error) {
+        console.error('Ошибка синхронизации пользователей:', error);
+      }
+    };
+    
+    syncUsers();
+  }, [setUsers]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 

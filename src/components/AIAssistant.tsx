@@ -95,7 +95,7 @@ const AIAssistant = () => {
     } catch (error) {
       const errorMessage: Message = {
         sender: 'assistant',
-        message: 'Произошла ошибка. Попробуйте позже или обратитесь в поддержку: https://t.me/+QgiLIa1gFRY4Y2Iy'
+        message: 'Произошла ошибка. Вы можете связаться с главным администратором:\n\n👤 Сляднев Владимир Сергеевич\n📧 s89624027661@yandex.ru\n✈️ Telegram: @Fou9725\n\nИли обратитесь в поддержку: https://t.me/+QgiLIa1gFRY4Y2Iy'
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

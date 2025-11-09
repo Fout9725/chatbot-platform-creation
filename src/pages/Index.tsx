@@ -9,6 +9,7 @@ import BotConstructorModal from '@/components/modals/BotConstructorModal';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
+import ContactSupport from '@/components/ContactSupport';
 import { useAuth } from '@/contexts/AuthContext';
 const Index = () => {
   const navigate = useNavigate();
@@ -321,6 +322,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      <ContactSupport />
 
       <BotConstructorModal 
         isOpen={isConstructorOpen} 

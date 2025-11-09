@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 
@@ -17,17 +18,40 @@ interface AdminStatsTabProps {
 }
 
 const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
+  const [stats, setStats] = useState(platformStats);
+  
+  useEffect(() => {
+    const syncStats = async () => {
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        const data = await response.json();
+        
+        if (data.total !== undefined) {
+          setStats(prev => ({
+            ...prev,
+            totalUsers: data.total,
+            activeUsers: data.total
+          }));
+        }
+      } catch (error) {
+        console.error('Ошибка синхронизации статистики:', error);
+      }
+    };
+    
+    syncStats();
+  }, []);
+  
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
         <CardHeader className="pb-3">
           <CardDescription>Всего пользователей</CardDescription>
-          <CardTitle className="text-3xl">{platformStats.totalUsers.toLocaleString()}</CardTitle>
+          <CardTitle className="text-3xl">{stats.totalUsers.toLocaleString()}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon name="TrendingUp" size={14} className="text-green-600" />
-            <span>Активных: {platformStats.activeUsers.toLocaleString()}</span>
+            <span>Активных: {stats.activeUsers.toLocaleString()}</span>
           </div>
         </CardContent>
       </Card>
@@ -35,12 +59,12 @@ const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
       <Card>
         <CardHeader className="pb-3">
           <CardDescription>Всего ботов</CardDescription>
-          <CardTitle className="text-3xl">{platformStats.totalBots.toLocaleString()}</CardTitle>
+          <CardTitle className="text-3xl">{stats.totalBots.toLocaleString()}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon name="Activity" size={14} className="text-blue-600" />
-            <span>Активных: {platformStats.activeBots.toLocaleString()}</span>
+            <span>Активных: {stats.activeBots.toLocaleString()}</span>
           </div>
         </CardContent>
       </Card>
@@ -48,12 +72,12 @@ const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
       <Card>
         <CardHeader className="pb-3">
           <CardDescription>Ботов в маркетплейсе</CardDescription>
-          <CardTitle className="text-3xl">{platformStats.marketplaceBots}</CardTitle>
+          <CardTitle className="text-3xl">{stats.marketplaceBots}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon name="Store" size={14} className="text-purple-600" />
-            <span>Шаблонов: {platformStats.customTemplates}</span>
+            <span>Шаблонов: {stats.customTemplates}</span>
           </div>
         </CardContent>
       </Card>
@@ -61,7 +85,7 @@ const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
       <Card>
         <CardHeader className="pb-3">
           <CardDescription>Месячная выручка</CardDescription>
-          <CardTitle className="text-3xl">{(platformStats.monthlyRevenue / 1000).toFixed(0)}K₽</CardTitle>
+          <CardTitle className="text-3xl">{(stats.monthlyRevenue / 1000).toFixed(0)}K₽</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

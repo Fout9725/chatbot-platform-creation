@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(mockUser);
   };
 
-  const register = (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string) => {
     const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -105,6 +105,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasActivatedBot: false,
       sessionExpiry
     };
+    
+    try {
+      await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: 'user',
+          plan: newUser.plan
+        })
+      });
+    } catch (error) {
+      console.error('Ошибка синхронизации с БД:', error);
+    }
+    
     setUser(newUser);
   };
 
