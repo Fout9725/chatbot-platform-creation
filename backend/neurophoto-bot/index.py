@@ -768,8 +768,51 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         handle_help(chat_id)
         return
     
+    # Команда выхода из админ-панели
+    if text.startswith('/logout'):
+        if chat_id in ADMIN_IDS and chat_id in admin_authenticated:
+            admin_authenticated.discard(chat_id)
+            if chat_id in user_states:
+                del user_states[chat_id]
+            send_message(chat_id, '👋 Вышел из админ\\-панели\\. Для входа используй /admin')
+        else:
+            send_message(chat_id, '❌ Ты не авторизован в админ\\-панели')
+        return
+    
+    # Секретная команда для входа в админ-панель
+    if text.startswith('/admin'):
+        if chat_id in ADMIN_IDS:
+            if chat_id in admin_authenticated:
+                text_msg = '''⚙️ *Админ-панель*
+
+Добро пожаловать в панель управления ботом\!
+
+Выбери нужное действие:'''
+                send_message(chat_id, text_msg, get_admin_keyboard())
+            else:
+                send_message(chat_id, '🔐 Введи пароль для доступа к админ\\-панели:')
+                user_states[chat_id] = 'waiting_admin_password'
+        else:
+            send_message(chat_id, '❌ У тебя нет доступа к этой команде')
+        return
+    
+    # Проверка пароля админа
+    if chat_id in ADMIN_IDS and chat_id in user_states and user_states.get(chat_id) == 'waiting_admin_password':
+        if text.strip() == ADMIN_PASSWORD:
+            admin_authenticated.add(chat_id)
+            del user_states[chat_id]
+            text_msg = '''✅ *Доступ разрешен\\!*
+
+Добро пожаловать в панель управления ботом\!
+
+Выбери нужное действие:'''
+            send_message(chat_id, text_msg, get_admin_keyboard())
+        else:
+            send_message(chat_id, '❌ Неверный пароль\\. Попробуй еще раз или отмени командой /start')
+        return
+    
     # Обработка состояний админа
-    if chat_id in ADMIN_IDS and chat_id in user_states:
+    if chat_id in ADMIN_IDS and chat_id in admin_authenticated and chat_id in user_states:
         state = user_states[chat_id]
         
         if state == 'waiting_user_id':
