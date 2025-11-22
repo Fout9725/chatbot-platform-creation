@@ -325,6 +325,45 @@ def get_all_users(limit: int = 50, offset: int = 0) -> list:
             conn.close()
         return []
 
+def search_users_by_name(search_query: str, limit: int = 20) -> list:
+    '''Поиск пользователей по имени или username'''
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    search_pattern = f"%{search_query.lower()}%"
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at 
+            FROM neurophoto_users 
+            WHERE LOWER(first_name) LIKE %s OR LOWER(username) LIKE %s
+            ORDER BY total_used DESC
+            LIMIT %s
+        """, (search_pattern, search_pattern, limit))
+        
+        users = []
+        for row in cur.fetchall():
+            users.append({
+                'telegram_id': row[0],
+                'username': row[1],
+                'first_name': row[2],
+                'free_generations': row[3],
+                'paid_generations': row[4],
+                'total_used': row[5],
+                'created_at': row[6]
+            })
+        
+        cur.close()
+        conn.close()
+        return users
+    except Exception as e:
+        print(f'Database error in search_users_by_name: {e}')
+        if conn:
+            conn.close()
+        return []
+
 def get_all_user_ids() -> list:
     '''Получение всех telegram_id для рассылки'''
     conn = get_db_connection()
@@ -637,6 +676,7 @@ def get_admin_keyboard() -> Dict:
         'inline_keyboard': [
             [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
             [{'text': '👥 База пользователей', 'callback_data': 'admin_users'}],
+            [{'text': '🔍 Поиск пользователя', 'callback_data': 'admin_search'}],
             [{'text': '👤 Инфо о пользователе', 'callback_data': 'admin_userinfo'}],
             [{'text': '🎁 Начислить генерации', 'callback_data': 'admin_addgen'}],
             [{'text': '📢 Рассылка', 'callback_data': 'admin_broadcast'}],
@@ -696,6 +736,19 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
             send_message(chat_id, db_text, get_admin_keyboard())
         else:
             send_message(chat_id, '❌ Пользователи не найдены', get_admin_keyboard())
+        return
+    
+    elif data == 'admin_search' and is_admin:
+        text = '''🔍 *Поиск пользователя*
+
+Введи имя или username для поиска\\.
+
+*Примеры:*
+`Иван`
+`john`
+`@username`'''
+        send_message(chat_id, text, get_admin_keyboard())
+        user_states[chat_id] = 'waiting_search'
         return
     
     elif data == 'admin_userinfo' and is_admin:
@@ -913,7 +966,27 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     if chat_id in ADMIN_IDS and chat_id in admin_authenticated and chat_id in user_states:
         state = user_states[chat_id]
         
-        if state == 'waiting_user_id':
+        if state == 'waiting_search':
+            search_query = text.strip()
+            users = search_users_by_name(search_query)
+            
+            if users:
+                users_text = ''
+                for i, user in enumerate(users, 1):
+                    username_display = f"@{user['username']}" if user['username'] else 'нет'
+                    users_text += f"{i}\\. {user['first_name']} \\({username_display}\\)\\nID: `{user['telegram_id']}`\\nБ: {user['free_generations']} \\| П: {user['paid_generations']} \\| Использовано: {user['total_used']}\\n\\n"
+                
+                result_text = f'''🔍 *Результаты поиска по "{search_query}"*
+
+{users_text}Найдено: {len(users)} пользователей\\.'''
+                send_message(chat_id, result_text, get_admin_keyboard())
+            else:
+                send_message(chat_id, f'❌ Пользователи с именем "{search_query}" не найдены', get_admin_keyboard())
+            
+            del user_states[chat_id]
+            return
+        
+        elif state == 'waiting_user_id':
             user_info = None
             search_text = text.strip()
             
