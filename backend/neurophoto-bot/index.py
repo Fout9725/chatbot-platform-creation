@@ -250,6 +250,81 @@ def get_user_by_id(telegram_id: int) -> Optional[Dict]:
             conn.close()
         return None
 
+def get_user_by_username(username: str) -> Optional[Dict]:
+    '''Получение информации о пользователе по username'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    username_clean = username.lstrip('@').lower()
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at FROM neurophoto_users WHERE LOWER(username) = %s",
+            (username_clean,)
+        )
+        result = cur.fetchone()
+        
+        if result:
+            user_data = {
+                'telegram_id': result[0],
+                'username': result[1],
+                'first_name': result[2],
+                'free_generations': result[3],
+                'paid_generations': result[4],
+                'total_used': result[5],
+                'created_at': result[6]
+            }
+            cur.close()
+            conn.close()
+            return user_data
+        
+        cur.close()
+        conn.close()
+        return None
+    except Exception as e:
+        print(f'Database error in get_user_by_username: {e}')
+        if conn:
+            conn.close()
+        return None
+
+def get_all_users(limit: int = 50, offset: int = 0) -> list:
+    '''Получение списка всех пользователей с пагинацией'''
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at 
+            FROM neurophoto_users 
+            ORDER BY created_at DESC 
+            LIMIT %s OFFSET %s
+        """, (limit, offset))
+        
+        users = []
+        for row in cur.fetchall():
+            users.append({
+                'telegram_id': row[0],
+                'username': row[1],
+                'first_name': row[2],
+                'free_generations': row[3],
+                'paid_generations': row[4],
+                'total_used': row[5],
+                'created_at': row[6]
+            })
+        
+        cur.close()
+        conn.close()
+        return users
+    except Exception as e:
+        print(f'Database error in get_all_users: {e}')
+        if conn:
+            conn.close()
+        return []
+
 def get_all_user_ids() -> list:
     '''Получение всех telegram_id для рассылки'''
     conn = get_db_connection()
@@ -561,6 +636,7 @@ def get_admin_keyboard() -> Dict:
     return {
         'inline_keyboard': [
             [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
+            [{'text': '👥 База пользователей', 'callback_data': 'admin_users'}],
             [{'text': '👤 Инфо о пользователе', 'callback_data': 'admin_userinfo'}],
             [{'text': '🎁 Начислить генерации', 'callback_data': 'admin_addgen'}],
             [{'text': '📢 Рассылка', 'callback_data': 'admin_broadcast'}],
@@ -604,12 +680,33 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
             send_message(chat_id, '❌ Ошибка получения статистики', get_admin_keyboard())
         return
     
+    elif data == 'admin_users' and is_admin:
+        users = get_all_users(limit=20)
+        if users:
+            users_text = ''
+            for i, user in enumerate(users, 1):
+                username_display = f"@{user['username']}" if user['username'] else 'нет'
+                reg_date = user['created_at'].strftime('%d.%m.%Y') if user['created_at'] else 'N/A'
+                reg_date_escaped = reg_date.replace('.', '\\.')
+                users_text += f"{i}\\. {user['first_name']} \\({username_display}\\)\\nID: `{user['telegram_id']}`\\nБ: {user['free_generations']} \\| П: {user['paid_generations']} \\| Использовано: {user['total_used']}\\nРег: {reg_date_escaped}\\n\\n"
+            
+            db_text = f'''👥 *База пользователей*
+
+{users_text}Показано первых 20 пользователей\\.'''
+            send_message(chat_id, db_text, get_admin_keyboard())
+        else:
+            send_message(chat_id, '❌ Пользователи не найдены', get_admin_keyboard())
+        return
+    
     elif data == 'admin_userinfo' and is_admin:
         text = '''👤 *Информация о пользователе*
 
-Отправь мне Telegram ID пользователя, и я покажу всю информацию о нем\\.
+Отправь мне *username* \\(с @ или без\\) или *Telegram ID* пользователя\\.
 
-*Формат:* просто число, например: `123456789`'''
+*Примеры:*
+`@username`
+`username`
+`123456789`'''
         send_message(chat_id, text, get_admin_keyboard())
         user_states[chat_id] = 'waiting_user_id'
         return
@@ -618,11 +715,12 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
         text = '''🎁 *Начисление генераций*
 
 Отправь сообщение в формате:
-`ID количество тип`
+`username количество тип`
 
-*Пример:*
-`123456789 10 paid` \\- начислить 10 платных
-`123456789 5 free` \\- начислить 5 бесплатных'''
+*Примеры:*
+`@username 10 paid` \\- начислить 10 платных
+`username 5 free` \\- начислить 5 бесплатных
+`123456789 10 paid` \\- начислить по ID'''
         send_message(chat_id, text, get_admin_keyboard())
         user_states[chat_id] = 'waiting_addgen'
         return
@@ -816,28 +914,35 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         state = user_states[chat_id]
         
         if state == 'waiting_user_id':
-            try:
-                target_id = int(text.strip())
-                user_info = get_user_by_id(target_id)
+            user_info = None
+            search_text = text.strip()
+            
+            if search_text.startswith('@') or not search_text.isdigit():
+                user_info = get_user_by_username(search_text)
+            else:
+                try:
+                    target_id = int(search_text)
+                    user_info = get_user_by_id(target_id)
+                except ValueError:
+                    pass
+            
+            if user_info:
+                reg_date = user_info['created_at'].strftime('%d.%m.%Y') if user_info['created_at'] else 'N/A'
+                reg_date_escaped = reg_date.replace('.', '\\.')
+                username_display = f"@{user_info['username']}" if user_info['username'] else 'нет'
                 
-                if user_info:
-                    reg_date = user_info['created_at'].strftime('%d.%m.%Y') if user_info['created_at'] else 'N/A'
-                    reg_date_escaped = reg_date.replace('.', '\\.')
-                    
-                    info_text = f'''👤 *Информация о пользователе*
+                info_text = f'''👤 *Информация о пользователе*
 
 ID: `{user_info['telegram_id']}`
 Имя: {user_info['first_name']}
-Username: @{user_info['username'] or 'none'}
+Username: {username_display}
 Бесплатных: {user_info['free_generations']}
 Купленных: {user_info['paid_generations']}
 Использовано: {user_info['total_used']}
 Регистрация: {reg_date_escaped}'''
-                    send_message(chat_id, info_text, get_admin_keyboard())
-                else:
-                    send_message(chat_id, '❌ Пользователь не найден', get_admin_keyboard())
-            except ValueError:
-                send_message(chat_id, '❌ Неверный формат ID\\. Попробуй еще раз:', get_admin_keyboard())
+                send_message(chat_id, info_text, get_admin_keyboard())
+            else:
+                send_message(chat_id, '❌ Пользователь не найден', get_admin_keyboard())
             
             del user_states[chat_id]
             return
@@ -846,17 +951,36 @@ Username: @{user_info['username'] or 'none'}
             try:
                 parts = text.strip().split()
                 if len(parts) >= 3:
-                    target_id = int(parts[0])
+                    user_identifier = parts[0]
                     count = int(parts[1])
-                    gen_type = parts[2]
+                    gen_type = parts[2].lower()
+                    
+                    user_info = None
+                    if user_identifier.startswith('@') or not user_identifier.isdigit():
+                        user_info = get_user_by_username(user_identifier)
+                    else:
+                        target_id = int(user_identifier)
+                        user_info = get_user_by_id(target_id)
+                    
+                    if not user_info:
+                        send_message(chat_id, '❌ Пользователь не найден', get_admin_keyboard())
+                        del user_states[chat_id]
+                        return
+                    
+                    target_id = user_info['telegram_id']
                     
                     if gen_type == 'free':
                         success = add_generations(target_id, free_count=count)
-                    else:
+                    elif gen_type == 'paid':
                         success = add_generations(target_id, paid_count=count)
+                    else:
+                        send_message(chat_id, '❌ Тип должен быть free или paid', get_admin_keyboard())
+                        del user_states[chat_id]
+                        return
                     
                     if success:
-                        send_message(chat_id, f'✅ Добавлено {count} генераций пользователю {target_id}', get_admin_keyboard())
+                        username_display = f"@{user_info['username']}" if user_info['username'] else user_info['first_name']
+                        send_message(chat_id, f'✅ Добавлено {count} {gen_type} генераций пользователю {username_display}', get_admin_keyboard())
                         send_message(target_id, f'🎁 Администратор начислил тебе *{count}* генераций\\!')
                     else:
                         send_message(chat_id, '❌ Ошибка добавления генераций', get_admin_keyboard())
