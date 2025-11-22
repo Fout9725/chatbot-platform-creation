@@ -69,7 +69,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
             'telegram_id': telegram_id,
             'username': username,
             'first_name': first_name,
-            'free_generations': 3,
+            'free_generations': 15,
             'paid_generations': 0,
             'total_used': 0
         }
