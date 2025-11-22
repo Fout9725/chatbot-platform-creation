@@ -445,32 +445,8 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image_pollinations_fallback(prompt: str) -> Optional[bytes]:
-    '''Резервная генерация через Pollinations AI (100% бесплатно, без API ключа)'''
-    try:
-        import urllib.parse
-        
-        encoded_prompt = urllib.parse.quote(prompt)
-        pollinations_url = f'https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux&seed=-1&nologo=true&enhance=true'
-        
-        print(f'Trying Pollinations AI fallback: {pollinations_url[:100]}...')
-        
-        response = requests.get(pollinations_url, timeout=60)
-        
-        print(f'Pollinations AI response: {response.status_code}')
-        
-        if response.status_code == 200 and response.content:
-            print(f'Image generated via Pollinations, size: {len(response.content)} bytes')
-            return response.content
-        
-        return None
-            
-    except Exception as e:
-        print(f'Pollinations fallback error: {e}')
-        return None
-
 def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
-    '''Генерация изображения через Hugging Face Inference API (100% бесплатно)'''
+    '''Генерация изображения через OpenAI DALL-E 3'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
         'fashion': 'fashion photography, editorial style, vogue magazine, professional',
@@ -484,70 +460,48 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    # Попытка 1: Pollinations AI (100% бесплатно, без API ключа)
-    print(f'Generating image with prompt: {full_prompt[:100]}...')
-    pollinations_result = generate_image_pollinations_fallback(full_prompt)
+    print(f'Generating image with OpenAI DALL-E 3: {full_prompt[:100]}...')
     
-    if pollinations_result:
-        return pollinations_result
-    
-    # Попытка 2: Hugging Face (резерв)
-    print('Pollinations failed, trying Hugging Face as fallback...')
-    if HUGGINGFACE_API_KEY:
-        try:
-            headers = {
-                'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
-                'Content-Type': 'application/json',
-                'x-use-cache': 'false'
-            }
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENAI_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'model': 'dall-e-3',
+            'prompt': full_prompt,
+            'n': 1,
+            'size': '1024x1024',
+            'quality': 'standard'
+        }
+        
+        response = requests.post(
+            'https://api.openai.com/v1/images/generations',
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        print(f'OpenAI API response: {response.status_code}')
+        
+        if response.status_code == 200:
+            result = response.json()
+            image_url = result['data'][0]['url']
             
-            payload = {
-                'inputs': full_prompt,
-                'parameters': {
-                    'num_inference_steps': 4,
-                    'guidance_scale': 0.0,
-                    'width': 1024,
-                    'height': 1024
-                }
-            }
+            print(f'Downloading generated image from: {image_url[:50]}...')
+            img_response = requests.get(image_url, timeout=30)
             
-            response = requests.post(
-                'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
-                headers=headers,
-                json=payload,
-                timeout=120
-            )
-            
-            print(f'Hugging Face response status: {response.status_code}')
-            
-            if response.status_code == 200:
-                image_bytes = response.content
-                print(f'Image generated successfully via HuggingFace, size: {len(image_bytes)} bytes')
-                return image_bytes
-            elif response.status_code == 503:
-                print('HuggingFace model is loading, retrying in 20 seconds...')
-                import time
-                time.sleep(20)
-                
-                response = requests.post(
-                    'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
-                    headers=headers,
-                    json=payload,
-                    timeout=120
-                )
-                
-                if response.status_code == 200:
-                    image_bytes = response.content
-                    print(f'Image generated on retry via HuggingFace, size: {len(image_bytes)} bytes')
-                    return image_bytes
-            
-            print(f'HuggingFace failed: {response.status_code}, {response.text[:200]}')
-                
-        except Exception as e:
-            print(f'HuggingFace error: {e}')
-    
-    print('Both APIs failed')
-    return None
+            if img_response.status_code == 200:
+                print(f'Image downloaded successfully, size: {len(img_response.content)} bytes')
+                return img_response.content
+        else:
+            print(f'OpenAI API error: {response.status_code}, {response.text[:200]}')
+        
+        return None
+    except Exception as e:
+        print(f'OpenAI API error: {e}')
+        return None
 
 def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
     '''Отправка фото из байтов в Telegram'''
