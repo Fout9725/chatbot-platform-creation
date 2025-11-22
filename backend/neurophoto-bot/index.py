@@ -450,17 +450,20 @@ def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> Non
     except Exception as e:
         print(f'Error sending photo bytes: {e}')
 
-def get_start_keyboard() -> Dict:
+def get_start_keyboard(is_admin: bool = False) -> Dict:
     '''Клавиатура для главного меню'''
-    return {
-        'inline_keyboard': [
-            [{'text': '🎨 Создать фото из текста', 'callback_data': 'generate_text'}],
-            [{'text': '📸 Обработать мое фото', 'callback_data': 'process_photo'}],
-            [{'text': '🎁 Мои бонусы', 'callback_data': 'bonuses'}],
-            [{'text': '💎 Купить пакет фото', 'callback_data': 'buy_package'}],
-            [{'text': '❓ Помощь', 'callback_data': 'help'}]
-        ]
-    }
+    keyboard = [
+        [{'text': '🎨 Создать фото из текста', 'callback_data': 'generate_text'}],
+        [{'text': '📸 Обработать мое фото', 'callback_data': 'process_photo'}],
+        [{'text': '🎁 Мои бонусы', 'callback_data': 'bonuses'}],
+        [{'text': '💎 Купить пакет фото', 'callback_data': 'buy_package'}],
+        [{'text': '❓ Помощь', 'callback_data': 'help'}]
+    ]
+    
+    if is_admin:
+        keyboard.append([{'text': '⚙️ Админ-панель', 'callback_data': 'admin_panel'}])
+    
+    return {'inline_keyboard': keyboard}
 
 def get_styles_keyboard() -> Dict:
     '''Клавиатура для выбора стиля'''
@@ -485,6 +488,7 @@ def get_styles_keyboard() -> Dict:
 def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) -> None:
     '''Обработка команды /start'''
     user_data = get_or_create_user(chat_id, username, first_name)
+    is_admin = chat_id in ADMIN_IDS
     
     if user_data:
         free_gen = user_data['free_generations']
@@ -519,7 +523,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
 
 Выбери действие ниже 👇'''
     
-    send_message(chat_id, welcome_text, get_start_keyboard())
+    send_message(chat_id, welcome_text, get_start_keyboard(is_admin))
 
 def handle_help(chat_id: int) -> None:
     '''Справка по использованию'''
@@ -552,9 +556,101 @@ def handle_help(chat_id: int) -> None:
 *Вопросы?* Пиши @support\_bot'''
     send_message(chat_id, help_text, get_start_keyboard())
 
+def get_admin_keyboard() -> Dict:
+    '''Клавиатура админ-панели'''
+    return {
+        'inline_keyboard': [
+            [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
+            [{'text': '👤 Инфо о пользователе', 'callback_data': 'admin_userinfo'}],
+            [{'text': '🎁 Начислить генерации', 'callback_data': 'admin_addgen'}],
+            [{'text': '📢 Рассылка', 'callback_data': 'admin_broadcast'}],
+            [{'text': '⚙️ Настройки бота', 'callback_data': 'admin_settings'}],
+            [{'text': '⬅️ В главное меню', 'callback_data': 'back_menu'}]
+        ]
+    }
+
 def handle_callback(chat_id: int, data: str, message_id: int, username: Optional[str] = None, first_name: str = 'Друг') -> None:
     '''Обработка нажатий на кнопки'''
-    if data == 'generate_text':
+    is_admin = chat_id in ADMIN_IDS
+    
+    if data == 'admin_panel' and is_admin:
+        text = '''⚙️ *Админ-панель*
+
+Добро пожаловать в панель управления ботом\!
+
+Выбери нужное действие:'''
+        send_message(chat_id, text, get_admin_keyboard())
+        return
+    
+    elif data == 'admin_stats' and is_admin:
+        stats = get_all_stats()
+        if stats:
+            top_users_text = '\n'.join([
+                f"{i+1}\\. {user[1]} \\(@{user[2] or 'none'}\\) \\- {user[3]} генераций"
+                for i, user in enumerate(stats['top_users'])
+            ])
+            
+            stats_text = f'''📊 *Статистика бота*
+
+👥 Всего пользователей: *{stats['total_users']}*
+✅ Активных: *{stats['active_users']}*
+🆕 Новых сегодня: *{stats['new_today']}*
+🎨 Всего генераций: *{stats['total_generations']}*
+
+🏆 *Топ\\-5 пользователей:*
+{top_users_text}'''
+            send_message(chat_id, stats_text, get_admin_keyboard())
+        else:
+            send_message(chat_id, '❌ Ошибка получения статистики', get_admin_keyboard())
+        return
+    
+    elif data == 'admin_userinfo' and is_admin:
+        text = '''👤 *Информация о пользователе*
+
+Отправь мне Telegram ID пользователя, и я покажу всю информацию о нем\\.
+
+*Формат:* просто число, например: `123456789`'''
+        send_message(chat_id, text, get_admin_keyboard())
+        user_states[chat_id] = 'waiting_user_id'
+        return
+    
+    elif data == 'admin_addgen' and is_admin:
+        text = '''🎁 *Начисление генераций*
+
+Отправь сообщение в формате:
+`ID количество тип`
+
+*Пример:*
+`123456789 10 paid` \\- начислить 10 платных
+`123456789 5 free` \\- начислить 5 бесплатных'''
+        send_message(chat_id, text, get_admin_keyboard())
+        user_states[chat_id] = 'waiting_addgen'
+        return
+    
+    elif data == 'admin_broadcast' and is_admin:
+        text = '''📢 *Рассылка сообщений*
+
+Отправь текст сообщения, которое нужно разослать всем пользователям бота\\.
+
+⚠️ Используй эту функцию аккуратно\\!'''
+        send_message(chat_id, text, get_admin_keyboard())
+        user_states[chat_id] = 'waiting_broadcast'
+        return
+    
+    elif data == 'admin_settings' and is_admin:
+        text = '''⚙️ *Настройки бота*
+
+*Текущие настройки:*
+\- Бесплатных генераций: 15
+\- Цена мини\\-пакета: 299₽
+\- Цена стандарт: 499₽
+\- Цена профи: 799₽
+
+Для изменения настроек свяжись с разработчиком\\.'''
+        send_message(chat_id, text, get_admin_keyboard())
+        return
+    
+    elif data == 'generate_text':
         text = '''🎨 *Генерация фото из текста*
 
 Опиши, какое фото ты хочешь создать\\.
@@ -577,7 +673,8 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
 \- Художественные фильтры
 
 Отправь фото 👇'''
-        send_message(chat_id, text, get_start_keyboard())
+        is_admin = chat_id in ADMIN_IDS
+        send_message(chat_id, text, get_start_keyboard(is_admin))
     
     elif data == 'bonuses':
         user_data = get_or_create_user(chat_id, username, first_name)
@@ -612,7 +709,8 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
 
 Используй бонусы с умом\! 🎯'''
         
-        send_message(chat_id, text, get_start_keyboard())
+        is_admin = chat_id in ADMIN_IDS
+        send_message(chat_id, text, get_start_keyboard(is_admin))
     
     elif data == 'buy_package':
         text = '''💎 *Пакеты фотосессий*
@@ -636,14 +734,16 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
 \- Эксклюзивные стили
 
 Для покупки свяжись с @support\_bot'''
-        send_message(chat_id, text, get_start_keyboard())
+        is_admin = chat_id in ADMIN_IDS
+        send_message(chat_id, text, get_start_keyboard(is_admin))
     
     elif data == 'help':
         handle_help(chat_id)
     
     elif data == 'back_menu':
         text = 'Выбери действие 👇'
-        send_message(chat_id, text, get_start_keyboard())
+        is_admin = chat_id in ADMIN_IDS
+        send_message(chat_id, text, get_start_keyboard(is_admin))
     
     elif data.startswith('style_'):
         style = data.replace('style_', '')
@@ -667,6 +767,83 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     if text.startswith('/help'):
         handle_help(chat_id)
         return
+    
+    # Обработка состояний админа
+    if chat_id in ADMIN_IDS and chat_id in user_states:
+        state = user_states[chat_id]
+        
+        if state == 'waiting_user_id':
+            try:
+                target_id = int(text.strip())
+                user_info = get_user_by_id(target_id)
+                
+                if user_info:
+                    reg_date = user_info['created_at'].strftime('%d.%m.%Y') if user_info['created_at'] else 'N/A'
+                    reg_date_escaped = reg_date.replace('.', '\\.')
+                    
+                    info_text = f'''👤 *Информация о пользователе*
+
+ID: `{user_info['telegram_id']}`
+Имя: {user_info['first_name']}
+Username: @{user_info['username'] or 'none'}
+Бесплатных: {user_info['free_generations']}
+Купленных: {user_info['paid_generations']}
+Использовано: {user_info['total_used']}
+Регистрация: {reg_date_escaped}'''
+                    send_message(chat_id, info_text, get_admin_keyboard())
+                else:
+                    send_message(chat_id, '❌ Пользователь не найден', get_admin_keyboard())
+            except ValueError:
+                send_message(chat_id, '❌ Неверный формат ID\\. Попробуй еще раз:', get_admin_keyboard())
+            
+            del user_states[chat_id]
+            return
+        
+        elif state == 'waiting_addgen':
+            try:
+                parts = text.strip().split()
+                if len(parts) >= 3:
+                    target_id = int(parts[0])
+                    count = int(parts[1])
+                    gen_type = parts[2]
+                    
+                    if gen_type == 'free':
+                        success = add_generations(target_id, free_count=count)
+                    else:
+                        success = add_generations(target_id, paid_count=count)
+                    
+                    if success:
+                        send_message(chat_id, f'✅ Добавлено {count} генераций пользователю {target_id}', get_admin_keyboard())
+                        send_message(target_id, f'🎁 Администратор начислил тебе *{count}* генераций\\!')
+                    else:
+                        send_message(chat_id, '❌ Ошибка добавления генераций', get_admin_keyboard())
+                else:
+                    send_message(chat_id, '❌ Неверный формат\\. Попробуй еще раз:', get_admin_keyboard())
+            except ValueError:
+                send_message(chat_id, '❌ Неверный формат\\. Попробуй еще раз:', get_admin_keyboard())
+            
+            del user_states[chat_id]
+            return
+        
+        elif state == 'waiting_broadcast':
+            broadcast_text = text
+            user_ids = get_all_user_ids()
+            
+            if user_ids:
+                success_count = 0
+                for user_id in user_ids:
+                    try:
+                        send_message(user_id, broadcast_text)
+                        success_count += 1
+                    except Exception as e:
+                        print(f'Failed to send to {user_id}: {e}')
+                
+                send_message(chat_id, f'✅ Рассылка завершена\\! Отправлено: {success_count}/{len(user_ids)}', get_admin_keyboard())
+            else:
+                send_message(chat_id, '❌ Не удалось получить список пользователей', get_admin_keyboard())
+            
+            del user_states[chat_id]
+            return
     
     # Админ-команды
     if chat_id in ADMIN_IDS:
