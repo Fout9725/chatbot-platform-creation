@@ -14,6 +14,7 @@ import SocialMediaGuide from '@/components/SocialMediaGuide';
 import BotTraining from '@/components/BotTraining';
 import AITools from '@/components/AITools';
 import APIKeysManager from '@/components/APIKeysManager';
+import { AI_MODELS, getModelsByBotType } from '@/config/aiModels';
 
 interface ScenarioNode {
   id: string;
@@ -28,7 +29,7 @@ const BotConstructor = () => {
   const [botType, setBotType] = useState('');
   const [platform, setPlatform] = useState('');
   const [description, setDescription] = useState('');
-  const [aiModel, setAiModel] = useState('deepseek');
+  const [aiModel, setAiModel] = useState('google/gemini-2.0-flash-exp:free');
   const [aiPrompt, setAiPrompt] = useState('Ты вежливый помощник. Отвечай кратко и по делу.');
   const [scenarios, setScenarios] = useState<ScenarioNode[]>([
     { id: '1', type: 'start', title: 'Начало диалога' }
@@ -172,14 +173,47 @@ const BotConstructor = () => {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="ai-model">AI Модель</Label>
+              <Select value={aiModel} onValueChange={setAiModel}>
+                <SelectTrigger id="ai-model">
+                  <SelectValue placeholder="Выберите модель" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Бесплатные модели</div>
+                  {getModelsByBotType(botType).filter(m => m.free).map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">Free</Badge>
+                        <span>{model.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Платные модели</div>
+                  {getModelsByBotType(botType).filter(m => !m.free).map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">Paid</Badge>
+                        <span>{model.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {aiModel && (
+                <p className="text-xs text-muted-foreground">
+                  {AI_MODELS.find(m => m.id === aiModel)?.description}
+                </p>
+              )}
+            </div>
+
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <Icon name="CheckCircle" size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-green-900">
-                  <p className="font-semibold mb-1">Умный бот без API ключей!</p>
+                  <p className="font-semibold mb-1">Подключено через OpenRouter!</p>
                   <p className="text-xs">
-                    Бот использует встроенное машинное обучение и самообучается на диалогах.
-                    Никаких внешних сервисов не требуется.
+                    Доступ к {AI_MODELS.filter(m => m.free).length} бесплатным и {AI_MODELS.filter(m => !m.free).length} платным моделям.
                   </p>
                 </div>
               </div>

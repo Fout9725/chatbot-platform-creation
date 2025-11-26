@@ -1,5 +1,5 @@
 '''
-Business: Telegram-бот для создания AI-фотосессий через Hugging Face Serverless API (бесплатно)
+Business: Telegram-бот для создания AI-фотосессий через OpenRouter API (поддержка множества моделей)
 Args: event - dict with httpMethod (POST для webhook), body (JSON от Telegram)
       context - object with request_id, function_name, etc.
 Returns: HTTP response dict с обработкой команд и генерацией изображений
@@ -15,9 +15,18 @@ from dataclasses import dataclass
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
+
+IMAGE_MODELS = {
+    'gemini-3-pro-image': {'id': 'google/gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image', 'free': False},
+    'gpt-5-image-mini': {'id': 'openai/gpt-5-image-mini', 'name': 'GPT-5 Image Mini', 'free': False},
+    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': 'GPT-5 Image', 'free': False},
+    'gemini-2.5-flash-image': {'id': 'google/gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image', 'free': False},
+    'gemini-2.5-flash-image-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': 'Gemini 2.5 Flash Image Preview', 'free': False}
+}
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -445,8 +454,8 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
-    '''Генерация изображения через OpenAI DALL-E 3'''
+def generate_image(prompt: str, style: str = 'portrait', model: str = 'gemini-2.5-flash-image') -> Optional[bytes]:
+    '''Генерация изображения через OpenRouter API с поддержкой множества моделей'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
         'fashion': 'fashion photography, editorial style, vogue magazine, professional',
@@ -460,47 +469,57 @@ def generate_image(prompt: str, style: str = 'portrait') -> Optional[bytes]:
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    print(f'Generating image with OpenAI DALL-E 3: {full_prompt[:100]}...')
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-2.5-flash-image'])
+    model_id = model_info['id']
+    
+    print(f'Generating image with {model_info["name"]} ({model_id}): {full_prompt[:100]}...')
     
     try:
         headers = {
-            'Authorization': f'Bearer {OPENAI_API_KEY}',
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'Neurophoto Bot',
             'Content-Type': 'application/json'
         }
         
         payload = {
-            'model': 'dall-e-3',
+            'model': model_id,
             'prompt': full_prompt,
-            'n': 1,
-            'size': '1024x1024',
-            'quality': 'standard'
+            'max_tokens': 1000
         }
         
         response = requests.post(
-            'https://api.openai.com/v1/images/generations',
+            'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
             timeout=60
         )
         
-        print(f'OpenAI API response: {response.status_code}')
+        print(f'OpenRouter API response: {response.status_code}')
         
         if response.status_code == 200:
             result = response.json()
-            image_url = result['data'][0]['url']
             
-            print(f'Downloading generated image from: {image_url[:50]}...')
-            img_response = requests.get(image_url, timeout=30)
-            
-            if img_response.status_code == 200:
-                print(f'Image downloaded successfully, size: {len(img_response.content)} bytes')
-                return img_response.content
+            if 'choices' in result and len(result['choices']) > 0:
+                content = result['choices'][0].get('message', {}).get('content', '')
+                
+                if 'image_url' in str(content):
+                    import re
+                    urls = re.findall(r'https?://[^\s<>"]+', content)
+                    if urls:
+                        image_url = urls[0]
+                        print(f'Downloading generated image from: {image_url[:50]}...')
+                        img_response = requests.get(image_url, timeout=30)
+                        
+                        if img_response.status_code == 200:
+                            print(f'Image downloaded successfully, size: {len(img_response.content)} bytes')
+                            return img_response.content
         else:
-            print(f'OpenAI API error: {response.status_code}, {response.text[:200]}')
+            print(f'OpenRouter API error: {response.status_code}, {response.text[:200]}')
         
         return None
     except Exception as e:
-        print(f'OpenAI API error: {e}')
+        print(f'OpenRouter API error: {e}')
         return None
 
 def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
