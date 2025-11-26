@@ -49,7 +49,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
         
         # Проверяем, есть ли пользователь
         cur.execute(
-            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used FROM neurophoto_users WHERE telegram_id = %s",
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, preferred_model FROM neurophoto_users WHERE telegram_id = %s",
             (telegram_id,)
         )
         result = cur.fetchone()
@@ -61,7 +61,8 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
                 'first_name': result[2],
                 'free_generations': result[3],
                 'paid_generations': result[4],
-                'total_used': result[5]
+                'total_used': result[5],
+                'preferred_model': result[6] or 'gemini-2.5-flash-image'
             }
             cur.close()
             conn.close()
@@ -537,11 +538,65 @@ def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> Non
     except Exception as e:
         print(f'Error sending photo bytes: {e}')
 
+def get_user_model(telegram_id: int) -> str:
+    '''Получение выбранной модели пользователя'''
+    conn = get_db_connection()
+    if not conn:
+        return 'gemini-2.5-flash-image'
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT preferred_model FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result[0] if result and result[0] else 'gemini-2.5-flash-image'
+    except Exception as e:
+        print(f'Error getting user model: {e}')
+        if conn:
+            conn.close()
+        return 'gemini-2.5-flash-image'
+
+def set_user_model(telegram_id: int, model: str) -> bool:
+    '''Установка выбранной модели для пользователя'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s",
+            (model, telegram_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Error setting user model: {e}')
+        if conn:
+            conn.close()
+        return False
+
+def get_models_keyboard() -> Dict:
+    '''Клавиатура для выбора модели генерации'''
+    return {
+        'inline_keyboard': [
+            [{'text': '⚡ Gemini 2.5 Flash (быстро)', 'callback_data': 'model_gemini-2.5-flash-image'}],
+            [{'text': '🎨 Gemini 3 Pro (качество)', 'callback_data': 'model_gemini-3-pro-image'}],
+            [{'text': '🚀 GPT-5 Image', 'callback_data': 'model_gpt-5-image'}],
+            [{'text': '💡 GPT-5 Image Mini', 'callback_data': 'model_gpt-5-image-mini'}],
+            [{'text': '⬅️ Назад', 'callback_data': 'back_menu'}]
+        ]
+    }
+
 def get_start_keyboard(is_admin: bool = False) -> Dict:
     '''Клавиатура для главного меню'''
     keyboard = [
         [{'text': '🎨 Создать фото из текста', 'callback_data': 'generate_text'}],
         [{'text': '📸 Обработать мое фото', 'callback_data': 'process_photo'}],
+        [{'text': '🤖 Выбрать AI модель', 'callback_data': 'select_model'}],
         [{'text': '🎁 Мои бонусы', 'callback_data': 'bonuses'}],
         [{'text': '💎 Купить пакет фото', 'callback_data': 'buy_package'}],
         [{'text': '❓ Помощь', 'callback_data': 'help'}]
@@ -868,6 +923,36 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
         text = 'Выбери действие 👇'
         is_admin = chat_id in ADMIN_IDS
         send_message(chat_id, text, get_start_keyboard(is_admin))
+    
+    elif data == 'select_model':
+        current_model = get_user_model(chat_id)
+        model_name = IMAGE_MODELS.get(current_model, {}).get('name', 'Gemini 2.5 Flash Image')
+        
+        text = f'''🤖 *Выбор AI модели*
+
+Текущая модель: *{model_name}*
+
+Выбери модель для генерации изображений:
+
+⚡ *Gemini 2\\.5 Flash* \\- быстрая генерация
+🎨 *Gemini 3 Pro* \\- высокое качество
+🚀 *GPT\\-5 Image* \\- продвинутая модель
+💡 *GPT\\-5 Image Mini* \\- компактная версия'''
+        send_message(chat_id, text, get_models_keyboard())
+    
+    elif data.startswith('model_'):
+        model_key = data.replace('model_', '')
+        if model_key in IMAGE_MODELS:
+            set_user_model(chat_id, model_key)
+            model_name = IMAGE_MODELS[model_key]['name']
+            text = f'''✅ Модель изменена на *{model_name}*
+
+Теперь все изображения будут генерироваться с этой моделью\\.'''
+            is_admin = chat_id in ADMIN_IDS
+            send_message(chat_id, text, get_start_keyboard(is_admin))
+        else:
+            text = '❌ Неизвестная модель'
+            send_message(chat_id, text, get_models_keyboard())
     
     elif data.startswith('style_'):
         style = data.replace('style_', '')
@@ -1210,7 +1295,8 @@ _Пример: /reset 123456789_'''
     send_message(chat_id, '🎨 Генерирую твое фото\\.\\.\\. Это займет 20\\-40 секунд')
     send_chat_action(chat_id, 'upload_photo')
     
-    image_bytes = generate_image(text, 'portrait')
+    user_model = get_user_model(chat_id)
+    image_bytes = generate_image(text, 'portrait', user_model)
     
     if image_bytes:
         # Списываем генерацию

@@ -46,9 +46,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 users_list.append({
                     'id': user['id'],
                     'email': user['email'],
-                    'name': user.get('name', 'Пользователь'),
+                    'name': user.get('full_name', 'Пользователь'),
                     'role': user.get('role', 'user'),
-                    'plan': user.get('plan', 'free'),
+                    'plan': user.get('plan_type', 'free'),
                     'created_at': user['created_at'].isoformat() if user.get('created_at') else None
                 })
             
@@ -80,8 +80,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             cur.execute(
-                "INSERT INTO users (email, name, role, plan) VALUES (%s, %s, %s, %s) "
-                "ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, plan = EXCLUDED.plan "
+                "INSERT INTO users (email, full_name, role, plan_type) VALUES (%s, %s, %s, %s) "
+                "ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, plan_type = EXCLUDED.plan_type "
                 "RETURNING id",
                 (email, name, role, plan)
             )

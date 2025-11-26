@@ -1,0 +1,2 @@
+-- Добавление поля preferred_model для хранения выбранной пользователем модели генерации изображений
+ALTER TABLE neurophoto_users ADD COLUMN IF NOT EXISTS preferred_model VARCHAR(100) DEFAULT 'gemini-2.5-flash-image';
