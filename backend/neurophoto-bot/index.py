@@ -592,6 +592,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
 💡 Команды:
 /userinfo <telegram_id> - информация о пользователе
 /addgen <telegram_id> <count> - добавить платные генерации
+/addfree <telegram_id> <count> - добавить бесплатные генерации
 /broadcast <текст> - рассылка всем пользователям'''
             
             send_message(chat_id, admin_text)
@@ -675,6 +676,45 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             
             if cur.rowcount > 0:
                 send_message(chat_id, f'✅ Пользователю {user_id} добавлено {count} платных генераций')
+            else:
+                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+            
+            cur.close()
+            conn.close()
+        except ValueError:
+            send_message(chat_id, '❌ Неверный формат данных')
+        except Exception as e:
+            send_message(chat_id, f'❌ Ошибка: {e}')
+        return
+    
+    if text.startswith('/addfree'):
+        if chat_id not in ADMIN_IDS:
+            send_message(chat_id, '❌ У тебя нет доступа к этой команде')
+            return
+        
+        parts = text.split()
+        if len(parts) < 3:
+            send_message(chat_id, '❌ Использование: /addfree <telegram_id> <count>')
+            return
+        
+        try:
+            user_id = int(parts[1])
+            count = int(parts[2])
+            
+            conn = get_db_connection()
+            if not conn:
+                send_message(chat_id, '❌ Ошибка подключения к БД')
+                return
+            
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
+                (count, user_id)
+            )
+            conn.commit()
+            
+            if cur.rowcount > 0:
+                send_message(chat_id, f'✅ Пользователю {user_id} добавлено {count} бесплатных генераций')
             else:
                 send_message(chat_id, f'❌ Пользователь {user_id} не найден')
             
