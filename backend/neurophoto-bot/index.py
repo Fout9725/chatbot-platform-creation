@@ -1,5 +1,5 @@
 '''
-Business: Telegram-бот для создания AI-фотосессий через OpenRouter API (Gemini Flash Free, GPT-5 Image)
+Business: Telegram-бот для создания AI-фотосессий через OpenRouter API с историей генераций
 Args: event - dict with httpMethod (POST для webhook), body (JSON от Telegram)
       context - object with request_id, function_name, etc.
 Returns: HTTP response dict с обработкой команд и генерацией изображений через OpenRouter
@@ -15,7 +15,6 @@ TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
-ADMIN_PASSWORD = 'admin2024'
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': '🆓 Gemini Flash', 'paid': False},
@@ -37,7 +36,6 @@ IMAGE_EFFECTS = {
 }
 
 user_sessions = {}
-admin_authenticated = set()
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -149,11 +147,62 @@ def use_generation(telegram_id: int, is_paid: bool = False) -> bool:
             conn.close()
         return False
 
+def save_generation_history(telegram_id: int, prompt: str, model: str, effect: Optional[str], image_url: str, is_paid: bool) -> bool:
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO neurophoto_generations (telegram_id, prompt, model, effect, image_url, is_paid) VALUES (%s, %s, %s, %s, %s, %s)",
+            (telegram_id, prompt, model, effect, image_url, is_paid)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Database error in save_generation_history: {e}')
+        if conn:
+            conn.close()
+        return False
+
+def get_user_history(telegram_id: int, limit: int = 10) -> list:
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT prompt, model, effect, image_url, created_at FROM neurophoto_generations WHERE telegram_id = %s ORDER BY created_at DESC LIMIT %s",
+            (telegram_id, limit)
+        )
+        results = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        history = []
+        for row in results:
+            history.append({
+                'prompt': row[0],
+                'model': row[1],
+                'effect': row[2],
+                'image_url': row[3],
+                'created_at': row[4]
+            })
+        return history
+    except Exception as e:
+        print(f'Database error in get_user_history: {e}')
+        if conn:
+            conn.close()
+        return []
+
 def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -> None:
     data = {
         'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'MarkdownV2'
+        'text': text
     }
     if reply_markup:
         data['reply_markup'] = json.dumps(reply_markup)
@@ -161,6 +210,8 @@ def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -
     try:
         response = requests.post(f'{get_telegram_api()}/sendMessage', json=data, timeout=10)
         print(f'sendMessage response: {response.status_code}')
+        if response.status_code != 200:
+            print(f'sendMessage error: {response.text}')
     except Exception as e:
         print(f'Error sending message: {e}')
 
@@ -169,8 +220,7 @@ def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup
         data = {
             'chat_id': chat_id,
             'photo': image_url,
-            'caption': caption,
-            'parse_mode': 'MarkdownV2'
+            'caption': caption
         }
         if reply_markup:
             data['reply_markup'] = json.dumps(reply_markup)
@@ -270,6 +320,7 @@ def get_effects_keyboard() -> Dict:
     
     buttons.append([{'text': '✅ Оставить как есть', 'callback_data': 'effect_none'}])
     buttons.append([{'text': '🔄 Создать новое фото', 'callback_data': 'new_photo'}])
+    buttons.append([{'text': '📜 Моя история', 'callback_data': 'show_history'}])
     
     return {'inline_keyboard': buttons}
 
@@ -287,32 +338,32 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
         free_gen = user_data['free_generations']
         paid_gen = user_data['paid_generations']
         
-        welcome_text = f'''👋 Привет, *{first_name}*\!
+        welcome_text = f'''👋 Привет, {first_name}!
 
-Я *Нейрофотосессия PRO* \- твой AI\-фотограф в Telegram\!
+Я *Нейрофотосессия PRO* - твой AI-фотограф в Telegram!
 
 💳 *Твой баланс:*
-🆓 Бесплатных генераций: *{free_gen}/10*
-💎 Платных генераций: *{paid_gen}*
+🆓 Бесплатных генераций: {free_gen}/10
+💎 Платных генераций: {paid_gen}
 
 📝 *Опиши, какую нейрофотографию ты хочешь создать?*
 
 Например:
 • Портрет девушки с длинными волосами на закате
-• Бизнес\-фото мужчины в костюме в офисе
+• Бизнес-фото мужчины в костюме в офисе
 • Креативное фото в стиле киберпанк'''
     else:
-        welcome_text = f'''👋 Привет, *{first_name}*\!
+        welcome_text = f'''👋 Привет, {first_name}!
 
-Я *Нейрофотосессия PRO* \- твой AI\-фотограф в Telegram\!
+Я *Нейрофотосессия PRO* - твой AI-фотограф в Telegram!
 
-🎁 *У тебя 10 бесплатных генераций\!*
+🎁 *У тебя 10 бесплатных генераций!*
 
 📝 *Опиши, какую нейрофотографию ты хочешь создать?*
 
 Например:
 • Портрет девушки с длинными волосами на закате
-• Бизнес\-фото мужчины в костюме в офисе
+• Бизнес-фото мужчины в костюме в офисе
 • Креативное фото в стиле киберпанк'''
     
     user_sessions[chat_id] = {'state': 'waiting_prompt'}
@@ -327,10 +378,10 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
     if data == 'tariff_free':
         text = '''🆓 *Бесплатный тариф*
 
-Ты выбрал бесплатную генерацию\\.
+Ты выбрал бесплатную генерацию.
 
 Доступная модель:
-• Gemini Flash \- быстрая и качественная генерация
+• Gemini Flash - быстрая и качественная генерация
 
 Нажми кнопку ниже для старта генерации 👇'''
         send_message(chat_id, text, get_free_model_keyboard())
@@ -341,20 +392,20 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         if user_data and user_data['paid_generations'] > 0:
             text = '''💎 *Платный тариф*
 
-Ты выбрал платную генерацию\\.
+Ты выбрал платную генерацию.
 
 Доступные премиум модели:
-• GPT\\-5 Mini \\- быстрая платная модель
-• GPT\\-5 Premium \\- максимальное качество
+• GPT-5 Mini - быстрая платная модель
+• GPT-5 Premium - максимальное качество
 
 Выбери модель для генерации 👇'''
             send_message(chat_id, text, get_paid_models_keyboard())
         else:
-            text = '''❌ *У тебя нет платных генераций\!*
+            text = '''❌ *У тебя нет платных генераций!*
 
-Чтобы использовать премиум модели, купи пакет генераций\\.
+Чтобы использовать премиум модели, купи пакет генераций.
 
-Свяжись с @support\\_bot для покупки'''
+Свяжись с @support_bot для покупки'''
             send_message(chat_id, text, get_tariff_keyboard())
         return
     
@@ -364,7 +415,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         prompt = session.get('prompt', '')
         
         if not prompt:
-            send_message(chat_id, '❌ Ошибка: промпт не найден\\. Начни заново с /start')
+            send_message(chat_id, '❌ Ошибка: промпт не найден. Начни заново с /start')
             return
         
         model_info = IMAGE_MODELS.get(model_key)
@@ -380,24 +431,26 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             return
         
         if is_paid and user_data['paid_generations'] <= 0:
-            send_message(chat_id, '❌ У тебя нет платных генераций\!')
+            send_message(chat_id, '❌ У тебя нет платных генераций!')
             return
         
         if not is_paid and user_data['free_generations'] <= 0:
-            send_message(chat_id, '❌ У тебя закончились бесплатные генерации\!')
+            send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
             return
         
-        send_message(chat_id, f'🎨 Генерирую изображение с помощью *{model_info["name"]}*\\.\\.\\.\nЭто займет 20\\-60 секунд')
+        send_message(chat_id, f'🎨 Генерирую изображение с помощью {model_info["name"]}...\nЭто займет 20-60 секунд')
         send_chat_action(chat_id, 'upload_photo')
         
         image_url = generate_image(prompt, model_key)
         
         if image_url:
             if use_generation(chat_id, is_paid):
+                save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
+                
                 remaining_free = user_data['free_generations'] - (0 if is_paid else 1)
                 remaining_paid = user_data['paid_generations'] - (1 if is_paid else 0)
                 
-                caption = f'''✨ *Готово\!*
+                caption = f'''✨ Готово!
 
 Модель: {model_info["name"]}
 Осталось бесплатных: {remaining_free}
@@ -407,7 +460,8 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
                     'state': 'choosing_effects',
                     'prompt': prompt,
                     'model': model_key,
-                    'image_url': image_url
+                    'image_url': image_url,
+                    'is_paid': is_paid
                 }
                 
                 effects_text = '''🎨 *Хочешь добавить эффекты?*
@@ -419,17 +473,18 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             else:
                 send_message(chat_id, '❌ Ошибка списания генерации')
         else:
-            send_message(chat_id, '❌ Не удалось сгенерировать изображение\\. Попробуй позже')
+            send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже')
         return
     
     elif data.startswith('effect_'):
         session = user_sessions.get(chat_id, {})
         original_prompt = session.get('prompt', '')
         model_key = session.get('model', 'gemini-flash')
+        is_paid = session.get('is_paid', False)
         
         if data == 'effect_none':
-            send_message(chat_id, '✅ Отлично\\! Фото сохранено без эффектов\\.', get_admin_keyboard() if chat_id in ADMIN_IDS else None)
-            send_message(chat_id, '📝 Хочешь создать еще одно фото? Просто напиши новое описание\!')
+            send_message(chat_id, '✅ Отлично! Фото сохранено без эффектов.', get_admin_keyboard() if chat_id in ADMIN_IDS else None)
+            send_message(chat_id, '📝 Хочешь создать еще одно фото? Просто напиши новое описание!')
             user_sessions[chat_id] = {'state': 'waiting_prompt'}
             return
         
@@ -442,39 +497,82 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         
         enhanced_prompt = f"{original_prompt}, {effect_info['prompt']}"
         
-        send_message(chat_id, f'🎨 Применяю эффект *{effect_info["name"]}*\\.\\.\\.')
+        send_message(chat_id, f'🎨 Применяю эффект {effect_info["name"]}...')
         send_chat_action(chat_id, 'upload_photo')
         
         image_url = generate_image(enhanced_prompt, model_key)
         
         if image_url:
-            caption = f'''✨ *Эффект применен\!*
+            save_generation_history(chat_id, enhanced_prompt, model_key, effect_key, image_url, is_paid)
+            
+            caption = f'''✨ Эффект применен!
 
 Эффект: {effect_info["name"]}'''
             send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
         else:
-            send_message(chat_id, '❌ Не удалось применить эффект\\. Попробуй другой')
+            send_message(chat_id, '❌ Не удалось применить эффект. Попробуй другой')
         return
     
     elif data == 'new_photo':
-        text = '📝 Отлично\\! Опиши новую нейрофотографию, которую хочешь создать:'
+        text = '📝 Отлично! Опиши новую нейрофотографию, которую хочешь создать:'
         user_sessions[chat_id] = {'state': 'waiting_prompt'}
         send_message(chat_id, text, get_admin_keyboard() if chat_id in ADMIN_IDS else None)
         return
     
+    elif data == 'show_history':
+        history = get_user_history(chat_id, 5)
+        
+        if not history:
+            send_message(chat_id, '📜 У тебя пока нет истории генераций')
+            return
+        
+        history_text = '📜 *Твоя история (последние 5):*\n\n'
+        for i, item in enumerate(history, 1):
+            model_name = IMAGE_MODELS.get(item['model'], {}).get('name', 'Unknown')
+            effect_name = IMAGE_EFFECTS.get(item['effect'], {}).get('name', 'Без эффекта') if item['effect'] else 'Без эффекта'
+            prompt_short = item['prompt'][:50] + '...' if len(item['prompt']) > 50 else item['prompt']
+            
+            history_text += f"{i}. {prompt_short}\n"
+            history_text += f"   Модель: {model_name}\n"
+            history_text += f"   Эффект: {effect_name}\n\n"
+        
+        send_message(chat_id, history_text)
+        return
+    
     elif data == 'admin_panel' and chat_id in ADMIN_IDS:
-        text = '''⚙️ *Админ\\-панель*
+        text = '''⚙️ *Админ-панель*
 
 Доступные команды:
-/stats \\- статистика бота
-/addgen <id> <count> \\- добавить генерации
-/userinfo <id> \\- инфо о пользователе'''
+/stats - статистика бота
+/addgen <id> <count> - добавить генерации
+/userinfo <id> - инфо о пользователе'''
         send_message(chat_id, text)
         return
 
 def handle_message(chat_id: int, text: str, first_name: str, username: Optional[str] = None) -> None:
     if text.startswith('/start'):
         handle_start(chat_id, first_name, username)
+        return
+    
+    if text.startswith('/history'):
+        history = get_user_history(chat_id, 10)
+        
+        if not history:
+            send_message(chat_id, '📜 У тебя пока нет истории генераций')
+            return
+        
+        history_text = '📜 *Твоя история (последние 10):*\n\n'
+        for i, item in enumerate(history, 1):
+            model_name = IMAGE_MODELS.get(item['model'], {}).get('name', 'Unknown')
+            effect_name = IMAGE_EFFECTS.get(item['effect'], {}).get('name', 'Без эффекта') if item['effect'] else 'Без эффекта'
+            prompt_short = item['prompt'][:50] + '...' if len(item['prompt']) > 50 else item['prompt']
+            
+            history_text += f"{i}. {prompt_short}\n"
+            history_text += f"   Модель: {model_name}\n"
+            history_text += f"   Эффект: {effect_name}\n"
+            history_text += f"   Дата: {item['created_at'].strftime('%d.%m.%Y %H:%M')}\n\n"
+        
+        send_message(chat_id, history_text)
         return
     
     session = user_sessions.get(chat_id, {})
@@ -486,9 +584,9 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             'prompt': text
         }
         
-        tariff_text = f'''✅ *Отлично\!*
+        tariff_text = f'''✅ Отлично!
 
-Твой запрос: _{text[:100]}_
+Твой запрос: {text[:100]}
 
 Теперь выбери тариф для генерации:'''
         send_message(chat_id, tariff_text, get_tariff_keyboard())
