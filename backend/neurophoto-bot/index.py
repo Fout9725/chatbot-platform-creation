@@ -590,9 +590,9 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
 💎 Платных генераций осталось: {total_paid_remaining}
 
 💡 Команды:
-/userinfo <telegram_id> - информация о пользователе
-/addgen <telegram_id> <count> - добавить платные генерации
-/addfree <telegram_id> <count> - добавить бесплатные генерации
+/userinfo <@username или id> - информация о пользователе
+/addgen <@username или id> <count> - добавить платные генерации
+/addfree <@username или id> <count> - добавить бесплатные генерации
 /broadcast <текст> - рассылка всем пользователям'''
             
             send_message(chat_id, admin_text)
@@ -607,27 +607,40 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         
         parts = text.split()
         if len(parts) < 2:
-            send_message(chat_id, '❌ Использование: /userinfo <telegram_id>')
+            send_message(chat_id, '❌ Использование: /userinfo <@username или telegram_id>')
             return
         
         try:
-            user_id = int(parts[1])
+            user_identifier = parts[1]
             conn = get_db_connection()
             if not conn:
                 send_message(chat_id, '❌ Ошибка подключения к БД')
                 return
             
             cur = conn.cursor()
-            cur.execute(
-                "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE telegram_id = %s",
-                (user_id,)
-            )
+            
+            # Проверяем, это username или telegram_id
+            if user_identifier.startswith('@'):
+                username = user_identifier[1:]  # Убираем @
+                cur.execute(
+                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE username = %s",
+                    (username,)
+                )
+                user_display = f'@{username}'
+            else:
+                user_id = int(user_identifier)
+                cur.execute(
+                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE telegram_id = %s",
+                    (user_id,)
+                )
+                user_display = user_id
+            
             result = cur.fetchone()
             cur.close()
             conn.close()
             
             if not result:
-                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+                send_message(chat_id, f'❌ Пользователь {user_display} не найден')
                 return
             
             user_text = f'''👤 Информация о пользователе
@@ -643,7 +656,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             
             send_message(chat_id, user_text)
         except ValueError:
-            send_message(chat_id, '❌ Неверный формат telegram_id')
+            send_message(chat_id, '❌ Неверный формат данных')
         except Exception as e:
             send_message(chat_id, f'❌ Ошибка: {e}')
         return
@@ -655,11 +668,11 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         
         parts = text.split()
         if len(parts) < 3:
-            send_message(chat_id, '❌ Использование: /addgen <telegram_id> <count>')
+            send_message(chat_id, '❌ Использование: /addgen <@username или telegram_id> <count>')
             return
         
         try:
-            user_id = int(parts[1])
+            user_identifier = parts[1]
             count = int(parts[2])
             
             conn = get_db_connection()
@@ -668,16 +681,29 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
                 return
             
             cur = conn.cursor()
-            cur.execute(
-                "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
-                (count, user_id)
-            )
+            
+            # Проверяем, это username или telegram_id
+            if user_identifier.startswith('@'):
+                username = user_identifier[1:]  # Убираем @
+                cur.execute(
+                    "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s",
+                    (count, username)
+                )
+                user_display = f'@{username}'
+            else:
+                user_id = int(user_identifier)
+                cur.execute(
+                    "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
+                    (count, user_id)
+                )
+                user_display = user_id
+            
             conn.commit()
             
             if cur.rowcount > 0:
-                send_message(chat_id, f'✅ Пользователю {user_id} добавлено {count} платных генераций')
+                send_message(chat_id, f'✅ Пользователю {user_display} добавлено {count} платных генераций')
             else:
-                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+                send_message(chat_id, f'❌ Пользователь {user_display} не найден')
             
             cur.close()
             conn.close()
@@ -694,11 +720,11 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         
         parts = text.split()
         if len(parts) < 3:
-            send_message(chat_id, '❌ Использование: /addfree <telegram_id> <count>')
+            send_message(chat_id, '❌ Использование: /addfree <@username или telegram_id> <count>')
             return
         
         try:
-            user_id = int(parts[1])
+            user_identifier = parts[1]
             count = int(parts[2])
             
             conn = get_db_connection()
@@ -707,16 +733,29 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
                 return
             
             cur = conn.cursor()
-            cur.execute(
-                "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
-                (count, user_id)
-            )
+            
+            # Проверяем, это username или telegram_id
+            if user_identifier.startswith('@'):
+                username = user_identifier[1:]  # Убираем @
+                cur.execute(
+                    "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE username = %s",
+                    (count, username)
+                )
+                user_display = f'@{username}'
+            else:
+                user_id = int(user_identifier)
+                cur.execute(
+                    "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
+                    (count, user_id)
+                )
+                user_display = user_id
+            
             conn.commit()
             
             if cur.rowcount > 0:
-                send_message(chat_id, f'✅ Пользователю {user_id} добавлено {count} бесплатных генераций')
+                send_message(chat_id, f'✅ Пользователю {user_display} добавлено {count} бесплатных генераций')
             else:
-                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+                send_message(chat_id, f'❌ Пользователь {user_display} не найден')
             
             cur.close()
             conn.close()
