@@ -21,11 +21,10 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
 
 IMAGE_MODELS = {
-    'gemini-3-pro-image': {'id': 'google/gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image', 'free': False},
-    'gpt-5-image-mini': {'id': 'openai/gpt-5-image-mini', 'name': 'GPT-5 Image Mini', 'free': False},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': 'GPT-5 Image', 'free': False},
-    'gemini-2.5-flash-image': {'id': 'google/gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image', 'free': False},
-    'gemini-2.5-flash-image-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': 'Gemini 2.5 Flash Image Preview', 'free': False}
+    'flux-schnell': {'id': 'black-forest-labs/FLUX.1-schnell', 'name': 'FLUX Schnell (быстро)', 'api': 'huggingface'},
+    'flux-dev': {'id': 'black-forest-labs/FLUX.1-dev', 'name': 'FLUX Dev (качество)', 'api': 'huggingface'},
+    'stable-diffusion': {'id': 'stabilityai/stable-diffusion-3-5-large', 'name': 'Stable Diffusion 3.5', 'api': 'huggingface'},
+    'dreamshaper': {'id': 'Lykon/dreamshaper-8', 'name': 'DreamShaper (арт)', 'api': 'huggingface'}
 }
 
 def get_telegram_api() -> str:
@@ -62,7 +61,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
                 'free_generations': result[3],
                 'paid_generations': result[4],
                 'total_used': result[5],
-                'preferred_model': result[6] or 'gemini-2.5-flash-image'
+                'preferred_model': result[6] or 'flux-schnell'
             }
             cur.close()
             conn.close()
@@ -455,8 +454,8 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image(prompt: str, style: str = 'portrait', model: str = 'gemini-2.5-flash-image') -> Optional[bytes]:
-    '''Генерация изображения через OpenRouter API с поддержкой множества моделей'''
+def generate_image(prompt: str, style: str = 'portrait', model: str = 'flux-schnell') -> Optional[bytes]:
+    '''Генерация изображения через Hugging Face Inference API'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
         'fashion': 'fashion photography, editorial style, vogue magazine, professional',
@@ -470,57 +469,45 @@ def generate_image(prompt: str, style: str = 'portrait', model: str = 'gemini-2.
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-2.5-flash-image'])
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['flux-schnell'])
     model_id = model_info['id']
     
     print(f'Generating image with {model_info["name"]} ({model_id}): {full_prompt[:100]}...')
     
+    if not HUGGINGFACE_API_KEY:
+        print('HUGGINGFACE_API_KEY not configured')
+        return None
+    
     try:
         headers = {
-            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-            'HTTP-Referer': 'https://poehali.dev',
-            'X-Title': 'Neurophoto Bot',
+            'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
             'Content-Type': 'application/json'
         }
         
         payload = {
-            'model': model_id,
-            'prompt': full_prompt,
-            'max_tokens': 1000
+            'inputs': full_prompt
         }
         
+        api_url = f'https://api-inference.huggingface.co/models/{model_id}'
+        
         response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
+            api_url,
             headers=headers,
             json=payload,
             timeout=60
         )
         
-        print(f'OpenRouter API response: {response.status_code}')
+        print(f'Hugging Face API response: {response.status_code}')
         
         if response.status_code == 200:
-            result = response.json()
-            
-            if 'choices' in result and len(result['choices']) > 0:
-                content = result['choices'][0].get('message', {}).get('content', '')
-                
-                if 'image_url' in str(content):
-                    import re
-                    urls = re.findall(r'https?://[^\s<>"]+', content)
-                    if urls:
-                        image_url = urls[0]
-                        print(f'Downloading generated image from: {image_url[:50]}...')
-                        img_response = requests.get(image_url, timeout=30)
-                        
-                        if img_response.status_code == 200:
-                            print(f'Image downloaded successfully, size: {len(img_response.content)} bytes')
-                            return img_response.content
+            print(f'Image generated successfully, size: {len(response.content)} bytes')
+            return response.content
         else:
-            print(f'OpenRouter API error: {response.status_code}, {response.text[:200]}')
+            print(f'Hugging Face API error: {response.status_code}, {response.text[:200]}')
         
         return None
     except Exception as e:
-        print(f'OpenRouter API error: {e}')
+        print(f'Hugging Face API error: {e}')
         return None
 
 def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
@@ -542,7 +529,7 @@ def get_user_model(telegram_id: int) -> str:
     '''Получение выбранной модели пользователя'''
     conn = get_db_connection()
     if not conn:
-        return 'gemini-2.5-flash-image'
+        return 'flux-schnell'
     
     try:
         cur = conn.cursor()
@@ -550,12 +537,12 @@ def get_user_model(telegram_id: int) -> str:
         result = cur.fetchone()
         cur.close()
         conn.close()
-        return result[0] if result and result[0] else 'gemini-2.5-flash-image'
+        return result[0] if result and result[0] else 'flux-schnell'
     except Exception as e:
         print(f'Error getting user model: {e}')
         if conn:
             conn.close()
-        return 'gemini-2.5-flash-image'
+        return 'flux-schnell'
 
 def set_user_model(telegram_id: int, model: str) -> bool:
     '''Установка выбранной модели для пользователя'''
@@ -583,10 +570,10 @@ def get_models_keyboard() -> Dict:
     '''Клавиатура для выбора модели генерации'''
     return {
         'inline_keyboard': [
-            [{'text': '⚡ Gemini 2.5 Flash (быстро)', 'callback_data': 'model_gemini-2.5-flash-image'}],
-            [{'text': '🎨 Gemini 3 Pro (качество)', 'callback_data': 'model_gemini-3-pro-image'}],
-            [{'text': '🚀 GPT-5 Image', 'callback_data': 'model_gpt-5-image'}],
-            [{'text': '💡 GPT-5 Image Mini', 'callback_data': 'model_gpt-5-image-mini'}],
+            [{'text': '⚡ FLUX Schnell (быстро)', 'callback_data': 'model_flux-schnell'}],
+            [{'text': '🎨 FLUX Dev (качество)', 'callback_data': 'model_flux-dev'}],
+            [{'text': '🚀 Stable Diffusion 3.5', 'callback_data': 'model_stable-diffusion'}],
+            [{'text': '💡 DreamShaper (арт)', 'callback_data': 'model_dreamshaper'}],
             [{'text': '⬅️ Назад', 'callback_data': 'back_menu'}]
         ]
     }
