@@ -1,8 +1,8 @@
 '''
-Business: Telegram-бот для создания AI-фотосессий через OpenRouter API (поддержка множества моделей)
+Business: Telegram-бот для создания AI-фотосессий через OpenRouter API (Gemini Flash Free, GPT-5 Image)
 Args: event - dict with httpMethod (POST для webhook), body (JSON от Telegram)
       context - object with request_id, function_name, etc.
-Returns: HTTP response dict с обработкой команд и генерацией изображений
+Returns: HTTP response dict с обработкой команд и генерацией изображений через OpenRouter
 '''
 
 import json
@@ -13,18 +13,14 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
-HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
 
 IMAGE_MODELS = {
-    'flux-schnell': {'id': 'black-forest-labs/FLUX.1-schnell', 'name': 'FLUX Schnell (быстро)', 'api': 'huggingface'},
-    'flux-dev': {'id': 'black-forest-labs/FLUX.1-dev', 'name': 'FLUX Dev (качество)', 'api': 'huggingface'},
-    'stable-diffusion': {'id': 'stabilityai/stable-diffusion-3-5-large', 'name': 'Stable Diffusion 3.5', 'api': 'huggingface'},
-    'dreamshaper': {'id': 'Lykon/dreamshaper-8', 'name': 'DreamShaper (арт)', 'api': 'huggingface'}
+    'gemini-flash': {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': '🆓 Gemini Flash (бесплатно)', 'paid': False},
+    'gpt-5-mini': {'id': 'openai/gpt-5-image-mini', 'name': '⚡ GPT-5 Mini (быстро)', 'paid': True},
+    'gpt-5': {'id': 'openai/gpt-5-image', 'name': '💎 GPT-5 (премиум)', 'paid': True}
 }
 
 def get_telegram_api() -> str:
@@ -61,7 +57,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
                 'free_generations': result[3],
                 'paid_generations': result[4],
                 'total_used': result[5],
-                'preferred_model': result[6] or 'flux-schnell'
+                'preferred_model': result[6] or 'gemini-flash'
             }
             cur.close()
             conn.close()
@@ -454,8 +450,8 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
-def generate_image(prompt: str, style: str = 'portrait', model: str = 'flux-schnell') -> Optional[bytes]:
-    '''Генерация изображения через Hugging Face Inference API'''
+def generate_image(prompt: str, style: str = 'portrait', model: str = 'gemini-flash') -> Optional[str]:
+    '''Генерация изображения через OpenRouter API'''
     style_prompts = {
         'portrait': 'professional portrait photo, studio lighting, high detail, photorealistic',
         'fashion': 'fashion photography, editorial style, vogue magazine, professional',
@@ -469,67 +465,72 @@ def generate_image(prompt: str, style: str = 'portrait', model: str = 'flux-schn
     
     full_prompt = f"{prompt}, {style_prompts.get(style, style_prompts['portrait'])}"
     
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['flux-schnell'])
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
     
     print(f'Generating image with {model_info["name"]} ({model_id}): {full_prompt[:100]}...')
     
-    if not HUGGINGFACE_API_KEY:
-        print('HUGGINGFACE_API_KEY not configured')
+    if not OPENROUTER_API_KEY:
+        print('OPENROUTER_API_KEY not configured')
         return None
     
     try:
         headers = {
-            'Authorization': f'Bearer {HUGGINGFACE_API_KEY}',
-            'Content-Type': 'application/json'
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
         }
         
         payload = {
-            'inputs': full_prompt
+            'model': model_id,
+            'prompt': full_prompt,
+            'n': 1,
+            'size': '1024x1024'
         }
         
-        api_url = f'https://api-inference.huggingface.co/models/{model_id}'
-        
         response = requests.post(
-            api_url,
+            'https://openrouter.ai/api/v1/images/generations',
             headers=headers,
             json=payload,
-            timeout=60
+            timeout=120
         )
         
-        print(f'Hugging Face API response: {response.status_code}')
+        print(f'OpenRouter API response: {response.status_code}')
         
         if response.status_code == 200:
-            print(f'Image generated successfully, size: {len(response.content)} bytes')
-            return response.content
+            data = response.json()
+            if data.get('data') and len(data['data']) > 0:
+                image_url = data['data'][0].get('url')
+                print(f'Image generated successfully: {image_url}')
+                return image_url
         else:
-            print(f'Hugging Face API error: {response.status_code}, {response.text[:200]}')
+            print(f'OpenRouter API error: {response.status_code}, {response.text[:200]}')
         
         return None
     except Exception as e:
-        print(f'Hugging Face API error: {e}')
+        print(f'OpenRouter API error: {e}')
         return None
 
-def send_photo_bytes(chat_id: int, image_bytes: bytes, caption: str = '') -> None:
-    '''Отправка фото из байтов в Telegram'''
+def send_photo_url(chat_id: int, image_url: str, caption: str = '') -> None:
+    '''Отправка фото по URL в Telegram'''
     try:
-        url = f'{get_telegram_api()}/sendPhoto'
-        files = {'photo': ('generated.png', image_bytes, 'image/png')}
         data = {
             'chat_id': chat_id,
+            'photo': image_url,
             'caption': caption,
             'parse_mode': 'MarkdownV2'
         }
-        response = requests.post(url, files=files, data=data, timeout=30)
+        response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
         print(f'sendPhoto response: {response.status_code}')
     except Exception as e:
-        print(f'Error sending photo bytes: {e}')
+        print(f'Error sending photo URL: {e}')
 
 def get_user_model(telegram_id: int) -> str:
     '''Получение выбранной модели пользователя'''
     conn = get_db_connection()
     if not conn:
-        return 'flux-schnell'
+        return 'gemini-flash'
     
     try:
         cur = conn.cursor()
@@ -537,12 +538,12 @@ def get_user_model(telegram_id: int) -> str:
         result = cur.fetchone()
         cur.close()
         conn.close()
-        return result[0] if result and result[0] else 'flux-schnell'
+        return result[0] if result and result[0] else 'gemini-flash'
     except Exception as e:
         print(f'Error getting user model: {e}')
         if conn:
             conn.close()
-        return 'flux-schnell'
+        return 'gemini-flash'
 
 def set_user_model(telegram_id: int, model: str) -> bool:
     '''Установка выбранной модели для пользователя'''
@@ -568,15 +569,12 @@ def set_user_model(telegram_id: int, model: str) -> bool:
 
 def get_models_keyboard() -> Dict:
     '''Клавиатура для выбора модели генерации'''
-    return {
-        'inline_keyboard': [
-            [{'text': '⚡ FLUX Schnell (быстро)', 'callback_data': 'model_flux-schnell'}],
-            [{'text': '🎨 FLUX Dev (качество)', 'callback_data': 'model_flux-dev'}],
-            [{'text': '🚀 Stable Diffusion 3.5', 'callback_data': 'model_stable-diffusion'}],
-            [{'text': '💡 DreamShaper (арт)', 'callback_data': 'model_dreamshaper'}],
-            [{'text': '⬅️ Назад', 'callback_data': 'back_menu'}]
-        ]
-    }
+    buttons = []
+    for key, model_info in IMAGE_MODELS.items():
+        buttons.append([{'text': model_info['name'], 'callback_data': f'model_{key}'}])
+    buttons.append([{'text': '⬅️ Назад', 'callback_data': 'back_menu'}])
+    
+    return {'inline_keyboard': buttons}
 
 def get_start_keyboard(is_admin: bool = False) -> Dict:
     '''Клавиатура для главного меню'''
@@ -913,18 +911,24 @@ def handle_callback(chat_id: int, data: str, message_id: int, username: Optional
     
     elif data == 'select_model':
         current_model = get_user_model(chat_id)
-        model_name = IMAGE_MODELS.get(current_model, {}).get('name', 'Gemini 2.5 Flash Image')
+        model_name = IMAGE_MODELS.get(current_model, {}).get('name', 'Неизвестная модель')
+        
+        models_list = []
+        for key, info in IMAGE_MODELS.items():
+            price_tag = '🆓 БЕСПЛАТНО' if not info['paid'] else '💰 ПЛАТНО'
+            models_list.append(f"{info['name']} \\- {price_tag}")
+        
+        models_text = '\n'.join(models_list)
         
         text = f'''🤖 *Выбор AI модели*
 
 Текущая модель: *{model_name}*
 
-Выбери модель для генерации изображений:
+Доступные модели:
 
-⚡ *Gemini 2\\.5 Flash* \\- быстрая генерация
-🎨 *Gemini 3 Pro* \\- высокое качество
-🚀 *GPT\\-5 Image* \\- продвинутая модель
-💡 *GPT\\-5 Image Mini* \\- компактная версия'''
+{models_text}
+
+Выбери модель для генерации изображений:'''
         send_message(chat_id, text, get_models_keyboard())
     
     elif data.startswith('model_'):
@@ -1283,14 +1287,15 @@ _Пример: /reset 123456789_'''
     send_chat_action(chat_id, 'upload_photo')
     
     user_model = get_user_model(chat_id)
-    image_bytes = generate_image(text, 'portrait', user_model)
+    image_url = generate_image(text, 'portrait', user_model)
     
-    if image_bytes:
+    if image_url:
         # Списываем генерацию
         if use_generation(chat_id):
             remaining = total_gen - 1
-            caption = f'✨ *Готово\\!*\n\nОсталось генераций: {remaining}'
-            send_photo_bytes(chat_id, image_bytes, caption)
+            model_name = IMAGE_MODELS[user_model]['name']
+            caption = f'✨ *Готово\\!*\n\n{model_name}\nОсталось генераций: {remaining}'
+            send_photo_url(chat_id, image_url, caption)
             send_message(chat_id, '🎉 Фото готово\\! Хочешь создать еще?', get_start_keyboard())
         else:
             send_message(chat_id, '❌ Ошибка списания генерации\\. Попробуй еще раз\\.')
