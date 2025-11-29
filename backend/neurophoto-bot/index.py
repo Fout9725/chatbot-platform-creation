@@ -554,6 +554,138 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         handle_start(chat_id, first_name, username)
         return
     
+    if text.startswith('/admin'):
+        if chat_id not in ADMIN_IDS:
+            send_message(chat_id, '❌ У тебя нет доступа к админ-панели')
+            return
+        
+        conn = get_db_connection()
+        if not conn:
+            send_message(chat_id, '❌ Ошибка подключения к БД')
+            return
+        
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM neurophoto_users")
+            total_users = cur.fetchone()[0]
+            
+            cur.execute("SELECT SUM(total_used) FROM neurophoto_users")
+            total_generations = cur.fetchone()[0] or 0
+            
+            cur.execute("SELECT SUM(free_generations) FROM neurophoto_users")
+            total_free_remaining = cur.fetchone()[0] or 0
+            
+            cur.execute("SELECT SUM(paid_generations) FROM neurophoto_users")
+            total_paid_remaining = cur.fetchone()[0] or 0
+            
+            cur.close()
+            conn.close()
+            
+            admin_text = f'''⚙️ АДМИН-ПАНЕЛЬ
+
+📊 Статистика:
+👥 Всего пользователей: {total_users}
+🎨 Всего генераций: {total_generations}
+🆓 Бесплатных генераций осталось: {total_free_remaining}
+💎 Платных генераций осталось: {total_paid_remaining}
+
+💡 Команды:
+/userinfo <telegram_id> - информация о пользователе
+/addgen <telegram_id> <count> - добавить платные генерации
+/broadcast <текст> - рассылка всем пользователям'''
+            
+            send_message(chat_id, admin_text)
+        except Exception as e:
+            send_message(chat_id, f'❌ Ошибка: {e}')
+        return
+    
+    if text.startswith('/userinfo'):
+        if chat_id not in ADMIN_IDS:
+            send_message(chat_id, '❌ У тебя нет доступа к этой команде')
+            return
+        
+        parts = text.split()
+        if len(parts) < 2:
+            send_message(chat_id, '❌ Использование: /userinfo <telegram_id>')
+            return
+        
+        try:
+            user_id = int(parts[1])
+            conn = get_db_connection()
+            if not conn:
+                send_message(chat_id, '❌ Ошибка подключения к БД')
+                return
+            
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE telegram_id = %s",
+                (user_id,)
+            )
+            result = cur.fetchone()
+            cur.close()
+            conn.close()
+            
+            if not result:
+                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+                return
+            
+            user_text = f'''👤 Информация о пользователе
+
+🆔 Telegram ID: {result[0]}
+👤 Username: @{result[1] or "нет"}
+📝 Имя: {result[2]}
+🆓 Бесплатных: {result[3]}
+💎 Платных: {result[4]}
+📊 Всего использовано: {result[5]}
+📅 Регистрация: {result[6].strftime('%d.%m.%Y %H:%M')}
+🕐 Последняя генерация: {result[7].strftime('%d.%m.%Y %H:%M') if result[7] else 'никогда'}'''
+            
+            send_message(chat_id, user_text)
+        except ValueError:
+            send_message(chat_id, '❌ Неверный формат telegram_id')
+        except Exception as e:
+            send_message(chat_id, f'❌ Ошибка: {e}')
+        return
+    
+    if text.startswith('/addgen'):
+        if chat_id not in ADMIN_IDS:
+            send_message(chat_id, '❌ У тебя нет доступа к этой команде')
+            return
+        
+        parts = text.split()
+        if len(parts) < 3:
+            send_message(chat_id, '❌ Использование: /addgen <telegram_id> <count>')
+            return
+        
+        try:
+            user_id = int(parts[1])
+            count = int(parts[2])
+            
+            conn = get_db_connection()
+            if not conn:
+                send_message(chat_id, '❌ Ошибка подключения к БД')
+                return
+            
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
+                (count, user_id)
+            )
+            conn.commit()
+            
+            if cur.rowcount > 0:
+                send_message(chat_id, f'✅ Пользователю {user_id} добавлено {count} платных генераций')
+            else:
+                send_message(chat_id, f'❌ Пользователь {user_id} не найден')
+            
+            cur.close()
+            conn.close()
+        except ValueError:
+            send_message(chat_id, '❌ Неверный формат данных')
+        except Exception as e:
+            send_message(chat_id, f'❌ Ошибка: {e}')
+        return
+    
     if text.startswith('/history'):
         history = get_user_history(chat_id, 10)
         
