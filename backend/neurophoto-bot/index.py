@@ -16,6 +16,8 @@ OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 ADMIN_IDS = [1508333931, 285675692]
 
+print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
+
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': '🆓 Gemini Flash', 'paid': False},
     'gpt-5-mini': {'id': 'openai/gpt-5-image-mini', 'name': '⚡ GPT-5 Mini', 'paid': True},
@@ -202,7 +204,8 @@ def get_user_history(telegram_id: int, limit: int = 10) -> list:
 def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -> None:
     data = {
         'chat_id': chat_id,
-        'text': text
+        'text': text,
+        'parse_mode': 'Markdown'
     }
     if reply_markup:
         data['reply_markup'] = json.dumps(reply_markup)
@@ -254,13 +257,17 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'X-Title': 'NeurophotoBot'
         }
         
-        # OpenRouter использует формат chat/completions для text-to-image моделей
         payload = {
             'model': model_id,
             'messages': [
                 {
                     'role': 'user',
-                    'content': prompt
+                    'content': [
+                        {
+                            'type': 'text',
+                            'text': prompt
+                        }
+                    ]
                 }
             ]
         }
@@ -273,24 +280,36 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         )
         
         print(f'OpenRouter API response: {response.status_code}')
+        print(f'OpenRouter response body: {response.text[:1000]}')
         
         if response.status_code == 200:
             data = response.json()
-            # Ответ приходит в формате chat completion с изображением в content
             if data.get('choices') and len(data['choices']) > 0:
                 content = data['choices'][0].get('message', {}).get('content', '')
-                # Ищем URL изображения в ответе
-                if content and (content.startswith('http://') or content.startswith('https://')):
+                
+                # Проверяем, есть ли в ответе массив content с image_url
+                if isinstance(content, list):
+                    for item in content:
+                        if item.get('type') == 'image_url':
+                            image_url = item.get('image_url', {}).get('url', '')
+                            if image_url:
+                                print(f'Image generated successfully: {image_url}')
+                                return image_url
+                
+                # Если это строка с URL
+                if isinstance(content, str) and (content.startswith('http://') or content.startswith('https://')):
                     print(f'Image generated successfully: {content}')
                     return content
-                else:
-                    print(f'No image URL in response: {content[:200]}')
+                
+                print(f'No image URL in response. Content type: {type(content)}, value: {str(content)[:500]}')
         else:
             print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
         
         return None
     except Exception as e:
         print(f'OpenRouter API error: {e}')
+        import traceback
+        print(f'Traceback: {traceback.format_exc()}')
         return None
 
 def get_tariff_keyboard() -> Dict:
