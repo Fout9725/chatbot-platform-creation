@@ -264,7 +264,7 @@ def save_generation_history(telegram_id: int, prompt: str, model: str, effect: O
     try:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO neurophoto_generations (telegram_id, prompt, model, effect, image_url, is_paid) VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO t_p60354232_chatbot_platform_cre.neurophoto_generations (telegram_id, prompt, model, effect, image_url, is_paid) VALUES (%s, %s, %s, %s, %s, %s)",
             (telegram_id, prompt, model, effect, image_url, is_paid)
         )
         conn.commit()
@@ -311,7 +311,7 @@ def process_queue_item(item: Dict) -> bool:
         
         if retry_count == 0:
             cur.execute(
-                "UPDATE neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (queue_id,)
             )
             conn.commit()
@@ -322,7 +322,7 @@ def process_queue_item(item: Dict) -> bool:
             
             if image_url:
                 cur.execute(
-                    "UPDATE neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
                     (image_url, queue_id)
                 )
                 conn.commit()
@@ -335,14 +335,14 @@ def process_queue_item(item: Dict) -> bool:
             else:
                 if retry_count < 1:
                     cur.execute(
-                        "UPDATE neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
                     print(f'Queue {queue_id} timeout, will retry')
                 else:
                     cur.execute(
-                        "UPDATE neurophoto_queue SET status = 'failed', error_message = 'Generation timeout' WHERE id = %s",
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation timeout' WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
@@ -352,7 +352,7 @@ def process_queue_item(item: Dict) -> bool:
             
             if image_url and image_url != 'TIMEOUT':
                 cur.execute(
-                    "UPDATE neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
                     (image_url, queue_id)
                 )
                 conn.commit()
@@ -365,13 +365,13 @@ def process_queue_item(item: Dict) -> bool:
             else:
                 if retry_count < 2:
                     cur.execute(
-                        "UPDATE neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
                 else:
                     cur.execute(
-                        "UPDATE neurophoto_queue SET status = 'failed', error_message = 'Generation failed' WHERE id = %s",
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation failed' WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
@@ -402,7 +402,7 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
         cur = conn.cursor()
         print('Cursor created')
         
-        query = "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s"
+        query = "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s"
         print(f'Executing query: {query}')
         print(f'Limit: {limit}')
         
