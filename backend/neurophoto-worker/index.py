@@ -121,18 +121,18 @@ def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup
     except Exception as e:
         print(f'Error sending photo URL: {e}')
 
-def start_async_generation(prompt: str, model: str, queue_id: int) -> bool:
+def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
     '''
-    Запускает асинхронную генерацию с webhook callback
-    Возвращает True если запрос отправлен успешно
+    Генерация платной модели с длинным таймаутом 25 сек
+    Один запрос = одна оплата
     '''
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
     
-    print(f'Starting async generation for queue {queue_id} with {model_info["name"]}')
+    print(f'Paid generation with {model_info["name"]}: {prompt[:50]}...')
     
     if not OPENROUTER_API_KEY:
-        return False
+        return None
     
     try:
         headers = {
@@ -147,32 +147,43 @@ def start_async_generation(prompt: str, model: str, queue_id: int) -> bool:
             'messages': [{'role': 'user', 'content': prompt}],
             'modalities': ['text', 'image'],
             'stream': False,
-            'max_tokens': 4096,
-            'webhook': {
-                'url': CALLBACK_URL,
-                'metadata': {'queue_id': queue_id}
-            }
+            'max_tokens': 4096
         }
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=10
+            timeout=25
         )
         
-        print(f'Async request response: {response.status_code}')
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get('images') and len(data['images']) > 0:
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images') and len(message['images']) > 0:
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        return image_data
+                    elif isinstance(image_data, dict) and image_data.get('url'):
+                        return image_data['url']
+                
+                content = message.get('content', '')
+                if isinstance(content, str) and content.startswith('data:image'):
+                    return content
         
-        if response.status_code in [200, 202]:
-            print(f'Async generation started for queue {queue_id}')
-            return True
-        else:
-            print(f'Failed to start async: {response.text[:500]}')
-            return False
-    
+        return None
+    except requests.exceptions.Timeout:
+        print(f'Timeout after 25s')
+        return None
     except Exception as e:
-        print(f'Error starting async: {e}')
-        return False
+        print(f'Error: {e}')
+        return None
 
 def generate_image_sync(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     '''
@@ -299,30 +310,35 @@ def process_queue_item(item: Dict) -> bool:
             send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
         
         if is_paid:
-            success = start_async_generation(prompt, model, queue_id)
+            image_url = generate_image_paid_long(prompt, model)
             
-            if success:
+            if image_url:
                 cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', openrouter_request_id = 'webhook' WHERE id = %s",
-                    (queue_id,)
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (image_url, queue_id)
                 )
                 conn.commit()
-                send_message(chat_id, f'⏳ Генерация запущена. Изображение придет когда будет готово (~30 сек)')
-                print(f'Queue {queue_id} webhook sent')
+                
+                save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
+                
+                caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
+                send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+                print(f'Queue {queue_id} completed (paid)')
             else:
-                if retry_count < 2:
+                if retry_count < 1:
                     cur.execute(
                         "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
+                    print(f'Queue {queue_id} timeout, will retry')
                 else:
                     cur.execute(
-                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Failed to start' WHERE id = %s",
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation timeout' WHERE id = %s",
                         (queue_id,)
                     )
                     conn.commit()
-                    send_message(chat_id, '❌ Не удалось запустить генерацию')
+                    send_message(chat_id, '❌ Генерация не завершилась за отведенное время. Попробуй упростить описание или выбери другую модель.')
         else:
             image_url = generate_image_sync(prompt, model)
             
