@@ -353,67 +353,6 @@ def download_telegram_photo(file_id: str) -> Optional[str]:
         print(f'Error downloading photo: {e}')
         return None
 
-def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-flash') -> Optional[str]:
-    '''Генерирует изображение на основе загруженного фото и промпта - двухэтапный процесс'''
-    if not OPENROUTER_API_KEY:
-        print('OPENROUTER_API_KEY not configured')
-        return None
-    
-    print(f'Step 1: Analyzing photo with vision model...')
-    
-    try:
-        # Шаг 1: Анализируем фото с помощью vision-модели (используем бесплатную Grok 4.1 Fast)
-        vision_response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': BOT_URL,
-                'X-Title': 'Neurophoto Bot'
-            },
-            json={
-                'model': 'x-ai/grok-4.1-fast:free',
-                'messages': [
-                    {
-                        'role': 'user',
-                        'content': [
-                            {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
-                            {'type': 'image_url', 'image_url': {'url': photo_url}}
-                        ]
-                    }
-                ]
-            },
-            timeout=30
-        )
-        
-        if vision_response.status_code != 200:
-            print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
-            return None
-        
-        vision_data = vision_response.json()
-        if 'choices' not in vision_data or len(vision_data['choices']) == 0:
-            print('No description from vision model')
-            return None
-        
-        image_description = vision_data['choices'][0]['message']['content']
-        print(f'Image description: {image_description[:200]}...')
-        
-        # Шаг 2: Генерируем новое изображение на основе описания + инструкций пользователя
-        print(f'Step 2: Generating modified image...')
-        
-        combined_prompt = f'{image_description}. Now apply these changes: {prompt}'
-        
-        model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
-        model_id = model_info['id']
-        
-        return generate_image(combined_prompt, model)
-        
-    except Exception as e:
-        print(f'Error in generate_image_with_photo: {e}')
-        import traceback
-        print(f'Traceback: {traceback.format_exc()}')
-        return None
-
 def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
@@ -703,12 +642,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
         send_chat_action(chat_id, 'upload_photo')
         
-        photo_url = user_photo_context.get(chat_id)
-        
-        if photo_url:
-            image_url = generate_image_with_photo(prompt, photo_url, model_key)
-            user_photo_context[chat_id] = None
-        elif is_paid:
+        if is_paid:
             image_url = generate_image_paid_long(prompt, model_key)
         else:
             image_url = generate_image(prompt, model_key)
@@ -797,52 +731,15 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         return
 
 def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
-    '''Обрабатывает загруженное фото'''
+    '''Обрабатывает загруженное фото - автоматически запускает анализ и генерацию'''
     file_id = photo_data[-1]['file_id']
     
-    photo_url = download_telegram_photo(file_id)
-    if not photo_url:
-        send_message(chat_id, '❌ Не удалось загрузить фото. Попробуй еще раз.')
+    user_data = get_or_create_user(chat_id, username, first_name)
+    if not user_data:
+        send_message(chat_id, '❌ Ошибка подключения к базе данных')
         return
     
-    user_photo_context[chat_id] = photo_url
-    
-    if caption:
-        user_data = get_or_create_user(chat_id, username, first_name)
-        if not user_data:
-            send_message(chat_id, '❌ Ошибка подключения к базе данных')
-            return
-        
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
-                    (caption, chat_id)
-                )
-                conn.commit()
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print(f'Error saving prompt: {e}')
-                if conn:
-                    conn.close()
-        
-        text = f'''✅ Фото получено!
-
-📝 Твой промпт: "{caption}"
-
-🎨 Выбери модель для обработки фото:'''
-        
-        free_gen = user_data['free_generations']
-        paid_gen = user_data['paid_generations']
-        
-        if free_gen > 0:
-            send_message(chat_id, text, get_models_keyboard(has_free=True, has_paid=paid_gen > 0))
-        else:
-            send_message(chat_id, text, get_models_keyboard(has_free=False, has_paid=paid_gen > 0))
-    else:
+    if not caption:
         text = '''✅ Фото получено!
 
 📝 Теперь напиши, как нужно обработать это фото:
@@ -854,7 +751,97 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
 • Сделай фон размытым'''
         
         send_message(chat_id, text)
+        
+        photo_url = download_telegram_photo(file_id)
+        if photo_url:
+            user_photo_context[chat_id] = photo_url
+        
         user_sessions[chat_id] = {'state': 'waiting_prompt_for_photo'}
+        return
+    
+    if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
+        send_message(chat_id, '❌ У тебя закончились генерации! Свяжись с @support_bot для пополнения.')
+        return
+    
+    send_message(chat_id, f'📥 Загружаю фото...')
+    photo_url = download_telegram_photo(file_id)
+    if not photo_url:
+        send_message(chat_id, '❌ Не удалось загрузить фото. Попробуй еще раз.')
+        return
+    
+    send_message(chat_id, f'✅ Фото загружено!\n\n📝 Твоя инструкция: "{caption}"\n\n🔍 Анализирую фото с помощью AI...')
+    send_chat_action(chat_id, 'typing')
+    
+    print(f'Step 1: Analyzing photo with vision model for user {chat_id}...')
+    
+    try:
+        vision_response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': BOT_URL,
+                'X-Title': 'Neurophoto Bot'
+            },
+            json={
+                'model': 'x-ai/grok-4.1-fast:free',
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': [
+                            {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
+                            {'type': 'image_url', 'image_url': {'url': photo_url}}
+                        ]
+                    }
+                ]
+            },
+            timeout=30
+        )
+        
+        if vision_response.status_code != 200:
+            print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
+            send_message(chat_id, '❌ Ошибка анализа фото. Попробуй еще раз.')
+            return
+        
+        vision_data = vision_response.json()
+        if 'choices' not in vision_data or len(vision_data['choices']) == 0:
+            print('No description from vision model')
+            send_message(chat_id, '❌ Не удалось проанализировать фото. Попробуй еще раз.')
+            return
+        
+        image_description = vision_data['choices'][0]['message']['content']
+        print(f'Image description: {image_description[:200]}...')
+        
+        send_message(chat_id, f'✅ Анализ завершен!\n\n🎨 Генерирую новое фото на основе твоих инструкций...')
+        send_chat_action(chat_id, 'upload_photo')
+        
+        combined_prompt = f'{image_description}. Now apply these changes: {caption}'
+        
+        is_paid = user_data['paid_generations'] > 0 and user_data['free_generations'] <= 0
+        model_key = 'gemini-flash'
+        
+        if not use_generation(chat_id, is_paid):
+            send_message(chat_id, '❌ Ошибка списания генерации')
+            return
+        
+        model_info = IMAGE_MODELS.get(model_key)
+        print(f'Step 2: Generating image with {model_info["name"]}...')
+        
+        image_url = generate_image(combined_prompt, model_key)
+        
+        if image_url:
+            save_generation_history(chat_id, caption, model_key, None, image_url, is_paid)
+            caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {caption[:100]}'
+            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+        else:
+            refund_generation(chat_id, is_paid)
+            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+    
+    except Exception as e:
+        print(f'Error in handle_photo: {e}')
+        import traceback
+        print(f'Traceback: {traceback.format_exc()}')
+        send_message(chat_id, '❌ Произошла ошибка при обработке фото. Попробуй еще раз.')
 
 def handle_message(chat_id: int, text: str, first_name: str, username: Optional[str] = None) -> None:
     if text.startswith('/start'):
@@ -1101,31 +1088,93 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             send_message(chat_id, '❌ Ошибка подключения к базе данных')
             return
         
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
-                    (text, chat_id)
-                )
-                conn.commit()
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print(f'Error saving prompt: {e}')
-                if conn:
-                    conn.close()
+        photo_url = user_photo_context.get(chat_id)
+        if not photo_url:
+            send_message(chat_id, '❌ Фото не найдено. Отправь фото заново.')
+            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+            return
         
-        free_gen = user_data['free_generations']
-        paid_gen = user_data['paid_generations']
+        if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
+            send_message(chat_id, '❌ У тебя закончились генерации! Свяжись с @support_bot для пополнения.')
+            return
         
-        prompt_text = f'✅ Промпт получен: "{text}"\n\n🎨 Выбери модель для обработки фото:'
+        send_message(chat_id, f'✅ Инструкция получена: "{text}"\n\n🔍 Анализирую фото с помощью AI...')
+        send_chat_action(chat_id, 'typing')
         
-        if free_gen > 0:
-            send_message(chat_id, prompt_text, get_models_keyboard(has_free=True, has_paid=paid_gen > 0))
-        else:
-            send_message(chat_id, prompt_text, get_models_keyboard(has_free=False, has_paid=paid_gen > 0))
+        print(f'Step 1: Analyzing photo with vision model for user {chat_id}...')
+        
+        try:
+            vision_response = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': BOT_URL,
+                    'X-Title': 'Neurophoto Bot'
+                },
+                json={
+                    'model': 'x-ai/grok-4.1-fast:free',
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': [
+                                {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
+                                {'type': 'image_url', 'image_url': {'url': photo_url}}
+                            ]
+                        }
+                    ]
+                },
+                timeout=30
+            )
+            
+            if vision_response.status_code != 200:
+                print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
+                send_message(chat_id, '❌ Ошибка анализа фото. Попробуй еще раз.')
+                return
+            
+            vision_data = vision_response.json()
+            if 'choices' not in vision_data or len(vision_data['choices']) == 0:
+                print('No description from vision model')
+                send_message(chat_id, '❌ Не удалось проанализировать фото. Попробуй еще раз.')
+                return
+            
+            image_description = vision_data['choices'][0]['message']['content']
+            print(f'Image description: {image_description[:200]}...')
+            
+            send_message(chat_id, f'✅ Анализ завершен!\n\n🎨 Генерирую новое фото на основе твоих инструкций...')
+            send_chat_action(chat_id, 'upload_photo')
+            
+            combined_prompt = f'{image_description}. Now apply these changes: {text}'
+            
+            is_paid = user_data['paid_generations'] > 0 and user_data['free_generations'] <= 0
+            model_key = 'gemini-flash'
+            
+            if not use_generation(chat_id, is_paid):
+                send_message(chat_id, '❌ Ошибка списания генерации')
+                return
+            
+            model_info = IMAGE_MODELS.get(model_key)
+            print(f'Step 2: Generating image with {model_info["name"]}...')
+            
+            image_url = generate_image(combined_prompt, model_key)
+            
+            if image_url:
+                save_generation_history(chat_id, text, model_key, None, image_url, is_paid)
+                caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {text[:100]}'
+                send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+            else:
+                refund_generation(chat_id, is_paid)
+                send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+            
+            user_photo_context[chat_id] = None
+            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+        
+        except Exception as e:
+            print(f'Error processing photo: {e}')
+            import traceback
+            print(f'Traceback: {traceback.format_exc()}')
+            send_message(chat_id, '❌ Произошла ошибка при обработке фото. Попробуй еще раз.')
+        
         return
     
     conn = get_db_connection()
