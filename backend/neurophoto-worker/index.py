@@ -123,6 +123,7 @@ def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup
 def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
+    is_paid = model_info.get('paid', False)
     
     print(f'Generating image with {model_info["name"]} ({model_id}): {prompt[:100]}...')
     
@@ -130,8 +131,10 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         print('OPENROUTER_API_KEY not configured')
         return None
     
+    timeout_seconds = 25 if is_paid else 15
+    
     try:
-        with time_limit(18):
+        with time_limit(timeout_seconds):
             headers = {
                 'Authorization': f'Bearer {OPENROUTER_API_KEY}',
                 'Content-Type': 'application/json',
@@ -219,7 +222,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             
             return None
     except TimeoutException:
-        print(f'Hard timeout reached after 18 seconds')
+        print(f'Hard timeout reached after {timeout_seconds} seconds')
         return 'TIMEOUT'
     except requests.exceptions.Timeout:
         print(f'OpenRouter API timeout after 15 seconds')
