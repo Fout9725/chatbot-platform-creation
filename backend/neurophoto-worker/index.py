@@ -214,6 +214,8 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                                     return image_url
             else:
                 print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
+                if response.status_code == 429:
+                    return 'TIMEOUT'
             
             return None
     except TimeoutException:
