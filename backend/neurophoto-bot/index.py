@@ -19,12 +19,7 @@ ADMIN_IDS = [1508333931, 285675692]
 print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
-    'gemini-3-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Gemini 3 Pro', 'paid': True},
-    'gemini-2.5-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Gemini 2.5 Preview', 'paid': True},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image', 'name': '✨ Gemini 2.5 Flash', 'paid': True},
-    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True},
-    'dalle-3': {'id': 'openai/dall-e-3', 'name': '🖼️ DALL-E 3', 'paid': True}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False}
 }
 
 IMAGE_EFFECTS = {
@@ -277,7 +272,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=180
+            timeout=25
         )
         
         print(f'OpenRouter API response: {response.status_code}')
@@ -837,17 +832,44 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             if conn:
                 conn.close()
     
-    user_sessions[chat_id] = {
-        'state': 'choosing_tariff',
-        'prompt': text
-    }
+    user_data = get_or_create_user(chat_id, username, first_name)
+    if not user_data:
+        send_message(chat_id, '❌ Ошибка подключения к базе данных')
+        return
     
-    tariff_text = f'''✅ Отлично!
-
-Твой запрос: {text[:100]}
-
-Теперь выбери тариф для генерации:'''
-    send_message(chat_id, tariff_text, get_tariff_keyboard())
+    if user_data['free_generations'] <= 0:
+        send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
+        return
+    
+    send_message(chat_id, f'🎨 Генерирую изображение...\nЭто займет 10-20 секунд')
+    send_chat_action(chat_id, 'upload_photo')
+    
+    image_url = generate_image(text, 'gemini-flash')
+    
+    if image_url:
+        if use_generation(chat_id, False):
+            save_generation_history(chat_id, text, 'gemini-flash', None, image_url, False)
+            
+            remaining_free = user_data['free_generations'] - 1
+            
+            caption = f'''✨ Готово!\n\nМодель: Gemini Flash (бесплатно)\nОсталось генераций: {remaining_free}'''
+            
+            user_sessions[chat_id] = {
+                'state': 'choosing_effects',
+                'prompt': text,
+                'model': 'gemini-flash',
+                'image_url': image_url,
+                'is_paid': False
+            }
+            
+            effects_text = '''🎨 *Хочешь добавить эффекты?*\n\nВыбери эффект для улучшения изображения:'''
+            
+            send_photo_url(chat_id, image_url, caption)
+            send_message(chat_id, effects_text, get_effects_keyboard())
+        else:
+            send_message(chat_id, '❌ Ошибка списания генерации')
+    else:
+        send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже или другой промпт')
     return
     
     user_data = get_or_create_user(chat_id, username, first_name)
