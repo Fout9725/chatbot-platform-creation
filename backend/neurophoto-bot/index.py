@@ -20,8 +20,11 @@ print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
-    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '⚡ FLUX Pro', 'paid': True},
-    'dalle-3': {'id': 'openai/dall-e-3', 'name': '💎 DALL-E 3', 'paid': True}
+    'gemini-3-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Gemini 3 Pro', 'paid': True},
+    'gemini-2.5-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Gemini 2.5 Preview', 'paid': True},
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image', 'name': '✨ Gemini 2.5 Flash', 'paid': True},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True},
+    'dalle-3': {'id': 'openai/dall-e-3', 'name': '🖼️ DALL-E 3', 'paid': True}
 }
 
 IMAGE_EFFECTS = {
