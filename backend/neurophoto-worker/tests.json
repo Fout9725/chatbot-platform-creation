@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request (CORS preflight)",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Worker process queue (GET)",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "processed": 0
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Worker process queue (POST)",
+      "method": "POST",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "processed": 0
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -14,12 +14,16 @@ from typing import Dict, Any, Optional
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+WORKER_URL = 'https://functions.poehali.dev/42b8079f-c20c-4eb9-b6ec-d45acfbe9c0f'
 ADMIN_IDS = [1508333931, 285675692]
 
 print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '10-15 сек'},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '30-60 сек'},
+    'dalle-3': {'id': 'openai/dall-e-3', 'name': '🖼️ DALL-E 3', 'paid': True, 'time': '20-40 сек'},
+    'midjourney': {'id': 'midjourney/midjourney', 'name': '✨ Midjourney', 'paid': True, 'time': '40-60 сек'}
 }
 
 IMAGE_EFFECTS = {
@@ -54,7 +58,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, last_prompt FROM neurophoto_users WHERE telegram_id = %s",
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, last_prompt FROM t_p60354232_chatbot_platform_cre.neurophoto_users WHERE telegram_id = %s",
             (telegram_id,)
         )
         result = cur.fetchone()
@@ -74,7 +78,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
             return user_data
         
         cur.execute(
-            "INSERT INTO neurophoto_users (telegram_id, username, first_name, free_generations) VALUES (%s, %s, %s, 10)",
+            "INSERT INTO t_p60354232_chatbot_platform_cre.neurophoto_users (telegram_id, username, first_name, free_generations) VALUES (%s, %s, %s, 10)",
             (telegram_id, username, first_name)
         )
         conn.commit()
@@ -106,7 +110,7 @@ def use_generation(telegram_id: int, is_paid: bool = False) -> bool:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT free_generations, paid_generations FROM neurophoto_users WHERE telegram_id = %s",
+            "SELECT free_generations, paid_generations FROM t_p60354232_chatbot_platform_cre.neurophoto_users WHERE telegram_id = %s",
             (telegram_id,)
         )
         result = cur.fetchone()
@@ -121,7 +125,7 @@ def use_generation(telegram_id: int, is_paid: bool = False) -> bool:
         if is_paid:
             if paid_gen > 0:
                 cur.execute(
-                    "UPDATE neurophoto_users SET paid_generations = paid_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET paid_generations = paid_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
                     (telegram_id,)
                 )
             else:
@@ -131,7 +135,7 @@ def use_generation(telegram_id: int, is_paid: bool = False) -> bool:
         else:
             if free_gen > 0:
                 cur.execute(
-                    "UPDATE neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1, last_generation_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
                     (telegram_id,)
                 )
             else:
@@ -157,7 +161,7 @@ def save_generation_history(telegram_id: int, prompt: str, model: str, effect: O
     try:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO neurophoto_generations (telegram_id, prompt, model, effect, image_url, is_paid) VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO t_p60354232_chatbot_platform_cre.neurophoto_generations (telegram_id, prompt, model, effect, image_url, is_paid) VALUES (%s, %s, %s, %s, %s, %s)",
             (telegram_id, prompt, model, effect, image_url, is_paid)
         )
         conn.commit()
@@ -178,7 +182,7 @@ def get_user_history(telegram_id: int, limit: int = 10) -> list:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT prompt, model, effect, image_url, created_at FROM neurophoto_generations WHERE telegram_id = %s ORDER BY created_at DESC LIMIT %s",
+            "SELECT prompt, model, effect, image_url, created_at FROM t_p60354232_chatbot_platform_cre.neurophoto_generations WHERE telegram_id = %s ORDER BY created_at DESC LIMIT %s",
             (telegram_id, limit)
         )
         results = cur.fetchall()
@@ -239,6 +243,45 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
+def trigger_worker() -> None:
+    '''
+    Запускает worker для обработки очереди
+    '''
+    try:
+        requests.post(WORKER_URL, json={}, timeout=5)
+        print('Worker triggered successfully')
+    except Exception as e:
+        print(f'Error triggering worker: {e}')
+
+def add_to_queue(telegram_id: int, chat_id: int, username: Optional[str], first_name: str, prompt: str, model: str, is_paid: bool) -> Optional[int]:
+    '''
+    Добавляет задачу генерации в очередь
+    '''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO t_p60354232_chatbot_platform_cre.neurophoto_queue (telegram_id, chat_id, username, first_name, prompt, model, is_paid, status) VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending') RETURNING id",
+            (telegram_id, chat_id, username, first_name, prompt, model, is_paid)
+        )
+        queue_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f'Added to queue: {queue_id}, model: {model}, prompt: {prompt[:50]}...')
+        
+        trigger_worker()
+        
+        return queue_id
+    except Exception as e:
+        print(f'Error adding to queue: {e}')
+        if conn:
+            conn.close()
+        return None
+
 def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
@@ -268,11 +311,12 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'modalities': ['text', 'image']
         }
         
+        timeout = 25 if not model_info['paid'] else 90
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25
+            timeout=timeout
         )
         
         print(f'OpenRouter API response: {response.status_code}')
@@ -334,7 +378,7 @@ def get_paid_models_keyboard() -> Dict:
     buttons = []
     for key, model_info in IMAGE_MODELS.items():
         if model_info['paid']:
-            buttons.append([{'text': f'{model_info["name"]} (генерировать)', 'callback_data': f'gen_{key}'}])
+            buttons.append([{'text': f'{model_info["name"]} — {model_info["time"]}', 'callback_data': f'gen_{key}'}])
     return {'inline_keyboard': buttons}
 
 def get_effects_keyboard() -> Dict:
@@ -468,42 +512,45 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
             return
         
-        send_message(chat_id, f'🎨 Генерирую изображение с помощью {model_info["name"]}...\nЭто займет 20-60 секунд')
-        send_chat_action(chat_id, 'upload_photo')
-        
-        image_url = generate_image(prompt, model_key)
-        
-        if image_url:
-            if use_generation(chat_id, is_paid):
-                save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
-                
-                remaining_free = user_data['free_generations'] - (0 if is_paid else 1)
-                remaining_paid = user_data['paid_generations'] - (1 if is_paid else 0)
-                
-                caption = f'''✨ Готово!
-
-Модель: {model_info["name"]}
-Осталось бесплатных: {remaining_free}
-Осталось платных: {remaining_paid}'''
-                
-                user_sessions[chat_id] = {
-                    'state': 'choosing_effects',
-                    'prompt': prompt,
-                    'model': model_key,
-                    'image_url': image_url,
-                    'is_paid': is_paid
-                }
-                
-                effects_text = '''🎨 *Хочешь добавить эффекты?*
-
-Выбери эффект для улучшения изображения:'''
-                
-                send_photo_url(chat_id, image_url, caption)
-                send_message(chat_id, effects_text, get_effects_keyboard())
+        if is_paid:
+            queue_id = add_to_queue(user_data['telegram_id'], chat_id, username, first_name, prompt, model_key, is_paid)
+            if queue_id:
+                if use_generation(chat_id, is_paid):
+                    send_message(chat_id, f'⏳ Задача #{queue_id} добавлена в очередь\n\n{model_info["name"]} — {model_info["time"]}\n\nИзображение придет автоматически когда будет готово. Можешь продолжать пользоваться ботом!')
+                else:
+                    send_message(chat_id, '❌ Ошибка списания генерации')
             else:
-                send_message(chat_id, '❌ Ошибка списания генерации')
+                send_message(chat_id, '❌ Ошибка добавления в очередь')
         else:
-            send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже')
+            send_message(chat_id, f'🎨 Генерирую изображение с помощью {model_info["name"]}...\nЭто займет {model_info["time"]}')
+            send_chat_action(chat_id, 'upload_photo')
+            
+            image_url = generate_image(prompt, model_key)
+            
+            if image_url:
+                if use_generation(chat_id, is_paid):
+                    save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
+                    
+                    remaining_free = user_data['free_generations'] - 1
+                    
+                    caption = f'''✨ Готово!\n\nМодель: {model_info["name"]}\nОсталось бесплатных: {remaining_free}'''
+                    
+                    user_sessions[chat_id] = {
+                        'state': 'choosing_effects',
+                        'prompt': prompt,
+                        'model': model_key,
+                        'image_url': image_url,
+                        'is_paid': is_paid
+                    }
+                    
+                    effects_text = '''🎨 *Хочешь добавить эффекты?*\n\nВыбери эффект для улучшения изображения:'''
+                    
+                    send_photo_url(chat_id, image_url, caption)
+                    send_message(chat_id, effects_text, get_effects_keyboard())
+                else:
+                    send_message(chat_id, '❌ Ошибка списания генерации')
+            else:
+                send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже')
         return
     
     elif data.startswith('effect_'):
@@ -596,16 +643,16 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         
         try:
             cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM neurophoto_users")
+            cur.execute("SELECT COUNT(*) FROM t_p60354232_chatbot_platform_cre.neurophoto_users")
             total_users = cur.fetchone()[0]
             
-            cur.execute("SELECT SUM(total_used) FROM neurophoto_users")
+            cur.execute("SELECT SUM(total_used) FROM t_p60354232_chatbot_platform_cre.neurophoto_users")
             total_generations = cur.fetchone()[0] or 0
             
-            cur.execute("SELECT SUM(free_generations) FROM neurophoto_users")
+            cur.execute("SELECT SUM(free_generations) FROM t_p60354232_chatbot_platform_cre.neurophoto_users")
             total_free_remaining = cur.fetchone()[0] or 0
             
-            cur.execute("SELECT SUM(paid_generations) FROM neurophoto_users")
+            cur.execute("SELECT SUM(paid_generations) FROM t_p60354232_chatbot_platform_cre.neurophoto_users")
             total_paid_remaining = cur.fetchone()[0] or 0
             
             cur.close()
@@ -653,14 +700,14 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             if user_identifier.startswith('@'):
                 username = user_identifier[1:]  # Убираем @
                 cur.execute(
-                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE username = %s",
+                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM t_p60354232_chatbot_platform_cre.neurophoto_users WHERE username = %s",
                     (username,)
                 )
                 user_display = f'@{username}'
             else:
                 user_id = int(user_identifier)
                 cur.execute(
-                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM neurophoto_users WHERE telegram_id = %s",
+                    "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, created_at, last_generation_at FROM t_p60354232_chatbot_platform_cre.neurophoto_users WHERE telegram_id = %s",
                     (user_id,)
                 )
                 user_display = user_id
@@ -716,14 +763,14 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             if user_identifier.startswith('@'):
                 username = user_identifier[1:]  # Убираем @
                 cur.execute(
-                    "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s",
                     (count, username)
                 )
                 user_display = f'@{username}'
             else:
                 user_id = int(user_identifier)
                 cur.execute(
-                    "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
                     (count, user_id)
                 )
                 user_display = user_id
@@ -768,14 +815,14 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             if user_identifier.startswith('@'):
                 username = user_identifier[1:]  # Убираем @
                 cur.execute(
-                    "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE username = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET free_generations = free_generations + %s WHERE username = %s",
                     (count, username)
                 )
                 user_display = f'@{username}'
             else:
                 user_id = int(user_identifier)
                 cur.execute(
-                    "UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s",
                     (count, user_id)
                 )
                 user_display = user_id
@@ -821,7 +868,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         try:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
                 (text, chat_id)
             )
             conn.commit()
@@ -841,41 +888,8 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
         return
     
-    send_message(chat_id, f'🎨 Генерирую изображение...\nЭто займет 10-20 секунд')
-    send_chat_action(chat_id, 'upload_photo')
-    
-    image_url = generate_image(text, 'gemini-flash')
-    
-    if image_url:
-        if use_generation(chat_id, False):
-            save_generation_history(chat_id, text, 'gemini-flash', None, image_url, False)
-            
-            remaining_free = user_data['free_generations'] - 1
-            
-            caption = f'''✨ Готово!\n\nМодель: Gemini Flash (бесплатно)\nОсталось генераций: {remaining_free}'''
-            
-            user_sessions[chat_id] = {
-                'state': 'choosing_effects',
-                'prompt': text,
-                'model': 'gemini-flash',
-                'image_url': image_url,
-                'is_paid': False
-            }
-            
-            effects_text = '''🎨 *Хочешь добавить эффекты?*\n\nВыбери эффект для улучшения изображения:'''
-            
-            send_photo_url(chat_id, image_url, caption)
-            send_message(chat_id, effects_text, get_effects_keyboard())
-        else:
-            send_message(chat_id, '❌ Ошибка списания генерации')
-    else:
-        send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже или другой промпт')
-    return
-    
-    user_data = get_or_create_user(chat_id, username, first_name)
-    if user_data:
-        send_message(chat_id, '📝 Опиши, какую нейрофотографию ты хочешь создать?')
-        user_sessions[chat_id] = {'state': 'waiting_prompt'}
+    tariff_text = f'✅ Отлично!\n\nТвой запрос: {text[:100]}\n\nТеперь выбери тариф для генерации:'
+    send_message(chat_id, tariff_text, get_tariff_keyboard())
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     method: str = event.get('httpMethod', 'GET')

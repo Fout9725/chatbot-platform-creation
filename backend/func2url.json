@@ -1,4 +1,5 @@
 {
+  "neurophoto-worker": "https://functions.poehali.dev/42b8079f-c20c-4eb9-b6ec-d45acfbe9c0f",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
   "email-notifications": "https://functions.poehali.dev/0da74e3e-9774-49d3-a9d3-3f4045408269",
   "prodamus-webhook": "https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4",
