@@ -131,7 +131,8 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         print('OPENROUTER_API_KEY not configured')
         return None
     
-    timeout_seconds = 25 if is_paid else 15
+    timeout_seconds = 28 if is_paid else 15
+    request_timeout = 25 if is_paid else 12
     
     try:
         with time_limit(timeout_seconds):
@@ -159,7 +160,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                 'https://openrouter.ai/api/v1/chat/completions',
                 headers=headers,
                 json=payload,
-                timeout=15
+                timeout=request_timeout
             )
             
             print(f'OpenRouter API response: {response.status_code}')
