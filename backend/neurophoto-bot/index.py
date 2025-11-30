@@ -59,7 +59,7 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used FROM neurophoto_users WHERE telegram_id = %s",
+            "SELECT telegram_id, username, first_name, free_generations, paid_generations, total_used, last_prompt FROM neurophoto_users WHERE telegram_id = %s",
             (telegram_id,)
         )
         result = cur.fetchone()
@@ -71,7 +71,8 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
                 'first_name': result[2],
                 'free_generations': result[3],
                 'paid_generations': result[4],
-                'total_used': result[5]
+                'total_used': result[5],
+                'last_prompt': result[6]
             }
             cur.close()
             conn.close()
@@ -89,7 +90,8 @@ def get_or_create_user(telegram_id: int, username: Optional[str], first_name: st
             'first_name': first_name,
             'free_generations': 10,
             'paid_generations': 0,
-            'total_used': 0
+            'total_used': 0,
+            'last_prompt': None
         }
         
         cur.close()
@@ -275,7 +277,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=120
+            timeout=180
         )
         
         print(f'OpenRouter API response: {response.status_code}')
@@ -445,9 +447,13 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
     
     elif data.startswith('gen_'):
         model_key = data.replace('gen_', '')
-        session = user_sessions.get(chat_id, {})
-        prompt = session.get('prompt', '')
         
+        user_data = get_or_create_user(chat_id, username, first_name)
+        if not user_data:
+            send_message(chat_id, '❌ Ошибка подключения к базе данных')
+            return
+        
+        prompt = user_data.get('last_prompt', '')
         if not prompt:
             send_message(chat_id, '❌ Ошибка: промпт не найден. Начни заново с /start')
             return
@@ -458,11 +464,6 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             return
         
         is_paid = model_info['paid']
-        user_data = get_or_create_user(chat_id, username, first_name)
-        
-        if not user_data:
-            send_message(chat_id, '❌ Ошибка подключения к базе данных')
-            return
         
         if is_paid and user_data['paid_generations'] <= 0:
             send_message(chat_id, '❌ У тебя нет платных генераций!')
@@ -820,22 +821,34 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         send_message(chat_id, history_text)
         return
     
-    session = user_sessions.get(chat_id, {})
-    state = session.get('state', '')
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
+                (text, chat_id)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f'Error saving prompt: {e}')
+            if conn:
+                conn.close()
     
-    if state == 'waiting_prompt':
-        user_sessions[chat_id] = {
-            'state': 'choosing_tariff',
-            'prompt': text
-        }
-        
-        tariff_text = f'''✅ Отлично!
+    user_sessions[chat_id] = {
+        'state': 'choosing_tariff',
+        'prompt': text
+    }
+    
+    tariff_text = f'''✅ Отлично!
 
 Твой запрос: {text[:100]}
 
 Теперь выбери тариф для генерации:'''
-        send_message(chat_id, tariff_text, get_tariff_keyboard())
-        return
+    send_message(chat_id, tariff_text, get_tariff_keyboard())
+    return
     
     user_data = get_or_create_user(chat_id, username, first_name)
     if user_data:
