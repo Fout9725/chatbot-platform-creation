@@ -17,6 +17,7 @@ from contextlib import contextmanager
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+CALLBACK_URL = 'https://functions.poehali.dev/18e803e9-9f5e-4147-8776-dbed3f431a00'
 
 class TimeoutException(Exception):
     pass
@@ -120,18 +121,18 @@ def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup
     except Exception as e:
         print(f'Error sending photo URL: {e}')
 
-def generate_image_paid(prompt: str, model: str, attempt: int = 1) -> Optional[str]:
+def start_async_generation(prompt: str, model: str, queue_id: int) -> bool:
     '''
-    Генерация с платной моделью с коротким таймаутом (10 сек)
-    Возвращает: image_url если готово, 'PENDING' если нужно больше времени, None если ошибка
+    Запускает асинхронную генерацию с webhook callback
+    Возвращает True если запрос отправлен успешно
     '''
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
     
-    print(f'Paid generation attempt {attempt} with {model_info["name"]}: {prompt[:50]}...')
+    print(f'Starting async generation for queue {queue_id} with {model_info["name"]}')
     
     if not OPENROUTER_API_KEY:
-        return None
+        return False
     
     try:
         headers = {
@@ -146,45 +147,32 @@ def generate_image_paid(prompt: str, model: str, attempt: int = 1) -> Optional[s
             'messages': [{'role': 'user', 'content': prompt}],
             'modalities': ['text', 'image'],
             'stream': False,
-            'max_tokens': 4096
+            'max_tokens': 4096,
+            'webhook': {
+                'url': CALLBACK_URL,
+                'metadata': {'queue_id': queue_id}
+            }
         }
-        
-        timeout = min(10 + (attempt * 2), 20)
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=timeout
+            timeout=10
         )
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get('images') and len(data['images']) > 0:
-                return data['images'][0]
-            
-            if data.get('choices') and len(data['choices']) > 0:
-                message = data['choices'][0].get('message', {})
-                
-                if message.get('images') and len(message['images']) > 0:
-                    image_data = message['images'][0]
-                    if isinstance(image_data, str):
-                        return image_data
-                    elif isinstance(image_data, dict) and image_data.get('url'):
-                        return image_data['url']
-                
-                content = message.get('content', '')
-                if isinstance(content, str) and content.startswith('data:image'):
-                    return content
+        print(f'Async request response: {response.status_code}')
         
-        return None
-    except requests.exceptions.Timeout:
-        print(f'Timeout after {timeout}s - will retry')
-        return 'PENDING'
+        if response.status_code in [200, 202]:
+            print(f'Async generation started for queue {queue_id}')
+            return True
+        else:
+            print(f'Failed to start async: {response.text[:500]}')
+            return False
+    
     except Exception as e:
-        print(f'Error: {e}')
-        return None
+        print(f'Error starting async: {e}')
+        return False
 
 def generate_image_sync(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     '''
@@ -283,7 +271,7 @@ def get_effects_keyboard() -> Dict:
 
 def process_queue_item(item: Dict) -> bool:
     '''
-    Обрабатывает задачу с retry механизмом для платных моделей
+    Обрабатывает задачу: бесплатные синхронно, платные через webhook
     '''
     queue_id = item['id']
     chat_id = item['chat_id']
@@ -311,56 +299,59 @@ def process_queue_item(item: Dict) -> bool:
             send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
         
         if is_paid:
-            image_url = generate_image_paid(prompt, model, retry_count + 1)
+            success = start_async_generation(prompt, model, queue_id)
+            
+            if success:
+                cur.execute(
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', openrouter_request_id = 'webhook' WHERE id = %s",
+                    (queue_id,)
+                )
+                conn.commit()
+                send_message(chat_id, f'⏳ Генерация запущена. Изображение придет когда будет готово (~30 сек)')
+                print(f'Queue {queue_id} webhook sent')
+            else:
+                if retry_count < 2:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                else:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Failed to start' WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                    send_message(chat_id, '❌ Не удалось запустить генерацию')
         else:
             image_url = generate_image_sync(prompt, model)
-        
-        if image_url == 'PENDING':
-            if retry_count < 6:
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET retry_count = retry_count + 1 WHERE id = %s",
-                    (queue_id,)
-                )
-                conn.commit()
-                print(f'Queue {queue_id} pending, retry {retry_count + 1}')
-                if retry_count == 2:
-                    send_message(chat_id, '⏳ Генерация займет еще немного времени...')
-            else:
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Timeout' WHERE id = %s",
-                    (queue_id,)
-                )
-                conn.commit()
-                send_message(chat_id, '❌ Превышено время ожидания')
-        
-        elif image_url:
-            cur.execute(
-                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (image_url, queue_id)
-            )
-            conn.commit()
             
-            save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
-            
-            caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
-            send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
-            print(f'Queue {queue_id} completed')
-        
-        else:
-            if retry_count < 2:
+            if image_url and image_url != 'TIMEOUT':
                 cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
-                    (queue_id,)
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (image_url, queue_id)
                 )
                 conn.commit()
-                print(f'Queue {queue_id} failed, retry {retry_count + 1}')
+                
+                save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
+                
+                caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
+                send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+                print(f'Queue {queue_id} completed (sync)')
             else:
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation error' WHERE id = %s",
-                    (queue_id,)
-                )
-                conn.commit()
-                send_message(chat_id, '❌ Ошибка генерации')
+                if retry_count < 2:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                else:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation failed' WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                    send_message(chat_id, '❌ Ошибка генерации')
         
         cur.close()
         conn.close()
@@ -382,7 +373,7 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status IN ('pending', 'processing') ORDER BY created_at ASC LIMIT %s",
+            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s",
             (limit,)
         )
         rows = cur.fetchall()
