@@ -979,6 +979,9 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
         
         print(f'API response status: {response.status_code}')
         
+        if response.status_code != 200:
+            print(f'API error response: {response.text[:1000]}')
+        
         if response.status_code == 200:
             data = response.json()
             print(f'Response data keys: {list(data.keys())}')
