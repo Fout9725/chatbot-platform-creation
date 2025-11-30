@@ -382,17 +382,28 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
     '''
     Обрабатывает задачи из очереди (pending и processing с openrouter_request_id)
     '''
+    print('Starting process_queue')
     conn = get_db_connection()
     if not conn:
+        print('DB connection failed')
         return {'processed': 0, 'error': 'DB connection failed'}
+    
+    print('DB connection successful')
     
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s",
-            (limit,)
-        )
+        print('Cursor created')
+        
+        query = "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s"
+        print(f'Executing query: {query}')
+        print(f'Limit: {limit}')
+        
+        cur.execute(query, (limit,))
+        print('Query executed')
+        
         rows = cur.fetchall()
+        print(f'Fetched {len(rows) if rows else 0} rows')
+        
         cur.close()
         conn.close()
         
@@ -416,6 +427,8 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
                 'retry_count': row[8] or 0
             }
             
+            print(f'Processing queue item {item["id"]}')
+            
             if process_queue_item(item):
                 processed += 1
             
@@ -423,9 +436,14 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
         
         return {'processed': processed, 'total': len(rows)}
     except Exception as e:
+        import traceback
         print(f'Error in process_queue: {e}')
+        print(f'Traceback: {traceback.format_exc()}')
         if conn:
-            conn.close()
+            try:
+                conn.close()
+            except:
+                pass
         return {'processed': 0, 'error': str(e)}
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
