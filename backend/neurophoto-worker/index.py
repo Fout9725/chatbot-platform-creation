@@ -109,16 +109,26 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             
             if data.get('images') and len(data['images']) > 0:
                 image_data = data['images'][0]
-                print(f'Image generated successfully (base64): {image_data[:100]}...')
-                return image_data
+                print(f'Image found in data.images (type: {type(image_data)})')
+                if isinstance(image_data, str):
+                    print(f'Image data preview: {image_data[:100]}...')
+                    return image_data
+                elif isinstance(image_data, dict) and image_data.get('url'):
+                    print(f'Image URL: {image_data["url"][:100]}...')
+                    return image_data['url']
             
             if data.get('choices') and len(data['choices']) > 0:
                 message = data['choices'][0].get('message', {})
                 
-                if message.get('images'):
+                if message.get('images') and len(message['images']) > 0:
                     image_data = message['images'][0]
-                    print(f'Image generated successfully from message.images: {image_data[:100]}...')
-                    return image_data
+                    print(f'Image found in message.images (type: {type(image_data)})')
+                    if isinstance(image_data, str):
+                        print(f'Image data preview: {image_data[:100]}...')
+                        return image_data
+                    elif isinstance(image_data, dict) and image_data.get('url'):
+                        print(f'Image URL: {image_data["url"][:100]}...')
+                        return image_data['url']
                 
                 content = message.get('content', '')
                 print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
