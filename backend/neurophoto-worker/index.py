@@ -183,12 +183,21 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                     if message.get('images') and len(message['images']) > 0:
                         image_data = message['images'][0]
                         print(f'Image found in message.images (type: {type(image_data)})')
+                        print(f'Image data structure: {image_data}')
                         if isinstance(image_data, str):
                             print(f'Image data preview: {image_data[:100]}...')
                             return image_data
-                        elif isinstance(image_data, dict) and image_data.get('url'):
-                            print(f'Image URL: {image_data["url"][:100]}...')
-                            return image_data['url']
+                        elif isinstance(image_data, dict):
+                            print(f'Image dict keys: {list(image_data.keys())}')
+                            if image_data.get('url'):
+                                print(f'Image URL: {image_data["url"][:100]}...')
+                                return image_data['url']
+                            elif image_data.get('image_url'):
+                                url = image_data['image_url']
+                                if isinstance(url, dict):
+                                    url = url.get('url', '')
+                                print(f'Image URL from image_url: {url[:100]}...')
+                                return url
                     
                     content = message.get('content', '')
                     print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
