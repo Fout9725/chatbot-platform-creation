@@ -40,6 +40,7 @@ IMAGE_EFFECTS = {
 }
 
 user_sessions = {}
+user_photo_context = {}
 
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
@@ -334,6 +335,85 @@ def add_to_queue(telegram_id: int, chat_id: int, username: Optional[str], first_
             conn.close()
         return None
 
+def download_telegram_photo(file_id: str) -> Optional[str]:
+    '''Скачивает фото из Telegram и возвращает URL'''
+    try:
+        response = requests.get(f'{get_telegram_api()}/getFile?file_id={file_id}')
+        data = response.json()
+        
+        if not data.get('ok'):
+            print(f'Failed to get file info: {data}')
+            return None
+        
+        file_path = data['result']['file_path']
+        file_url = f'https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}'
+        return file_url
+    except Exception as e:
+        print(f'Error downloading photo: {e}')
+        return None
+
+def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-flash') -> Optional[str]:
+    '''Генерирует изображение на основе загруженного фото и промпта'''
+    if not OPENROUTER_API_KEY:
+        print('OPENROUTER_API_KEY not configured')
+        return None
+    
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_id = model_info['id']
+    
+    print(f'Transforming image with {model_info["name"]} ({model_id}): {prompt[:100]}...')
+    
+    try:
+        messages = [
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': f'Transform this image: {prompt}'},
+                    {'type': 'image_url', 'image_url': {'url': photo_url}}
+                ]
+            }
+        ]
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': BOT_URL,
+                'X-Title': 'Neurophoto Bot'
+            },
+            json={
+                'model': model_id,
+                'messages': messages,
+                'max_tokens': 1024
+            },
+            timeout=90
+        )
+        
+        print(f'OpenRouter response status: {response.status_code}')
+        
+        if response.status_code != 200:
+            print(f'OpenRouter API error: {response.status_code} - {response.text}')
+            return None
+        
+        data = response.json()
+        print(f'OpenRouter response data: {data}')
+        
+        if 'choices' in data and len(data['choices']) > 0:
+            content = data['choices'][0]['message']['content']
+            
+            if isinstance(content, str) and content.startswith('http'):
+                return content
+            elif isinstance(content, list):
+                for item in content:
+                    if item.get('type') == 'image_url':
+                        return item.get('image_url', {}).get('url')
+        
+        return None
+    except Exception as e:
+        print(f'Error in generate_image_with_photo: {e}')
+        return None
+
 def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
@@ -490,12 +570,21 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
 🆓 Бесплатных генераций: {free_gen}/10
 💎 Платных генераций: {paid_gen}
 
-📝 *Опиши, какую нейрофотографию ты хочешь создать?*
+🎨 *Я умею:*
+• Создавать новые фото по описанию
+• Обрабатывать твои фото с помощью AI
 
-Например:
+📝 *Создание нового фото:*
+Просто напиши описание:
 • Портрет девушки с длинными волосами на закате
 • Бизнес-фото мужчины в костюме в офисе
-• Креативное фото в стиле киберпанк'''
+• Креативное фото в стиле киберпанк
+
+🖼 *Обработка твоего фото:*
+Отправь фото + инструкцию в подписи:
+• Сделай в стиле аниме
+• Добавь драматическое освещение
+• Преврати в черно-белое с высоким контрастом'''
     else:
         welcome_text = f'''👋 Привет, {first_name}!
 
@@ -503,14 +592,24 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
 
 🎁 *У тебя 10 бесплатных генераций!*
 
-📝 *Опиши, какую нейрофотографию ты хочешь создать?*
+🎨 *Я умею:*
+• Создавать новые фото по описанию
+• Обрабатывать твои фото с помощью AI
 
-Например:
+📝 *Создание нового фото:*
+Просто напиши описание:
 • Портрет девушки с длинными волосами на закате
 • Бизнес-фото мужчины в костюме в офисе
-• Креативное фото в стиле киберпанк'''
+• Креативное фото в стиле киберпанк
+
+🖼 *Обработка твоего фото:*
+Отправь фото + инструкцию в подписи:
+• Сделай в стиле аниме
+• Добавь драматическое освещение
+• Преврати в черно-белое с высоким контрастом'''
     
     user_sessions[chat_id] = {'state': 'waiting_prompt'}
+    user_photo_context[chat_id] = None
     
     keyboard = None
     if chat_id in ADMIN_IDS:
@@ -588,7 +687,12 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
         send_chat_action(chat_id, 'upload_photo')
         
-        if is_paid:
+        photo_url = user_photo_context.get(chat_id)
+        
+        if photo_url:
+            image_url = generate_image_with_photo(prompt, photo_url, model_key)
+            user_photo_context[chat_id] = None
+        elif is_paid:
             image_url = generate_image_paid_long(prompt, model_key)
         else:
             image_url = generate_image(prompt, model_key)
@@ -675,6 +779,66 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 /userinfo <id> - инфо о пользователе'''
         send_message(chat_id, text)
         return
+
+def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
+    '''Обрабатывает загруженное фото'''
+    file_id = photo_data[-1]['file_id']
+    
+    photo_url = download_telegram_photo(file_id)
+    if not photo_url:
+        send_message(chat_id, '❌ Не удалось загрузить фото. Попробуй еще раз.')
+        return
+    
+    user_photo_context[chat_id] = photo_url
+    
+    if caption:
+        user_data = get_or_create_user(chat_id, username, first_name)
+        if not user_data:
+            send_message(chat_id, '❌ Ошибка подключения к базе данных')
+            return
+        
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
+                    (caption, chat_id)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f'Error saving prompt: {e}')
+                if conn:
+                    conn.close()
+        
+        text = f'''✅ Фото получено!
+
+📝 Твой промпт: "{caption}"
+
+🎨 Выбери модель для обработки фото:'''
+        
+        free_gen = user_data['free_generations']
+        paid_gen = user_data['paid_generations']
+        
+        if free_gen > 0:
+            send_message(chat_id, text, get_models_keyboard(has_free=True, has_paid=paid_gen > 0))
+        else:
+            send_message(chat_id, text, get_models_keyboard(has_free=False, has_paid=paid_gen > 0))
+    else:
+        text = '''✅ Фото получено!
+
+📝 Теперь напиши, как нужно обработать это фото:
+
+Например:
+• Сделай фото в стиле аниме
+• Добавь драматическое освещение
+• Преврати в черно-белое с высоким контрастом
+• Сделай фон размытым'''
+        
+        send_message(chat_id, text)
+        user_sessions[chat_id] = {'state': 'waiting_prompt_for_photo'}
 
 def handle_message(chat_id: int, text: str, first_name: str, username: Optional[str] = None) -> None:
     if text.startswith('/start'):
@@ -913,6 +1077,41 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         send_message(chat_id, history_text)
         return
     
+    session_state = user_sessions.get(chat_id, {}).get('state')
+    
+    if session_state == 'waiting_prompt_for_photo':
+        user_data = get_or_create_user(chat_id, username, first_name)
+        if not user_data:
+            send_message(chat_id, '❌ Ошибка подключения к базе данных')
+            return
+        
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
+                    (text, chat_id)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f'Error saving prompt: {e}')
+                if conn:
+                    conn.close()
+        
+        free_gen = user_data['free_generations']
+        paid_gen = user_data['paid_generations']
+        
+        prompt_text = f'✅ Промпт получен: "{text}"\n\n🎨 Выбери модель для обработки фото:'
+        
+        if free_gen > 0:
+            send_message(chat_id, prompt_text, get_models_keyboard(has_free=True, has_paid=paid_gen > 0))
+        else:
+            send_message(chat_id, prompt_text, get_models_keyboard(has_free=False, has_paid=paid_gen > 0))
+        return
+    
     conn = get_db_connection()
     if conn:
         try:
@@ -1147,9 +1346,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             chat_id = message['chat']['id']
             first_name = message['from'].get('first_name', 'Друг')
             username = message['from'].get('username')
-            text = message.get('text', '')
             
-            handle_message(chat_id, text, first_name, username)
+            if 'photo' in message:
+                photo_data = message['photo']
+                caption = message.get('caption')
+                handle_photo(chat_id, photo_data, caption, first_name, username)
+            elif 'text' in message:
+                text = message['text']
+                handle_message(chat_id, text, first_name, username)
         
         elif 'callback_query' in body:
             callback_query = body['callback_query']
