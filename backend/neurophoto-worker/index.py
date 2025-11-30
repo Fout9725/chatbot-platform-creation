@@ -48,7 +48,8 @@ def get_db_connection():
     if not DATABASE_URL:
         print('DATABASE_URL not configured')
         return None
-    return psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(DATABASE_URL, options='-c search_path=t_p60354232_chatbot_platform_cre,public')
+    return conn
 
 def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -> None:
     data = {
