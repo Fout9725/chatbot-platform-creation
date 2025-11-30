@@ -89,14 +89,16 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                     'content': prompt
                 }
             ],
-            'modalities': ['text', 'image']
+            'modalities': ['text', 'image'],
+            'stream': False,
+            'max_tokens': 4096
         }
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=180
+            timeout=25
         )
         
         print(f'OpenRouter API response: {response.status_code}')
@@ -236,16 +238,30 @@ def process_queue_item(item: Dict) -> bool:
             
             print(f'Queue item {queue_id} completed successfully')
         else:
-            error_msg = 'Не удалось сгенерировать изображение'
             cur.execute(
-                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (error_msg, queue_id)
+                "SELECT retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE id = %s",
+                (queue_id,)
             )
-            conn.commit()
+            retry_result = cur.fetchone()
+            retry_count = retry_result[0] if retry_result else 0
             
-            send_message(chat_id, f'❌ Ошибка генерации изображения (задача #{queue_id})\n\nПопробуй:\n• Другую модель\n• Упрости описание\n• Напиши /start для нового запроса')
-            
-            print(f'Queue item {queue_id} failed')
+            if retry_count < 2:
+                cur.execute(
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                    (queue_id,)
+                )
+                conn.commit()
+                send_message(chat_id, f'⏳ Генерация занимает больше времени... Попытка {retry_count + 2}/3')
+                print(f'Queue item {queue_id} timeout, retry {retry_count + 1}')
+            else:
+                error_msg = 'Превышено время ожидания'
+                cur.execute(
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (error_msg, queue_id)
+                )
+                conn.commit()
+                send_message(chat_id, f'❌ Ошибка генерации изображения (задача #{queue_id})\n\nПопробуй:\n• Другую модель\n• Упрости описание\n• Напиши /start для нового запроса')
+                print(f'Queue item {queue_id} failed after 3 retries')
         
         cur.close()
         conn.close()
