@@ -120,65 +120,96 @@ def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup
     except Exception as e:
         print(f'Error sending photo URL: {e}')
 
-def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
+def start_image_generation(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
+    '''
+    Запускает генерацию изображения и возвращает request_id для polling
+    '''
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
-    is_paid = model_info.get('paid', False)
     
-    print(f'Generating image with {model_info["name"]} ({model_id}): {prompt[:100]}...')
+    print(f'Starting async generation with {model_info["name"]} ({model_id}): {prompt[:100]}...')
     
     if not OPENROUTER_API_KEY:
         print('OPENROUTER_API_KEY not configured')
         return None
     
-    timeout_seconds = 28 if is_paid else 15
-    request_timeout = 25 if is_paid else 12
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        payload = {
+            'model': model_id,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': prompt
+                }
+            ],
+            'modalities': ['text', 'image'],
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=5
+        )
+        
+        print(f'Start generation response: {response.status_code}')
+        
+        if response.status_code == 200:
+            data = response.json()
+            request_id = data.get('id')
+            if request_id:
+                print(f'Generation started with request_id: {request_id}')
+                return request_id
+        
+        print(f'Failed to start generation: {response.text[:500]}')
+        return None
+    except Exception as e:
+        print(f'Error starting generation: {e}')
+        return None
+
+def check_generation_status(request_id: str) -> Optional[str]:
+    '''
+    Проверяет статус генерации по request_id
+    Возвращает: image_url если готово, 'PENDING' если в процессе, None если ошибка
+    '''
+    if not OPENROUTER_API_KEY:
+        return None
     
     try:
-        with time_limit(timeout_seconds):
-            headers = {
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://poehali.dev',
-                'X-Title': 'NeurophotoBot'
-            }
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(
+            f'https://openrouter.ai/api/v1/generation?id={request_id}',
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f'Check status response: {response.status_code}')
+        
+        if response.status_code == 200:
+            data = response.json()
+            status = data.get('status')
             
-            payload = {
-                'model': model_id,
-                'messages': [
-                    {
-                        'role': 'user',
-                        'content': prompt
-                    }
-                ],
-                'modalities': ['text', 'image'],
-                'stream': False,
-                'max_tokens': 4096
-            }
+            print(f'Generation status: {status}')
             
-            response = requests.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                headers=headers,
-                json=payload,
-                timeout=request_timeout
-            )
-            
-            print(f'OpenRouter API response: {response.status_code}')
-            
-            if response.status_code == 200:
-                data = response.json()
-                print(f'Response data keys: {list(data.keys())}')
-                if data.get('choices'):
-                    print(f'Choices[0] message keys: {list(data["choices"][0].get("message", {}).keys())}')
-                
+            if status == 'completed':
                 if data.get('images') and len(data['images']) > 0:
                     image_data = data['images'][0]
-                    print(f'Image found in data.images (type: {type(image_data)})')
                     if isinstance(image_data, str):
-                        print(f'Image data preview: {image_data[:100]}...')
                         return image_data
                     elif isinstance(image_data, dict) and image_data.get('url'):
-                        print(f'Image URL: {image_data["url"][:100]}...')
                         return image_data['url']
                 
                 if data.get('choices') and len(data['choices']) > 0:
@@ -186,50 +217,88 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                     
                     if message.get('images') and len(message['images']) > 0:
                         image_data = message['images'][0]
-                        print(f'Image found in message.images (type: {type(image_data)})')
-                        print(f'Image data structure: {image_data}')
                         if isinstance(image_data, str):
-                            print(f'Image data preview: {image_data[:100]}...')
                             return image_data
-                        elif isinstance(image_data, dict):
-                            print(f'Image dict keys: {list(image_data.keys())}')
-                            if image_data.get('url'):
-                                print(f'Image URL: {image_data["url"][:100]}...')
-                                return image_data['url']
-                            elif image_data.get('image_url'):
-                                url = image_data['image_url']
-                                if isinstance(url, dict):
-                                    url = url.get('url', '')
-                                print(f'Image URL from image_url: {url[:100]}...')
-                                return url
+                        elif isinstance(image_data, dict) and image_data.get('url'):
+                            return image_data['url']
                     
                     content = message.get('content', '')
-                    print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
                     if isinstance(content, str) and content.startswith('data:image'):
-                        print(f'Image generated successfully from content: {content[:100]}...')
                         return content
-                    
-                    if isinstance(content, list):
-                        for item in content:
-                            if isinstance(item, dict) and item.get('type') == 'image_url':
-                                image_url = item.get('image_url', {}).get('url', '')
-                                if image_url:
-                                    print(f'Image found in content array: {image_url[:100]}...')
-                                    return image_url
+                
+                return None
+            elif status in ['pending', 'processing']:
+                return 'PENDING'
             else:
-                print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
-                if response.status_code == 429:
-                    return 'TIMEOUT'
-            
-            return None
-    except TimeoutException:
-        print(f'Hard timeout reached after {timeout_seconds} seconds')
-        return 'TIMEOUT'
-    except requests.exceptions.Timeout:
-        print(f'OpenRouter API timeout after 15 seconds')
-        return 'TIMEOUT'
+                print(f'Generation failed with status: {status}')
+                return None
+        
+        return None
     except Exception as e:
-        print(f'OpenRouter API error: {e}')
+        print(f'Error checking status: {e}')
+        return None
+
+def generate_image_sync(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
+    '''
+    Синхронная генерация для бесплатных моделей (быстрые)
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_id = model_info['id']
+    
+    print(f'Sync generation with {model_info["name"]} ({model_id}): {prompt[:100]}...')
+    
+    if not OPENROUTER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        payload = {
+            'model': model_id,
+            'messages': [{'role': 'user', 'content': prompt}],
+            'modalities': ['text', 'image'],
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get('images') and len(data['images']) > 0:
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images') and len(message['images']) > 0:
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        return image_data
+                    elif isinstance(image_data, dict) and image_data.get('url'):
+                        return image_data['url']
+                
+                content = message.get('content', '')
+                if isinstance(content, str) and content.startswith('data:image'):
+                    return content
+        
+        elif response.status_code == 429:
+            return 'TIMEOUT'
+        
+        return None
+    except Exception as e:
+        print(f'Sync generation error: {e}')
         return None
 
 def save_generation_history(telegram_id: int, prompt: str, model: str, effect: Optional[str], image_url: str, is_paid: bool) -> bool:
@@ -266,7 +335,7 @@ def get_effects_keyboard() -> Dict:
 
 def process_queue_item(item: Dict) -> bool:
     '''
-    Обрабатывает одну задачу из очереди
+    Обрабатывает одну задачу из очереди с polling механизмом
     '''
     queue_id = item['id']
     chat_id = item['chat_id']
@@ -274,34 +343,9 @@ def process_queue_item(item: Dict) -> bool:
     prompt = item['prompt']
     model = item['model']
     is_paid = item['is_paid']
-    
-    conn = get_db_connection()
-    if not conn:
-        return False
-    
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
-            (queue_id,)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        print(f'Error updating queue status: {e}')
-        if conn:
-            conn.close()
-        return False
-    
-    print(f'Processing queue item {queue_id}: model={model}, prompt={prompt[:50]}...')
+    openrouter_request_id = item.get('openrouter_request_id')
     
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
-    send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
-    
-    image_url = generate_image(prompt, model)
-    
-    print(f'generate_image() returned: {type(image_url)}, value: {image_url if image_url != "TIMEOUT" else "TIMEOUT"}')
     
     conn = get_db_connection()
     if not conn:
@@ -310,70 +354,126 @@ def process_queue_item(item: Dict) -> bool:
     try:
         cur = conn.cursor()
         
-        if image_url and image_url != 'TIMEOUT':
+        if not openrouter_request_id:
+            print(f'Starting new generation for queue item {queue_id}')
+            
             cur.execute(
-                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (image_url, queue_id)
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (queue_id,)
             )
             conn.commit()
             
-            save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
+            send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
             
-            caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
-            send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
-            send_message(chat_id, '🎨 *Хочешь добавить эффекты?*\n\nВыбери эффект для улучшения изображения или создай новое фото:')
-            
-            print(f'Queue item {queue_id} completed successfully')
+            if is_paid:
+                request_id = start_image_generation(prompt, model)
+                
+                if request_id:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET openrouter_request_id = %s WHERE id = %s",
+                        (request_id, queue_id)
+                    )
+                    conn.commit()
+                    print(f'Queue {queue_id} started async generation: {request_id}')
+                else:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Failed to start generation' WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                    send_message(chat_id, f'❌ Не удалось запустить генерацию')
+            else:
+                image_url = generate_image_sync(prompt, model)
+                
+                if image_url and image_url != 'TIMEOUT':
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (image_url, queue_id)
+                    )
+                    conn.commit()
+                    
+                    save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
+                    
+                    caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
+                    send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+                    print(f'Queue {queue_id} completed (sync)')
+                else:
+                    cur.execute(
+                        "SELECT retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE id = %s",
+                        (queue_id,)
+                    )
+                    retry_result = cur.fetchone()
+                    retry_count = retry_result[0] if retry_result else 0
+                    
+                    if retry_count < 2:
+                        cur.execute(
+                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                            (queue_id,)
+                        )
+                        conn.commit()
+                        print(f'Queue {queue_id} retry {retry_count + 1}')
+                    else:
+                        cur.execute(
+                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Timeout' WHERE id = %s",
+                            (queue_id,)
+                        )
+                        conn.commit()
+                        send_message(chat_id, f'❌ Ошибка генерации')
         else:
-            cur.execute(
-                "SELECT retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE id = %s",
-                (queue_id,)
-            )
-            retry_result = cur.fetchone()
-            retry_count = retry_result[0] if retry_result else 0
+            print(f'Checking status for queue {queue_id}, request_id: {openrouter_request_id}')
             
-            if retry_count < 2:
+            result = check_generation_status(openrouter_request_id)
+            
+            if result == 'PENDING':
+                print(f'Queue {queue_id} still pending')
+                pass
+            elif result:
                 cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (result, queue_id)
+                )
+                conn.commit()
+                
+                save_generation_history(telegram_id, prompt, model, None, result, is_paid)
+                
+                caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
+                send_photo_url(chat_id, result, caption, get_effects_keyboard())
+                print(f'Queue {queue_id} completed (async)')
+            else:
+                cur.execute(
+                    "SELECT retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE id = %s",
                     (queue_id,)
                 )
-                conn.commit()
-                send_message(chat_id, f'⏳ Генерация занимает больше времени... Попытка {retry_count + 2}/3')
-                print(f'Queue item {queue_id} timeout, retry {retry_count + 1}')
-            else:
-                error_msg = 'Превышено время ожидания'
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (error_msg, queue_id)
-                )
-                conn.commit()
-                send_message(chat_id, f'❌ Ошибка генерации изображения (задача #{queue_id})\n\nПопробуй:\n• Другую модель\n• Упрости описание\n• Напиши /start для нового запроса')
-                print(f'Queue item {queue_id} failed after 3 retries')
+                retry_result = cur.fetchone()
+                retry_count = retry_result[0] if retry_result else 0
+                
+                if retry_count < 5:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET retry_count = retry_count + 1 WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                    print(f'Queue {queue_id} check retry {retry_count + 1}')
+                else:
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation failed' WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn.commit()
+                    send_message(chat_id, f'❌ Ошибка генерации')
         
         cur.close()
         conn.close()
         return True
     except Exception as e:
-        print(f'Error processing queue item {queue_id}: {e}')
+        print(f'Error processing queue {queue_id}: {e}')
         if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = %s WHERE id = %s",
-                    (str(e), queue_id)
-                )
-                conn.commit()
-                cur.close()
-                conn.close()
-            except:
-                if conn:
-                    conn.close()
-        
+            conn.close()
         return False
 
 def process_queue(limit: int = 5) -> Dict[str, Any]:
     '''
-    Обрабатывает задачи из очереди
+    Обрабатывает задачи из очереди (pending и processing с openrouter_request_id)
     '''
     conn = get_db_connection()
     if not conn:
@@ -382,7 +482,7 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s",
+            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, openrouter_request_id FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status IN ('pending', 'processing') ORDER BY created_at ASC LIMIT %s",
             (limit,)
         )
         rows = cur.fetchall()
@@ -390,10 +490,10 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
         conn.close()
         
         if not rows:
-            print('No pending tasks in queue')
+            print('No tasks in queue')
             return {'processed': 0, 'pending': 0}
         
-        print(f'Found {len(rows)} pending tasks')
+        print(f'Found {len(rows)} tasks to process')
         
         processed = 0
         for row in rows:
@@ -405,13 +505,14 @@ def process_queue(limit: int = 5) -> Dict[str, Any]:
                 'first_name': row[4],
                 'prompt': row[5],
                 'model': row[6],
-                'is_paid': row[7]
+                'is_paid': row[7],
+                'openrouter_request_id': row[8]
             }
             
             if process_queue_item(item):
                 processed += 1
             
-            time.sleep(2)
+            time.sleep(1)
         
         return {'processed': processed, 'total': len(rows)}
     except Exception as e:
