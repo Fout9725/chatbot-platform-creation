@@ -530,6 +530,22 @@ def get_paid_models_keyboard() -> Dict:
             buttons.append([{'text': f'{model_info["name"]} — {model_info["time"]}', 'callback_data': f'gen_{key}'}])
     return {'inline_keyboard': buttons}
 
+def get_models_keyboard(has_free: bool = True, has_paid: bool = True) -> Dict:
+    '''Клавиатура со всеми доступными моделями'''
+    buttons = []
+    
+    if has_free:
+        free_model = IMAGE_MODELS.get('gemini-flash')
+        if free_model:
+            buttons.append([{'text': f'{free_model["name"]} — {free_model["time"]}', 'callback_data': 'gen_gemini-flash'}])
+    
+    if has_paid:
+        for key, model_info in IMAGE_MODELS.items():
+            if model_info['paid']:
+                buttons.append([{'text': f'{model_info["name"]} — {model_info["time"]} 💎', 'callback_data': f'gen_{key}'}])
+    
+    return {'inline_keyboard': buttons}
+
 def get_effects_keyboard() -> Dict:
     buttons = []
     effects_list = list(IMAGE_EFFECTS.items())
