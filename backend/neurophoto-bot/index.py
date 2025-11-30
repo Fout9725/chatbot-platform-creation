@@ -21,6 +21,7 @@ print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '10-15 сек'},
+    'grok-fast': {'id': 'x-ai/grok-4.1-fast:free', 'name': '🆓 Grok 4.1 Fast', 'paid': False, 'time': '8-12 сек'},
     'gemini-3-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '🎨 Gemini 3 Pro', 'paid': True, 'time': '20-30 сек'},
     'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image', 'name': '🌟 Gemini 2.5 Flash', 'paid': True, 'time': '10-20 сек'},
     'gemini-2.5-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '✨ Gemini 2.5 Preview', 'paid': True, 'time': '10-20 сек'}
