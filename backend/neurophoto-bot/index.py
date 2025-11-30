@@ -784,7 +784,7 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
                 'X-Title': 'Neurophoto Bot'
             },
             json={
-                'model': 'x-ai/grok-4.1-fast:free',
+                'model': 'openrouter/bert-nebulon-alpha',
                 'messages': [
                     {
                         'role': 'user',
@@ -1113,7 +1113,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
                     'X-Title': 'Neurophoto Bot'
                 },
                 json={
-                    'model': 'x-ai/grok-4.1-fast:free',
+                    'model': 'openrouter/bert-nebulon-alpha',
                     'messages': [
                         {
                             'role': 'user',
