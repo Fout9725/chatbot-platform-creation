@@ -361,7 +361,7 @@ def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-
     print(f'Step 1: Analyzing photo with vision model...')
     
     try:
-        # Шаг 1: Анализируем фото с помощью vision-модели
+        # Шаг 1: Анализируем фото с помощью vision-модели (используем gemini-flash для vision)
         vision_response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers={
@@ -371,7 +371,7 @@ def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-
                 'X-Title': 'Neurophoto Bot'
             },
             json={
-                'model': 'google/gemini-pro-vision',
+                'model': 'google/gemini-2.0-flash-exp:free',
                 'messages': [
                     {
                         'role': 'user',
