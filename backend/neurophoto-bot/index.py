@@ -326,6 +326,13 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         if response.status_code == 200:
             data = response.json()
             
+            # Проверяем на ошибку внутри успешного ответа
+            if data.get('error'):
+                error_msg = data['error'].get('message', 'Unknown error')
+                error_code = data['error'].get('code', 'N/A')
+                print(f'OpenRouter API internal error: {error_code} - {error_msg}')
+                return None
+            
             # Проверяем поле images (base64 data URLs)
             if data.get('images') and len(data['images']) > 0:
                 image_data = data['images'][0]
@@ -912,6 +919,13 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
             data = response.json()
             print(f'Response data keys: {list(data.keys())}')
             print(f'Response preview: {str(data)[:500]}')
+            
+            # Проверяем на ошибку внутри успешного ответа
+            if data.get('error'):
+                error_msg = data['error'].get('message', 'Unknown error')
+                error_code = data['error'].get('code', 'N/A')
+                print(f'OpenRouter API internal error: {error_code} - {error_msg}')
+                return None
             
             if data.get('images') and len(data['images']) > 0:
                 return data['images'][0]
