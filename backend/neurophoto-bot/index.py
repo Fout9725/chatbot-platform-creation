@@ -513,14 +513,24 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
             return
         
-        queue_id = add_to_queue(user_data['telegram_id'], chat_id, username, first_name, prompt, model_key, is_paid)
-        if queue_id:
-            if use_generation(chat_id, is_paid):
-                send_message(chat_id, f'⏳ Задача #{queue_id} добавлена в очередь\n\n{model_info["name"]} — {model_info["time"]}\n\nИзображение придет автоматически когда будет готово. Можешь продолжать пользоваться ботом!')
-            else:
-                send_message(chat_id, '❌ Ошибка списания генерации')
+        if not use_generation(chat_id, is_paid):
+            send_message(chat_id, '❌ Ошибка списания генерации')
+            return
+        
+        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
+        send_chat_action(chat_id, 'upload_photo')
+        
+        if is_paid:
+            image_url = generate_image_paid_long(prompt, model_key)
         else:
-            send_message(chat_id, '❌ Ошибка добавления в очередь')
+            image_url = generate_image(prompt, model_key)
+        
+        if image_url:
+            save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
+            caption = f'✨ Готово!\n\nМодель: {model_info["name"]}'
+            send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+        else:
+            send_message(chat_id, '❌ Ошибка генерации. Попробуй ещё раз или выбери другую модель.')
         return
     
     elif data.startswith('effect_'):
