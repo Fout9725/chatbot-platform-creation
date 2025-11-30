@@ -98,7 +98,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25
+            timeout=20
         )
         
         print(f'OpenRouter API response: {response.status_code}')
@@ -149,6 +149,9 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
         
         return None
+    except requests.exceptions.Timeout:
+        print(f'OpenRouter API timeout after 20 seconds')
+        return 'TIMEOUT'
     except Exception as e:
         print(f'OpenRouter API error: {e}')
         return None
@@ -223,7 +226,7 @@ def process_queue_item(item: Dict) -> bool:
         
         cur = conn.cursor()
         
-        if image_url:
+        if image_url and image_url != 'TIMEOUT':
             cur.execute(
                 "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (image_url, queue_id)
