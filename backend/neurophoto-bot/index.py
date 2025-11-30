@@ -254,19 +254,15 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'X-Title': 'NeurophotoBot'
         }
         
-        # OpenRouter использует формат chat/completions для text-to-image моделей
         payload = {
             'model': model_id,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': prompt
-                }
-            ]
+            'prompt': prompt,
+            'n': 1,
+            'size': '1024x1024'
         }
         
         response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
+            'https://openrouter.ai/api/v1/images/generations',
             headers=headers,
             json=payload,
             timeout=120
@@ -276,17 +272,12 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         
         if response.status_code == 200:
             data = response.json()
-            # Ответ приходит в формате chat completion с изображением в content
-            if data.get('choices') and len(data['choices']) > 0:
-                content = data['choices'][0].get('message', {}).get('content', '')
-                # Ищем URL изображения в ответе
-                if content and (content.startswith('http://') or content.startswith('https://')):
-                    print(f'Image generated successfully: {content}')
-                    return content
-                else:
-                    print(f'No image URL in response: {content[:200]}')
+            if data.get('data') and len(data['data']) > 0:
+                image_url = data['data'][0].get('url')
+                print(f'Image generated successfully: {image_url}')
+                return image_url
         else:
-            print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
+            print(f'OpenRouter API error: {response.status_code}, {response.text[:200]}')
         
         return None
     except Exception as e:
