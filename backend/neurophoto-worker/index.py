@@ -66,16 +66,57 @@ def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -
 
 def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup: Optional[Dict] = None) -> None:
     try:
-        data = {
-            'chat_id': chat_id,
-            'photo': image_url,
-            'caption': caption
-        }
-        if reply_markup:
-            data['reply_markup'] = json.dumps(reply_markup)
-        
-        response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
-        print(f'sendPhoto response: {response.status_code}')
+        if image_url.startswith('data:image'):
+            import base64
+            header, encoded = image_url.split(',', 1)
+            image_bytes = base64.b64decode(encoded)
+            
+            files = {'photo': ('image.png', image_bytes, 'image/png')}
+            data = {
+                'chat_id': chat_id,
+                'caption': caption
+            }
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
+            
+            response = requests.post(f'{get_telegram_api()}/sendPhoto', data=data, files=files, timeout=30)
+            print(f'sendPhoto (base64) response: {response.status_code}')
+        elif image_url.startswith('http'):
+            img_response = requests.get(image_url, timeout=15)
+            if img_response.status_code == 200:
+                files = {'photo': ('image.jpg', img_response.content, 'image/jpeg')}
+                data = {
+                    'chat_id': chat_id,
+                    'caption': caption
+                }
+                if reply_markup:
+                    data['reply_markup'] = json.dumps(reply_markup)
+                
+                response = requests.post(f'{get_telegram_api()}/sendPhoto', data=data, files=files, timeout=30)
+                print(f'sendPhoto (downloaded) response: {response.status_code}')
+            else:
+                print(f'Failed to download image: {img_response.status_code}')
+                data = {
+                    'chat_id': chat_id,
+                    'photo': image_url,
+                    'caption': caption
+                }
+                if reply_markup:
+                    data['reply_markup'] = json.dumps(reply_markup)
+                
+                response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
+                print(f'sendPhoto (fallback URL) response: {response.status_code}')
+        else:
+            data = {
+                'chat_id': chat_id,
+                'photo': image_url,
+                'caption': caption
+            }
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
+            
+            response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
+            print(f'sendPhoto (URL) response: {response.status_code}')
     except Exception as e:
         print(f'Error sending photo URL: {e}')
 
