@@ -344,10 +344,20 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                 message = data['choices'][0].get('message', {})
                 
                 # Проверяем поле images в message
-                if message.get('images'):
+                if message.get('images') and len(message['images']) > 0:
                     image_data = message['images'][0]
-                    print(f'Image generated successfully from message.images: {image_data[:100]}...')
-                    return image_data
+                    # Структура: {"type": "image_url", "image_url": {"url": "data:image/..."}}
+                    if isinstance(image_data, str):
+                        print(f'Image generated successfully from message.images (string): {image_data[:100]}...')
+                        return image_data
+                    elif isinstance(image_data, dict):
+                        if image_data.get('image_url', {}).get('url'):
+                            url = image_data['image_url']['url']
+                            print(f'Image generated successfully from message.images[0].image_url.url: {url[:100]}...')
+                            return url
+                        elif image_data.get('url'):
+                            print(f'Image generated successfully from message.images[0].url: {image_data["url"][:100]}...')
+                            return image_data['url']
                 
                 # Проверяем content
                 content = message.get('content', '')
@@ -935,10 +945,14 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
                 
                 if message.get('images') and len(message['images']) > 0:
                     image_data = message['images'][0]
+                    # Структура: {"type": "image_url", "image_url": {"url": "data:image/..."}}
                     if isinstance(image_data, str):
                         return image_data
-                    elif isinstance(image_data, dict) and image_data.get('url'):
-                        return image_data['url']
+                    elif isinstance(image_data, dict):
+                        if image_data.get('image_url', {}).get('url'):
+                            return image_data['image_url']['url']
+                        elif image_data.get('url'):
+                            return image_data['url']
                 
                 content = message.get('content', '')
                 if isinstance(content, str) and content.startswith('data:image'):

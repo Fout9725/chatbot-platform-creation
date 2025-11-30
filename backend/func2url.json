@@ -1,4 +1,6 @@
 {
+  "test-paid-model": "https://functions.poehali.dev/1d6cbc07-d751-4cbf-bf4e-53afbc7cd854",
+  "check-openrouter": "https://functions.poehali.dev/9aaa2b44-a7dc-4ed6-8101-ff6d9c35b97d",
   "neurophoto-callback": "https://functions.poehali.dev/18e803e9-9f5e-4147-8776-dbed3f431a00",
   "neurophoto-worker": "https://functions.poehali.dev/42b8079f-c20c-4eb9-b6ec-d45acfbe9c0f",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
