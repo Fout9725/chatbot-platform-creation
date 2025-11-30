@@ -906,8 +906,12 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
             timeout=25
         )
         
+        print(f'API response status: {response.status_code}')
+        
         if response.status_code == 200:
             data = response.json()
+            print(f'Response data keys: {list(data.keys())}')
+            print(f'Response preview: {str(data)[:500]}')
             
             if data.get('images') and len(data['images']) > 0:
                 return data['images'][0]
