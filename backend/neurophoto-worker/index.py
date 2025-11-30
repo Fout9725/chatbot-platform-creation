@@ -232,18 +232,24 @@ def process_queue_item(item: Dict) -> bool:
         conn.commit()
         cur.close()
         conn.close()
-        
-        print(f'Processing queue item {queue_id}: model={model}, prompt={prompt[:50]}...')
-        
-        model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
-        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
-        
-        image_url = generate_image(prompt, model)
-        
-        conn = get_db_connection()
-        if not conn:
-            return False
-        
+    except Exception as e:
+        print(f'Error updating queue status: {e}')
+        if conn:
+            conn.close()
+        return False
+    
+    print(f'Processing queue item {queue_id}: model={model}, prompt={prompt[:50]}...')
+    
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
+    
+    image_url = generate_image(prompt, model)
+    
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
         cur = conn.cursor()
         
         if image_url and image_url != 'TIMEOUT':
@@ -291,8 +297,6 @@ def process_queue_item(item: Dict) -> bool:
         return True
     except Exception as e:
         print(f'Error processing queue item {queue_id}: {e}')
-        
-        conn = get_db_connection()
         if conn:
             try:
                 cur = conn.cursor()
@@ -304,7 +308,8 @@ def process_queue_item(item: Dict) -> bool:
                 cur.close()
                 conn.close()
             except:
-                pass
+                if conn:
+                    conn.close()
         
         return False
 
