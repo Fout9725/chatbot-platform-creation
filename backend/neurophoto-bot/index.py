@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-WORKER_URL = 'https://functions.poehali.dev/42b8079f-c20c-4eb9-b6ec-d45acfbe9c0f'
+BOT_URL = 'https://functions.poehali.dev/861d11a4-4516-4868-97c9-4f90b87d454b'
 ADMIN_IDS = [1508333931, 285675692]
 
 print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
@@ -246,13 +246,13 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
 
 def trigger_worker() -> None:
     '''
-    Запускает worker для обработки очереди
+    Запускает обработку очереди (GET запрос к этой же функции)
     '''
     try:
-        requests.post(WORKER_URL, json={}, timeout=5)
-        print('Worker triggered successfully')
+        requests.get(BOT_URL, timeout=2)
+        print('Queue processing triggered')
     except Exception as e:
-        print(f'Error triggering worker: {e}')
+        print(f'Error triggering queue: {e}')
 
 def add_to_queue(telegram_id: int, chat_id: int, username: Optional[str], first_name: str, prompt: str, model: str, is_paid: bool) -> Optional[int]:
     '''
@@ -861,8 +861,170 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     tariff_text = f'✅ Отлично!\n\nТвой запрос: {text[:100]}\n\nТеперь выбери тариф для генерации:'
     send_message(chat_id, tariff_text, get_tariff_keyboard())
 
+def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
+    '''
+    Генерация платной модели с длинным таймаутом 25 сек
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_id = model_info['id']
+    
+    print(f'Paid generation with {model_info["name"]}: {prompt[:50]}...')
+    
+    if not OPENROUTER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        payload = {
+            'model': model_id,
+            'messages': [{'role': 'user', 'content': prompt}],
+            'modalities': ['text', 'image'],
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=25
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get('images') and len(data['images']) > 0:
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images') and len(message['images']) > 0:
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        return image_data
+                    elif isinstance(image_data, dict) and image_data.get('url'):
+                        return image_data['url']
+                
+                content = message.get('content', '')
+                if isinstance(content, str) and content.startswith('data:image'):
+                    return content
+        
+        return None
+    except requests.exceptions.Timeout:
+        print(f'Timeout after 25s')
+        return None
+    except Exception as e:
+        print(f'Error: {e}')
+        return None
+
+def process_queue_internal(limit: int = 5) -> Dict[str, Any]:
+    '''
+    Обрабатывает очередь генераций
+    '''
+    conn = get_db_connection()
+    if not conn:
+        return {'processed': 0, 'error': 'DB connection failed'}
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count FROM t_p60354232_chatbot_platform_cre.neurophoto_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT %s",
+            (limit,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        if not rows:
+            return {'processed': 0, 'pending': 0}
+        
+        processed = 0
+        for row in rows:
+            queue_id, telegram_id, chat_id, username, first_name, prompt, model, is_paid, retry_count = row
+            model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+            
+            conn2 = get_db_connection()
+            if not conn2:
+                continue
+            
+            try:
+                cur2 = conn2.cursor()
+                
+                if retry_count == 0:
+                    cur2.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn2.commit()
+                    send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
+                
+                if is_paid:
+                    image_url = generate_image_paid_long(prompt, model)
+                else:
+                    image_url = generate_image(prompt, model)
+                    if image_url == 'TIMEOUT':
+                        image_url = None
+                
+                if image_url:
+                    cur2.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'completed', image_url = %s, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (image_url, queue_id)
+                    )
+                    conn2.commit()
+                    
+                    save_generation_history(telegram_id, prompt, model, None, image_url, is_paid)
+                    
+                    caption = f'✨ Готово!\n\nМодель: {model_info["name"]}\nЗадача #{queue_id}'
+                    send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+                    processed += 1
+                else:
+                    max_retries = 1 if is_paid else 2
+                    if retry_count < max_retries:
+                        cur2.execute(
+                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
+                            (queue_id,)
+                        )
+                        conn2.commit()
+                    else:
+                        cur2.execute(
+                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation timeout' WHERE id = %s",
+                            (queue_id,)
+                        )
+                        conn2.commit()
+                        send_message(chat_id, '❌ Генерация не завершилась за отведенное время.')
+                
+                cur2.close()
+                conn2.close()
+            except Exception as e:
+                print(f'Error processing queue item {queue_id}: {e}')
+                if conn2:
+                    conn2.close()
+        
+        return {'processed': processed, 'total': len(rows)}
+    except Exception as e:
+        print(f'Error in process_queue_internal: {e}')
+        if conn:
+            conn.close()
+        return {'processed': 0, 'error': str(e)}
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    method: str = event.get('httpMethod', 'GET')
+    method: str = event.get('httpMethod', 'POST')
+    
+    if method == 'GET':
+        result = process_queue_internal(limit=5)
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps(result),
+            'isBase64Encoded': False
+        }
     
     if method == 'OPTIONS':
         return {
