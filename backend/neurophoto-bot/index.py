@@ -19,9 +19,9 @@ ADMIN_IDS = [1508333931, 285675692]
 print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': '🆓 Gemini Flash', 'paid': False},
-    'gpt-5-mini': {'id': 'openai/gpt-5-image-mini', 'name': '⚡ GPT-5 Mini', 'paid': True},
-    'gpt-5': {'id': 'openai/gpt-5-image', 'name': '💎 GPT-5 Premium', 'paid': True}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '⚡ FLUX Pro', 'paid': True},
+    'dalle-3': {'id': 'openai/dall-e-3', 'name': '💎 DALL-E 3', 'paid': True}
 }
 
 IMAGE_EFFECTS = {
@@ -262,14 +262,10 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'messages': [
                 {
                     'role': 'user',
-                    'content': [
-                        {
-                            'type': 'text',
-                            'text': prompt
-                        }
-                    ]
+                    'content': prompt
                 }
-            ]
+            ],
+            'modalities': ['text', 'image']
         }
         
         response = requests.post(
@@ -284,24 +280,31 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         
         if response.status_code == 200:
             data = response.json()
+            
+            # Проверяем поле images (base64 data URLs)
+            if data.get('images') and len(data['images']) > 0:
+                image_data = data['images'][0]
+                print(f'Image generated successfully (base64): {image_data[:100]}...')
+                return image_data
+            
+            # Проверяем choices[0].message для альтернативных форматов
             if data.get('choices') and len(data['choices']) > 0:
-                content = data['choices'][0].get('message', {}).get('content', '')
+                message = data['choices'][0].get('message', {})
                 
-                # Проверяем, есть ли в ответе массив content с image_url
-                if isinstance(content, list):
-                    for item in content:
-                        if item.get('type') == 'image_url':
-                            image_url = item.get('image_url', {}).get('url', '')
-                            if image_url:
-                                print(f'Image generated successfully: {image_url}')
-                                return image_url
+                # Проверяем поле images в message
+                if message.get('images'):
+                    image_data = message['images'][0]
+                    print(f'Image generated successfully from message.images: {image_data[:100]}...')
+                    return image_data
                 
-                # Если это строка с URL
-                if isinstance(content, str) and (content.startswith('http://') or content.startswith('https://')):
-                    print(f'Image generated successfully: {content}')
+                # Проверяем content
+                content = message.get('content', '')
+                if isinstance(content, str) and content.startswith('data:image'):
+                    print(f'Image generated successfully from content: {content[:100]}...')
                     return content
                 
-                print(f'No image URL in response. Content type: {type(content)}, value: {str(content)[:500]}')
+                print(f'No image in response. Message keys: {list(message.keys())}')
+                print(f'Content type: {type(content)}, value: {str(content)[:500]}')
         else:
             print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
         
