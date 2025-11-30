@@ -154,6 +154,36 @@ def use_generation(telegram_id: int, is_paid: bool = False) -> bool:
             conn.close()
         return False
 
+def refund_generation(telegram_id: int, is_paid: bool = False) -> bool:
+    '''Возвращает генерацию обратно при ошибке'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        
+        if is_paid:
+            cur.execute(
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET paid_generations = paid_generations + 1, total_used = total_used - 1 WHERE telegram_id = %s",
+                (telegram_id,)
+            )
+        else:
+            cur.execute(
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET free_generations = free_generations + 1, total_used = total_used - 1 WHERE telegram_id = %s",
+                (telegram_id,)
+            )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Database error in refund_generation: {e}')
+        if conn:
+            conn.close()
+        return False
+
 def save_generation_history(telegram_id: int, prompt: str, model: str, effect: Optional[str], image_url: str, is_paid: bool) -> bool:
     conn = get_db_connection()
     if not conn:
@@ -569,7 +599,9 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             caption = f'✨ Готово!\n\nМодель: {model_info["name"]}'
             send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
         else:
-            send_message(chat_id, '❌ Ошибка генерации. Попробуй ещё раз или выбери другую модель.')
+            # Возвращаем генерацию обратно
+            refund_generation(chat_id, is_paid)
+            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз или выбери другую модель.')
         return
     
     elif data.startswith('effect_'):
@@ -1049,20 +1081,14 @@ def process_queue_internal(limit: int = 5) -> Dict[str, Any]:
                     send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
                     processed += 1
                 else:
-                    max_retries = 1 if is_paid else 2
-                    if retry_count < max_retries:
-                        cur2.execute(
-                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = %s",
-                            (queue_id,)
-                        )
-                        conn2.commit()
-                    else:
-                        cur2.execute(
-                            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation timeout' WHERE id = %s",
-                            (queue_id,)
-                        )
-                        conn2.commit()
-                        send_message(chat_id, '❌ Генерация не завершилась за отведенное время.')
+                    # Только одна попытка - при ошибке помечаем как failed и возвращаем генерацию
+                    cur2.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'failed', error_message = 'Generation failed' WHERE id = %s",
+                        (queue_id,)
+                    )
+                    conn2.commit()
+                    refund_generation(telegram_id, is_paid)
+                    send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз или выбери другую модель.')
                 
                 cur2.close()
                 conn2.close()
