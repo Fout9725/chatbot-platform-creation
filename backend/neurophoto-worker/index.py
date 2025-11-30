@@ -96,13 +96,16 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=180
         )
         
         print(f'OpenRouter API response: {response.status_code}')
         
         if response.status_code == 200:
             data = response.json()
+            print(f'Response data keys: {list(data.keys())}')
+            if data.get('choices'):
+                print(f'Choices[0] message keys: {list(data["choices"][0].get("message", {}).keys())}')
             
             if data.get('images') and len(data['images']) > 0:
                 image_data = data['images'][0]
@@ -118,9 +121,18 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                     return image_data
                 
                 content = message.get('content', '')
+                print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
                 if isinstance(content, str) and content.startswith('data:image'):
                     print(f'Image generated successfully from content: {content[:100]}...')
                     return content
+                
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            image_url = item.get('image_url', {}).get('url', '')
+                            if image_url:
+                                print(f'Image found in content array: {image_url[:100]}...')
+                                return image_url
         else:
             print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
         
