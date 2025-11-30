@@ -353,28 +353,16 @@ def download_telegram_photo(file_id: str) -> Optional[str]:
         return None
 
 def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-flash') -> Optional[str]:
-    '''Генерирует изображение на основе загруженного фото и промпта'''
+    '''Генерирует изображение на основе загруженного фото и промпта - двухэтапный процесс'''
     if not OPENROUTER_API_KEY:
         print('OPENROUTER_API_KEY not configured')
         return None
     
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
-    model_id = model_info['id']
-    
-    print(f'Transforming image with {model_info["name"]} ({model_id}): {prompt[:100]}...')
+    print(f'Step 1: Analyzing photo with vision model...')
     
     try:
-        messages = [
-            {
-                'role': 'user',
-                'content': [
-                    {'type': 'text', 'text': f'Transform this image: {prompt}'},
-                    {'type': 'image_url', 'image_url': {'url': photo_url}}
-                ]
-            }
-        ]
-        
-        response = requests.post(
+        # Шаг 1: Анализируем фото с помощью vision-модели
+        vision_response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers={
                 'Authorization': f'Bearer {OPENROUTER_API_KEY}',
@@ -383,35 +371,46 @@ def generate_image_with_photo(prompt: str, photo_url: str, model: str = 'gemini-
                 'X-Title': 'Neurophoto Bot'
             },
             json={
-                'model': model_id,
-                'messages': messages,
-                'max_tokens': 1024
+                'model': 'google/gemini-pro-vision',
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': [
+                            {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
+                            {'type': 'image_url', 'image_url': {'url': photo_url}}
+                        ]
+                    }
+                ]
             },
-            timeout=90
+            timeout=30
         )
         
-        print(f'OpenRouter response status: {response.status_code}')
-        
-        if response.status_code != 200:
-            print(f'OpenRouter API error: {response.status_code} - {response.text}')
+        if vision_response.status_code != 200:
+            print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
             return None
         
-        data = response.json()
-        print(f'OpenRouter response data: {data}')
+        vision_data = vision_response.json()
+        if 'choices' not in vision_data or len(vision_data['choices']) == 0:
+            print('No description from vision model')
+            return None
         
-        if 'choices' in data and len(data['choices']) > 0:
-            content = data['choices'][0]['message']['content']
-            
-            if isinstance(content, str) and content.startswith('http'):
-                return content
-            elif isinstance(content, list):
-                for item in content:
-                    if item.get('type') == 'image_url':
-                        return item.get('image_url', {}).get('url')
+        image_description = vision_data['choices'][0]['message']['content']
+        print(f'Image description: {image_description[:200]}...')
         
-        return None
+        # Шаг 2: Генерируем новое изображение на основе описания + инструкций пользователя
+        print(f'Step 2: Generating modified image...')
+        
+        combined_prompt = f'{image_description}. Now apply these changes: {prompt}'
+        
+        model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+        model_id = model_info['id']
+        
+        return generate_image(combined_prompt, model)
+        
     except Exception as e:
         print(f'Error in generate_image_with_photo: {e}')
+        import traceback
+        print(f'Traceback: {traceback.format_exc()}')
         return None
 
 def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
