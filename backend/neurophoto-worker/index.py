@@ -11,10 +11,26 @@ import requests
 import psycopg2
 from typing import Dict, Any, Optional
 import time
+import signal
+from contextlib import contextmanager
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+class TimeoutException(Exception):
+    pass
+
+@contextmanager
+def time_limit(seconds: int):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out!")
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
@@ -74,57 +90,45 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         return None
     
     try:
-        headers = {
-            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://poehali.dev',
-            'X-Title': 'NeurophotoBot'
-        }
-        
-        payload = {
-            'model': model_id,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': prompt
-                }
-            ],
-            'modalities': ['text', 'image'],
-            'stream': False,
-            'max_tokens': 4096
-        }
-        
-        response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers=headers,
-            json=payload,
-            timeout=20
-        )
-        
-        print(f'OpenRouter API response: {response.status_code}')
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f'Response data keys: {list(data.keys())}')
-            if data.get('choices'):
-                print(f'Choices[0] message keys: {list(data["choices"][0].get("message", {}).keys())}')
+        with time_limit(18):
+            headers = {
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://poehali.dev',
+                'X-Title': 'NeurophotoBot'
+            }
             
-            if data.get('images') and len(data['images']) > 0:
-                image_data = data['images'][0]
-                print(f'Image found in data.images (type: {type(image_data)})')
-                if isinstance(image_data, str):
-                    print(f'Image data preview: {image_data[:100]}...')
-                    return image_data
-                elif isinstance(image_data, dict) and image_data.get('url'):
-                    print(f'Image URL: {image_data["url"][:100]}...')
-                    return image_data['url']
+            payload = {
+                'model': model_id,
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': prompt
+                    }
+                ],
+                'modalities': ['text', 'image'],
+                'stream': False,
+                'max_tokens': 4096
+            }
             
-            if data.get('choices') and len(data['choices']) > 0:
-                message = data['choices'][0].get('message', {})
+            response = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers=headers,
+                json=payload,
+                timeout=15
+            )
+            
+            print(f'OpenRouter API response: {response.status_code}')
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f'Response data keys: {list(data.keys())}')
+                if data.get('choices'):
+                    print(f'Choices[0] message keys: {list(data["choices"][0].get("message", {}).keys())}')
                 
-                if message.get('images') and len(message['images']) > 0:
-                    image_data = message['images'][0]
-                    print(f'Image found in message.images (type: {type(image_data)})')
+                if data.get('images') and len(data['images']) > 0:
+                    image_data = data['images'][0]
+                    print(f'Image found in data.images (type: {type(image_data)})')
                     if isinstance(image_data, str):
                         print(f'Image data preview: {image_data[:100]}...')
                         return image_data
@@ -132,25 +136,41 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
                         print(f'Image URL: {image_data["url"][:100]}...')
                         return image_data['url']
                 
-                content = message.get('content', '')
-                print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
-                if isinstance(content, str) and content.startswith('data:image'):
-                    print(f'Image generated successfully from content: {content[:100]}...')
-                    return content
-                
-                if isinstance(content, list):
-                    for item in content:
-                        if isinstance(item, dict) and item.get('type') == 'image_url':
-                            image_url = item.get('image_url', {}).get('url', '')
-                            if image_url:
-                                print(f'Image found in content array: {image_url[:100]}...')
-                                return image_url
-        else:
-            print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
-        
-        return None
+                if data.get('choices') and len(data['choices']) > 0:
+                    message = data['choices'][0].get('message', {})
+                    
+                    if message.get('images') and len(message['images']) > 0:
+                        image_data = message['images'][0]
+                        print(f'Image found in message.images (type: {type(image_data)})')
+                        if isinstance(image_data, str):
+                            print(f'Image data preview: {image_data[:100]}...')
+                            return image_data
+                        elif isinstance(image_data, dict) and image_data.get('url'):
+                            print(f'Image URL: {image_data["url"][:100]}...')
+                            return image_data['url']
+                    
+                    content = message.get('content', '')
+                    print(f'Content type: {type(content)}, starts with data:image: {isinstance(content, str) and content.startswith("data:image") if content else False}')
+                    if isinstance(content, str) and content.startswith('data:image'):
+                        print(f'Image generated successfully from content: {content[:100]}...')
+                        return content
+                    
+                    if isinstance(content, list):
+                        for item in content:
+                            if isinstance(item, dict) and item.get('type') == 'image_url':
+                                image_url = item.get('image_url', {}).get('url', '')
+                                if image_url:
+                                    print(f'Image found in content array: {image_url[:100]}...')
+                                    return image_url
+            else:
+                print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
+            
+            return None
+    except TimeoutException:
+        print(f'Hard timeout reached after 18 seconds')
+        return 'TIMEOUT'
     except requests.exceptions.Timeout:
-        print(f'OpenRouter API timeout after 20 seconds')
+        print(f'OpenRouter API timeout after 15 seconds')
         return 'TIMEOUT'
     except Exception as e:
         print(f'OpenRouter API error: {e}')
