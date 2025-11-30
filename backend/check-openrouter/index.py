@@ -60,26 +60,40 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         data = response.json()
         models = data.get('data', [])
         
-        # Фильтруем только image-генерирующие модели
-        image_models = []
+        # Фильтруем модели: генерация изображений и vision (мультимодальные)
+        image_generation_models = []
+        vision_models = []
+        
         for model in models:
             model_id = model.get('id', '')
             model_name = model.get('name', '')
+            architecture = model.get('architecture', {})
+            pricing = model.get('pricing', {})
+            context_length = model.get('context_length', 0)
             
-            # Ищем модели с "image" в названии или поддержкой multimodal
-            if 'image' in model_id.lower() or 'image' in model_name.lower():
-                pricing = model.get('pricing', {})
-                context_length = model.get('context_length', 0)
-                
-                image_models.append({
-                    'id': model_id,
-                    'name': model_name,
-                    'pricing': {
-                        'prompt': pricing.get('prompt', 'N/A'),
-                        'completion': pricing.get('completion', 'N/A')
-                    },
-                    'context_length': context_length
-                })
+            input_modalities = architecture.get('input_modalities', [])
+            output_modalities = architecture.get('output_modalities', [])
+            
+            model_info = {
+                'id': model_id,
+                'name': model_name,
+                'pricing': {
+                    'prompt': pricing.get('prompt', 'N/A'),
+                    'completion': pricing.get('completion', 'N/A'),
+                    'image': pricing.get('image', 'N/A')
+                },
+                'context_length': context_length,
+                'input_modalities': input_modalities,
+                'output_modalities': output_modalities
+            }
+            
+            # Vision модели (принимают изображения на вход)
+            if 'image' in input_modalities:
+                vision_models.append(model_info)
+            
+            # Генерация изображений (выдают изображения на выход)
+            if 'image' in output_modalities:
+                image_generation_models.append(model_info)
         
         # Также проверяем кредиты
         credits_response = requests.get(
@@ -95,13 +109,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if credits_response.status_code == 200:
             credits_data = credits_response.json().get('data', {})
         
+        # Сортируем бесплатные модели в начало
+        vision_models.sort(key=lambda x: x['pricing']['image'] == '0', reverse=True)
+        image_generation_models.sort(key=lambda x: x['pricing']['prompt'] == '0', reverse=True)
+        
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'total_models': len(models),
-                'image_models_count': len(image_models),
-                'image_models': image_models,
+                'vision_models_count': len(vision_models),
+                'vision_models': vision_models[:20],
+                'image_generation_models_count': len(image_generation_models),
+                'image_generation_models': image_generation_models[:20],
                 'credits': credits_data
             }, indent=2),
             'isBase64Encoded': False
