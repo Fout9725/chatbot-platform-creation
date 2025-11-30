@@ -297,6 +297,8 @@ def process_queue_item(item: Dict) -> bool:
     
     image_url = generate_image(prompt, model)
     
+    print(f'generate_image() returned: {type(image_url)}, value: {image_url if image_url != "TIMEOUT" else "TIMEOUT"}')
+    
     conn = get_db_connection()
     if not conn:
         return False
