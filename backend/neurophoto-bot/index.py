@@ -225,18 +225,40 @@ def send_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -
 
 def send_photo_url(chat_id: int, image_url: str, caption: str = '', reply_markup: Optional[Dict] = None) -> None:
     try:
-        data = {
-            'chat_id': chat_id,
-            'photo': image_url,
-            'caption': caption
-        }
-        if reply_markup:
-            data['reply_markup'] = json.dumps(reply_markup)
-        
-        response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
-        print(f'sendPhoto response: {response.status_code}')
+        # Если это base64 data URL, декодируем и отправляем как файл
+        if image_url.startswith('data:image'):
+            import base64
+            header, encoded = image_url.split(',', 1)
+            image_bytes = base64.b64decode(encoded)
+            
+            files = {'photo': ('image.png', image_bytes, 'image/png')}
+            data = {
+                'chat_id': chat_id,
+                'caption': caption
+            }
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
+            
+            response = requests.post(f'{get_telegram_api()}/sendPhoto', data=data, files=files, timeout=30)
+            print(f'sendPhoto (base64) response: {response.status_code}')
+            if response.status_code != 200:
+                print(f'sendPhoto error: {response.text}')
+        # Если это обычный URL
+        else:
+            data = {
+                'chat_id': chat_id,
+                'photo': image_url,
+                'caption': caption
+            }
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
+            
+            response = requests.post(f'{get_telegram_api()}/sendPhoto', json=data, timeout=30)
+            print(f'sendPhoto (URL) response: {response.status_code}')
+            if response.status_code != 200:
+                print(f'sendPhoto error: {response.text}')
     except Exception as e:
-        print(f'Error sending photo URL: {e}')
+        print(f'Error sending photo: {e}')
 
 def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
     requests.post(f'{get_telegram_api()}/sendChatAction', json={
