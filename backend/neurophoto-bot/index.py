@@ -513,45 +513,14 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
             return
         
-        if is_paid:
-            queue_id = add_to_queue(user_data['telegram_id'], chat_id, username, first_name, prompt, model_key, is_paid)
-            if queue_id:
-                if use_generation(chat_id, is_paid):
-                    send_message(chat_id, f'⏳ Задача #{queue_id} добавлена в очередь\n\n{model_info["name"]} — {model_info["time"]}\n\nИзображение придет автоматически когда будет готово. Можешь продолжать пользоваться ботом!')
-                else:
-                    send_message(chat_id, '❌ Ошибка списания генерации')
+        queue_id = add_to_queue(user_data['telegram_id'], chat_id, username, first_name, prompt, model_key, is_paid)
+        if queue_id:
+            if use_generation(chat_id, is_paid):
+                send_message(chat_id, f'⏳ Задача #{queue_id} добавлена в очередь\n\n{model_info["name"]} — {model_info["time"]}\n\nИзображение придет автоматически когда будет готово. Можешь продолжать пользоваться ботом!')
             else:
-                send_message(chat_id, '❌ Ошибка добавления в очередь')
+                send_message(chat_id, '❌ Ошибка списания генерации')
         else:
-            send_message(chat_id, f'🎨 Генерирую изображение с помощью {model_info["name"]}...\nЭто займет {model_info["time"]}')
-            send_chat_action(chat_id, 'upload_photo')
-            
-            image_url = generate_image(prompt, model_key)
-            
-            if image_url:
-                if use_generation(chat_id, is_paid):
-                    save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
-                    
-                    remaining_free = user_data['free_generations'] - 1
-                    
-                    caption = f'''✨ Готово!\n\nМодель: {model_info["name"]}\nОсталось бесплатных: {remaining_free}'''
-                    
-                    user_sessions[chat_id] = {
-                        'state': 'choosing_effects',
-                        'prompt': prompt,
-                        'model': model_key,
-                        'image_url': image_url,
-                        'is_paid': is_paid
-                    }
-                    
-                    effects_text = '''🎨 *Хочешь добавить эффекты?*\n\nВыбери эффект для улучшения изображения:'''
-                    
-                    send_photo_url(chat_id, image_url, caption)
-                    send_message(chat_id, effects_text, get_effects_keyboard())
-                else:
-                    send_message(chat_id, '❌ Ошибка списания генерации')
-            else:
-                send_message(chat_id, '❌ Не удалось сгенерировать изображение. Попробуй позже')
+            send_message(chat_id, '❌ Ошибка добавления в очередь')
         return
     
     elif data.startswith('effect_'):
