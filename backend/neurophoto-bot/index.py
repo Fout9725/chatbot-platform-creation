@@ -465,6 +465,12 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
         elif response.status_code == 200:
             data = response.json()
             
+            # Полное логирование ответа для отладки
+            import json
+            print(f'=== FULL API RESPONSE ===')
+            print(json.dumps(data, indent=2, default=str)[:3000])
+            print(f'=== END RESPONSE ===')
+            
             # Проверяем на ошибку внутри успешного ответа
             if data.get('error'):
                 error_msg = data['error'].get('message', 'Unknown error')
