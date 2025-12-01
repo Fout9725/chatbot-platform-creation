@@ -430,10 +430,12 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
             'X-Title': 'NeurophotoBot'
         }
         
-        # Если есть изображение - НЕ отправляем его, чтобы избежать копирования
-        # Вместо этого используем только текстовое описание изменений
+        # Если есть изображение - отправляем vision запрос (редактирование)
         if image_url:
-            content = f'Generate a new image with these characteristics: {prompt}\n\nIMPORTANT: Create a completely NEW image from scratch based on this description. Do NOT copy or replicate any existing image. Generate original artwork.'
+            content = [
+                {'type': 'image_url', 'image_url': {'url': image_url}},
+                {'type': 'text', 'text': f'You are an expert photo editor. I will show you an image and you need to MODIFY it according to my instructions.\n\nYour task:\n1. Analyze the image I provided\n2. Apply these specific changes: {prompt}\n3. Return the MODIFIED version\n\nIMPORTANT RULES:\n- You MUST make VISIBLE changes to the image\n- The output should be DIFFERENT from the original\n- Apply the changes SIGNIFICANTLY and OBVIOUSLY\n- If I ask to add light - make it MUCH brighter\n- If I ask to change color - make STRONG color changes\n- If I ask for style changes - apply them DRAMATICALLY\n\nNow, modify the image according to this instruction: {prompt}'}
+            ]
         else:
             content = prompt
         
@@ -1590,10 +1592,12 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'X-Title': 'NeurophotoBot'
         }
         
-        # Если есть изображение - НЕ отправляем его, чтобы избежать копирования
-        # Вместо этого используем только текстовое описание изменений
+        # Если есть изображение - отправляем vision запрос (редактирование)
         if image_url:
-            content = f'Generate a new image with these characteristics: {prompt}\n\nIMPORTANT: Create a completely NEW image from scratch based on this description. Do NOT copy or replicate any existing image. Generate original artwork.'
+            content = [
+                {'type': 'image_url', 'image_url': {'url': image_url}},
+                {'type': 'text', 'text': f'You are an expert photo editor. I will show you an image and you need to MODIFY it according to my instructions.\n\nYour task:\n1. Analyze the image I provided\n2. Apply these specific changes: {prompt}\n3. Return the MODIFIED version\n\nIMPORTANT RULES:\n- You MUST make VISIBLE changes to the image\n- The output should be DIFFERENT from the original\n- Apply the changes SIGNIFICANTLY and OBVIOUSLY\n- If I ask to add light - make it MUCH brighter\n- If I ask to change color - make STRONG color changes\n- If I ask for style changes - apply them DRAMATICALLY\n\nNow, modify the image according to this instruction: {prompt}'}
+            ]
         else:
             content = prompt
         
