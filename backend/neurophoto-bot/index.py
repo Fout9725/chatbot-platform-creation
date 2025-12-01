@@ -395,7 +395,12 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
         print(f'OpenRouter API response: {response.status_code}')
         print(f'OpenRouter response body: {response.text[:1000]}')
         
-        if response.status_code == 200:
+        if response.status_code == 429:
+            data = response.json()
+            error_msg = data.get('error', {}).get('message', 'Rate limit')
+            print(f'Rate limit error: {error_msg}')
+            return None
+        elif response.status_code == 200:
             data = response.json()
             
             # Проверяем на ошибку внутри успешного ответа
@@ -1252,10 +1257,16 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             
             text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{text}"\n\n🎨 Теперь выбери модель для генерации:'
             
+            print(f'User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
+            
             if user_data['free_generations'] > 0:
-                send_message(chat_id, text_message, get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0))
+                keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
+                print(f'Showing photo edit keyboard with {len(keyboard["inline_keyboard"])} buttons')
+                send_message(chat_id, text_message, keyboard)
             elif user_data['paid_generations'] > 0:
-                send_message(chat_id, text_message, get_paid_models_keyboard())
+                keyboard = get_paid_models_keyboard()
+                print(f'Showing paid models keyboard with {len(keyboard["inline_keyboard"])} buttons')
+                send_message(chat_id, text_message, keyboard)
             else:
                 send_message(chat_id, '❌ У тебя закончились генерации!')
                 user_sessions[chat_id] = {'state': 'waiting_prompt'}
