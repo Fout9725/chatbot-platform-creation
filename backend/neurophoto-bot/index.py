@@ -514,6 +514,9 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
                                     print(f'Image found in content array: {img_url[:100]}...')
                                     return img_url
                 
+                # Логируем весь message для отладки
+                import json
+                print(f'Full message object: {json.dumps(message, indent=2, default=str)[:2000]}')
                 print(f'No image in response. Message keys: {list(message.keys())}')
                 print(f'Content type: {type(content)}, value: {str(content)[:500]}')
         else:
