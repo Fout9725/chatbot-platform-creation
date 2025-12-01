@@ -408,7 +408,7 @@ def download_telegram_photo(file_id: str) -> Optional[str]:
         print(f'Error downloading photo: {e}')
         return None
 
-def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
+def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional[str] = None) -> Optional[str]:
     model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
     model_id = model_info['id']
     
@@ -426,12 +426,21 @@ def generate_image(prompt: str, model: str = 'gemini-flash') -> Optional[str]:
             'X-Title': 'NeurophotoBot'
         }
         
+        # Если есть изображение - отправляем vision запрос (редактирование)
+        if image_url:
+            content = [
+                {'type': 'image_url', 'image_url': {'url': image_url}},
+                {'type': 'text', 'text': prompt}
+            ]
+        else:
+            content = prompt
+        
         payload = {
             'model': model_id,
             'messages': [
                 {
                     'role': 'user',
-                    'content': prompt
+                    'content': content
                 }
             ],
             'modalities': ['text', 'image']
@@ -743,13 +752,12 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ Сессия истекла. Отправь фото заново.')
             return
         
-        photo_prompt = session.get('photo_prompt')
         photo_url = session.get('photo_url')
         user_instruction = session.get('user_instruction')
         
-        if not photo_prompt or not photo_url:
+        if not photo_url or not user_instruction:
             send_message(chat_id, '❌ Данные фото не найдены. Отправь фото заново.')
-            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+            clear_user_session(chat_id)
             return
         
         user_data = get_or_create_user(chat_id, username, first_name)
@@ -779,12 +787,14 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
         send_chat_action(chat_id, 'upload_photo')
         
-        print(f'Step 2: Generating edited image with {model_info["name"]} for user {chat_id}...')
+        print(f'Generating edited image with {model_info["name"]} for user {chat_id}...')
+        print(f'Image URL: {photo_url[:100]}...')
+        print(f'User instruction: {user_instruction}')
         
         if is_paid:
-            image_url = generate_image_paid_long(photo_prompt, model_key)
+            image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
         else:
-            image_url = generate_image(photo_prompt, model_key)
+            image_url = generate_image(user_instruction, model_key, photo_url)
         
         if image_url:
             save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
@@ -840,7 +850,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         return
 
 def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
-    '''Обрабатывает загруженное фото - автоматически запускает анализ и генерацию'''
+    '''Обрабатывает загруженное фото - сохраняет и предлагает выбрать модель'''
     file_id = photo_data[-1]['file_id']
     
     user_data = get_or_create_user(chat_id, username, first_name)
@@ -877,74 +887,23 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
         send_message(chat_id, '❌ Не удалось загрузить фото. Попробуй еще раз.')
         return
     
-    send_message(chat_id, f'✅ Фото загружено!\n\n📝 Твоя инструкция: "{caption}"\n\n🔍 Анализирую фото с помощью AI...')
-    send_chat_action(chat_id, 'typing')
+    save_user_session(chat_id, 'waiting_model_for_photo', photo_url, caption, caption)
     
-    print(f'Step 1: Analyzing photo with vision model for user {chat_id}...')
+    text_message = f'✅ Фото загружено!\n\nТвоя инструкция: "{caption}"\n\n🎨 Выбери модель для генерации:'
     
-    try:
-        vision_response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': BOT_URL,
-                'X-Title': 'Neurophoto Bot'
-            },
-            json={
-                'model': 'openrouter/bert-nebulon-alpha',
-                'messages': [
-                    {
-                        'role': 'user',
-                        'content': [
-                            {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
-                            {'type': 'image_url', 'image_url': {'url': photo_url}}
-                        ]
-                    }
-                ]
-            },
-            timeout=30
-        )
-        
-        if vision_response.status_code != 200:
-            print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
-            send_message(chat_id, '❌ Ошибка анализа фото. Попробуй еще раз.')
-            return
-        
-        vision_data = vision_response.json()
-        if 'choices' not in vision_data or len(vision_data['choices']) == 0:
-            print('No description from vision model')
-            send_message(chat_id, '❌ Не удалось проанализировать фото. Попробуй еще раз.')
-            return
-        
-        image_description = vision_data['choices'][0]['message']['content']
-        print(f'Image description: {image_description[:200]}...')
-        
-        combined_prompt = f'{image_description}. Now apply these changes: {caption}'
-        
-        save_user_session(chat_id, 'waiting_model_for_photo', photo_url, combined_prompt, caption)
-        
-        text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{caption}"\n\n🎨 Теперь выбери модель для генерации:'
-        
-        print(f'[Photo with caption] User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
-        
-        if user_data['free_generations'] > 0:
-            keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
-            print(f'[Photo with caption] Showing photo edit keyboard with {len(keyboard["inline_keyboard"])} buttons')
-            send_message(chat_id, text_message, keyboard)
-        elif user_data['paid_generations'] > 0:
-            keyboard = get_paid_models_keyboard()
-            print(f'[Photo with caption] Showing paid models keyboard with {len(keyboard["inline_keyboard"])} buttons')
-            send_message(chat_id, text_message, keyboard)
-        else:
-            send_message(chat_id, '❌ У тебя закончились генерации!')
-            clear_user_session(chat_id)
+    print(f'[Photo with caption] User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
     
-    except Exception as e:
-        print(f'Error in handle_photo: {e}')
-        import traceback
-        print(f'Traceback: {traceback.format_exc()}')
-        send_message(chat_id, '❌ Произошла ошибка при обработке фото. Попробуй еще раз.')
+    if user_data['free_generations'] > 0:
+        keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
+        print(f'[Photo with caption] Showing photo edit keyboard with {len(keyboard["inline_keyboard"])} buttons')
+        send_message(chat_id, text_message, keyboard)
+    elif user_data['paid_generations'] > 0:
+        keyboard = get_paid_models_keyboard()
+        print(f'[Photo with caption] Showing paid models keyboard with {len(keyboard["inline_keyboard"])} buttons')
+        send_message(chat_id, text_message, keyboard)
+    else:
+        send_message(chat_id, '❌ У тебя закончились генерации!')
+        clear_user_session(chat_id)
 
 def handle_message(chat_id: int, text: str, first_name: str, username: Optional[str] = None) -> None:
     if text.startswith('/start'):
@@ -1300,7 +1259,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     tariff_text = f'✅ Отлично!\n\nТвой запрос: {text[:100]}\n\nТеперь выбери тариф для генерации:'
     send_message(chat_id, tariff_text, get_tariff_keyboard())
 
-def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
+def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] = None) -> Optional[str]:
     '''
     Генерация платной модели с длинным таймаутом 25 сек
     '''
@@ -1320,9 +1279,18 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
             'X-Title': 'NeurophotoBot'
         }
         
+        # Если есть изображение - отправляем vision запрос (редактирование)
+        if image_url:
+            content = [
+                {'type': 'image_url', 'image_url': {'url': image_url}},
+                {'type': 'text', 'text': prompt}
+            ]
+        else:
+            content = prompt
+        
         payload = {
             'model': model_id,
-            'messages': [{'role': 'user', 'content': prompt}],
+            'messages': [{'role': 'user', 'content': content}],
             'modalities': ['text', 'image'],
             'stream': False,
             'max_tokens': 4096
