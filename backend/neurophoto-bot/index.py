@@ -19,6 +19,9 @@ ADMIN_IDS = [1508333931, 285675692]
 
 print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0}')
 
+# Хранилище для медиа-групп (несколько фото одновременно)
+MEDIA_GROUPS = {}
+
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
     'grok-fast': {'id': 'x-ai/grok-4.1-fast:free', 'name': '🆓 Grok 4.1 Fast', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
@@ -771,7 +774,10 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         model_key = data.replace('photo_edit_', '')
         
         session = get_user_session(chat_id)
-        if not session or session.get('state') != 'waiting_model_for_photo':
+        state = session.get('state') if session else None
+        
+        # Поддерживаем и одно фото, и несколько
+        if not session or (state != 'waiting_model_for_photo' and state != 'waiting_model_for_photos'):
             send_message(chat_id, '❌ Сессия истекла. Отправь фото заново.')
             return
         
@@ -782,6 +788,10 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ Данные фото не найдены. Отправь фото заново.')
             clear_user_session(chat_id)
             return
+        
+        # Определяем сколько фото
+        is_multiple_photos = state == 'waiting_model_for_photos'
+        photo_urls = photo_url.split(',') if is_multiple_photos else [photo_url]
         
         user_data = get_or_create_user(chat_id, username, first_name)
         if not user_data:
@@ -807,17 +817,25 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             send_message(chat_id, '❌ Ошибка списания генерации')
             return
         
-        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
+        photo_count_text = f'{len(photo_urls)} фото' if is_multiple_photos else 'фото'
+        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]} ({photo_count_text})...\n\n⏳ Это займёт {model_info["time"]}')
         send_chat_action(chat_id, 'upload_photo')
         
         print(f'Generating edited image with {model_info["name"]} for user {chat_id}...')
-        print(f'Image URL: {photo_url[:100]}...')
+        print(f'Photos count: {len(photo_urls)}')
         print(f'User instruction: {user_instruction}')
         
+        # Для нескольких фото передаём массив URLs
         if is_paid:
-            image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
+            if is_multiple_photos:
+                image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
+            else:
+                image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
         else:
-            image_url = generate_image(user_instruction, model_key, photo_url)
+            if is_multiple_photos:
+                image_url = generate_image_multi(user_instruction, model_key, photo_urls)
+            else:
+                image_url = generate_image(user_instruction, model_key, photo_url)
         
         if image_url:
             save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
@@ -872,9 +890,98 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         send_message(chat_id, text)
         return
 
-def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
+def handle_media_group(chat_id: int, photo_file_ids: list, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
+    '''Обрабатывает группу фото (несколько фото одновременно)'''
+    print(f'Processing media group with {len(photo_file_ids)} photos')
+    
+    user_data = get_or_create_user(chat_id, username, first_name)
+    if not user_data:
+        send_message(chat_id, '❌ Ошибка подключения к базе данных')
+        return
+    
+    if not caption:
+        text = f'''✅ Получено {len(photo_file_ids)} фото!
+
+📝 Теперь напиши, что нужно сделать с этими фото:
+
+Например:
+• Объедини эти фото в одну картинку
+• Сделай коллаж из этих фото
+• Создай композицию из этих изображений
+• Совмести эти фото вместе'''
+        
+        send_message(chat_id, text)
+        
+        # Скачиваем все фото
+        photo_urls = []
+        for file_id in photo_file_ids:
+            photo_url = download_telegram_photo(file_id)
+            if photo_url:
+                photo_urls.append(photo_url)
+        
+        if photo_urls:
+            # Сохраняем URLs всех фото через запятую
+            save_user_session(chat_id, 'waiting_prompt_for_photos', ','.join(photo_urls), None, None)
+        
+        return
+    
+    if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
+        send_message(chat_id, '❌ У тебя закончились генерации!')
+        return
+    
+    send_message(chat_id, f'📥 Загружаю {len(photo_file_ids)} фото...')
+    
+    # Скачиваем все фото
+    photo_urls = []
+    for file_id in photo_file_ids:
+        photo_url = download_telegram_photo(file_id)
+        if photo_url:
+            photo_urls.append(photo_url)
+    
+    if not photo_urls:
+        send_message(chat_id, '❌ Не удалось загрузить фото. Попробуй еще раз.')
+        return
+    
+    # Сохраняем URLs всех фото через запятую
+    save_user_session(chat_id, 'waiting_model_for_photos', ','.join(photo_urls), caption, caption)
+    
+    text_message = f'✅ Загружено {len(photo_urls)} фото!\n\nТвоя инструкция: "{caption}"\n\n🎨 Выбери модель для генерации:'
+    
+    print(f'[Media group with caption] User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
+    
+    if user_data['free_generations'] > 0:
+        keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
+        send_message(chat_id, text_message, keyboard)
+    elif user_data['paid_generations'] > 0:
+        keyboard = get_paid_models_keyboard()
+        send_message(chat_id, text_message, keyboard)
+    else:
+        send_message(chat_id, '❌ У тебя закончились генерации!')
+        clear_user_session(chat_id)
+
+def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_name: str, username: Optional[str] = None, media_group_id: Optional[str] = None) -> None:
     '''Обрабатывает загруженное фото - сохраняет и предлагает выбрать модель'''
     file_id = photo_data[-1]['file_id']
+    
+    # Если это медиа-группа (несколько фото), собираем их
+    if media_group_id:
+        import time
+        if media_group_id not in MEDIA_GROUPS:
+            MEDIA_GROUPS[media_group_id] = {
+                'photos': [],
+                'caption': caption,
+                'chat_id': chat_id,
+                'first_name': first_name,
+                'username': username,
+                'timestamp': time.time()
+            }
+        
+        MEDIA_GROUPS[media_group_id]['photos'].append(file_id)
+        
+        # Telegram отправляет фото по одному, ждём 2 секунды после последнего фото
+        # Обработка будет в отдельной функции через таймер
+        print(f'Added photo to media group {media_group_id}, total: {len(MEDIA_GROUPS[media_group_id]["photos"])}')
+        return
     
     user_data = get_or_create_user(chat_id, username, first_name)
     if not user_data:
@@ -1254,6 +1361,46 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         
         return
     
+    # Обработка нескольких фото
+    if session and session.get('state') == 'waiting_prompt_for_photos':
+        user_data = get_or_create_user(chat_id, username, first_name)
+        if not user_data:
+            send_message(chat_id, '❌ Ошибка подключения к базе данных')
+            return
+        
+        photo_urls_str = session.get('photo_url')
+        if not photo_urls_str:
+            send_message(chat_id, '❌ Фото не найдены. Отправь фото заново.')
+            clear_user_session(chat_id)
+            return
+        
+        photo_urls = photo_urls_str.split(',')
+        
+        if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
+            send_message(chat_id, '❌ У тебя закончились генерации!')
+            return
+        
+        send_message(chat_id, f'✅ Инструкция получена: "{text}"\n\n🔍 Анализирую {len(photo_urls)} фото...')
+        
+        # Для нескольких фото просто передаём их все вместе с инструкцией
+        combined_prompt = f'{text}. Use these {len(photo_urls)} images together.'
+        
+        save_user_session(chat_id, 'waiting_model_for_photos', photo_urls_str, combined_prompt, text)
+        
+        text_message = f'✅ Готово!\n\nТвоя инструкция: "{text}"\n\n🎨 Выбери модель для генерации:'
+        
+        if user_data['free_generations'] > 0:
+            keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
+            send_message(chat_id, text_message, keyboard)
+        elif user_data['paid_generations'] > 0:
+            keyboard = get_paid_models_keyboard()
+            send_message(chat_id, text_message, keyboard)
+        else:
+            send_message(chat_id, '❌ У тебя закончились генерации!')
+            clear_user_session(chat_id)
+        
+        return
+    
     conn = get_db_connection()
     if conn:
         try:
@@ -1281,6 +1428,177 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
     
     tariff_text = f'✅ Отлично!\n\nТвой запрос: {text[:100]}\n\nТеперь выбери тариф для генерации:'
     send_message(chat_id, tariff_text, get_tariff_keyboard())
+
+def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) -> Optional[str]:
+    '''
+    Генерация платной модели с несколькими изображениями
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_id = model_info['id']
+    
+    print(f'Paid generation with {model_info["name"]} and {len(image_urls)} images: {prompt[:50]}...')
+    
+    if not OPENROUTER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        # Создаём content с несколькими изображениями
+        content = []
+        for img_url in image_urls:
+            content.append({'type': 'image_url', 'image_url': {'url': img_url}})
+        
+        content.append({'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'})
+        
+        payload = {
+            'model': model_id,
+            'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['text', 'image'],
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        print(f'API response status: {response.status_code}')
+        
+        if response.status_code != 200:
+            print(f'API error response: {response.text[:1000]}')
+            return None
+        
+        data = response.json()
+        
+        # Проверяем на ошибку
+        if data.get('error'):
+            print(f'OpenRouter API error: {data["error"]}')
+            return None
+        
+        # Проверяем все возможные места где может быть изображение
+        if data.get('images'):
+            return data['images'][0]
+        
+        if data.get('choices') and len(data['choices']) > 0:
+            message = data['choices'][0].get('message', {})
+            
+            if message.get('images'):
+                image_data = message['images'][0]
+                if isinstance(image_data, str):
+                    return image_data
+                elif isinstance(image_data, dict):
+                    return image_data.get('image_url', {}).get('url') or image_data.get('url')
+            
+            content_resp = message.get('content', '')
+            if isinstance(content_resp, str) and content_resp.startswith('data:image'):
+                return content_resp
+            
+            if isinstance(content_resp, list):
+                for item in content_resp:
+                    if isinstance(item, dict) and item.get('type') == 'image_url':
+                        return item.get('image_url', {}).get('url')
+        
+        print(f'No image found in response')
+        return None
+    
+    except Exception as e:
+        print(f'Error: {e}')
+        return None
+
+def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[str]:
+    '''
+    Генерация бесплатной модели с несколькими изображениями
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_id = model_info['id']
+    
+    print(f'Generating with {model_info["name"]} and {len(image_urls)} images: {prompt[:100]}...')
+    
+    if not OPENROUTER_API_KEY:
+        print('OPENROUTER_API_KEY not configured')
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        # Создаём content с несколькими изображениями
+        content = []
+        for img_url in image_urls:
+            content.append({'type': 'image_url', 'image_url': {'url': img_url}})
+        
+        content.append({'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'})
+        
+        payload = {
+            'model': model_id,
+            'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['text', 'image']
+        }
+        
+        timeout = 25
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=timeout
+        )
+        
+        print(f'OpenRouter API response: {response.status_code}')
+        
+        if response.status_code == 429:
+            print(f'Rate limit error')
+            return None
+        elif response.status_code == 200:
+            data = response.json()
+            
+            if data.get('error'):
+                print(f'OpenRouter API internal error: {data["error"]}')
+                return None
+            
+            # Проверяем все возможные места
+            if data.get('images'):
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images'):
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        return image_data
+                    elif isinstance(image_data, dict):
+                        return image_data.get('image_url', {}).get('url') or image_data.get('url')
+                
+                content_resp = message.get('content', '')
+                if isinstance(content_resp, str) and content_resp.startswith('data:image'):
+                    return content_resp
+                
+                if isinstance(content_resp, list):
+                    for item in content_resp:
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            return item.get('image_url', {}).get('url')
+            
+            print(f'No image found')
+        else:
+            print(f'OpenRouter API error: {response.status_code}')
+        
+        return None
+    except Exception as e:
+        print(f'OpenRouter API error: {e}')
+        return None
 
 def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] = None) -> Optional[str]:
     '''
@@ -1522,7 +1840,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if 'photo' in message:
                 photo_data = message['photo']
                 caption = message.get('caption')
-                handle_photo(chat_id, photo_data, caption, first_name, username)
+                media_group_id = message.get('media_group_id')
+                handle_photo(chat_id, photo_data, caption, first_name, username, media_group_id)
+                
+                # Если это медиа-группа, запускаем обработку через 3 секунды
+                if media_group_id:
+                    import time
+                    import threading
+                    def process_media_group():
+                        time.sleep(3)  # Ждём пока все фото придут
+                        if media_group_id in MEDIA_GROUPS:
+                            group_data = MEDIA_GROUPS[media_group_id]
+                            handle_media_group(
+                                group_data['chat_id'],
+                                group_data['photos'],
+                                group_data['caption'],
+                                group_data['first_name'],
+                                group_data['username']
+                            )
+                            del MEDIA_GROUPS[media_group_id]
+                    
+                    threading.Thread(target=process_media_group, daemon=True).start()
             elif 'text' in message:
                 text = message['text']
                 handle_message(chat_id, text, first_name, username)
