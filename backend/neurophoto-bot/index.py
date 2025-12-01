@@ -1311,74 +1311,25 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             send_message(chat_id, '❌ У тебя закончились генерации! Свяжись с @support_bot для пополнения.')
             return
         
-        send_message(chat_id, f'✅ Инструкция получена: "{text}"\n\n🔍 Анализирую фото с помощью AI...')
-        send_chat_action(chat_id, 'typing')
+        # Для повторного редактирования результата НЕ нужен vision analysis
+        # Просто используем инструкцию пользователя напрямую
+        save_user_session(chat_id, 'waiting_model_for_photo', photo_url, text, text)
         
-        print(f'Step 1: Analyzing photo with vision model for user {chat_id}...')
+        text_message = f'✅ Инструкция получена: "{text}"\n\n🎨 Выбери модель для генерации:'
         
-        try:
-            vision_response = requests.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                headers={
-                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': BOT_URL,
-                    'X-Title': 'Neurophoto Bot'
-                },
-                json={
-                    'model': 'openrouter/bert-nebulon-alpha',
-                    'messages': [
-                        {
-                            'role': 'user',
-                            'content': [
-                                {'type': 'text', 'text': 'Describe this image in detail, focusing on: people, objects, background, lighting, colors, style, atmosphere. Be very detailed and specific.'},
-                                {'type': 'image_url', 'image_url': {'url': photo_url}}
-                            ]
-                        }
-                    ]
-                },
-                timeout=30
-            )
-            
-            if vision_response.status_code != 200:
-                print(f'Vision API error: {vision_response.status_code} - {vision_response.text[:500]}')
-                send_message(chat_id, '❌ Ошибка анализа фото. Попробуй еще раз.')
-                return
-            
-            vision_data = vision_response.json()
-            if 'choices' not in vision_data or len(vision_data['choices']) == 0:
-                print('No description from vision model')
-                send_message(chat_id, '❌ Не удалось проанализировать фото. Попробуй еще раз.')
-                return
-            
-            image_description = vision_data['choices'][0]['message']['content']
-            print(f'Image description: {image_description[:200]}...')
-            
-            combined_prompt = f'{image_description}. Now apply these changes: {text}'
-            
-            save_user_session(chat_id, 'waiting_model_for_photo', photo_url, combined_prompt, text)
-            
-            text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{text}"\n\n🎨 Теперь выбери модель для генерации:'
-            
-            print(f'User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
-            
-            if user_data['free_generations'] > 0:
-                keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
-                print(f'Showing photo edit keyboard with {len(keyboard["inline_keyboard"])} buttons')
-                send_message(chat_id, text_message, keyboard)
-            elif user_data['paid_generations'] > 0:
-                keyboard = get_paid_models_keyboard()
-                print(f'Showing paid models keyboard with {len(keyboard["inline_keyboard"])} buttons')
-                send_message(chat_id, text_message, keyboard)
-            else:
-                send_message(chat_id, '❌ У тебя закончились генерации!')
-                clear_user_session(chat_id)
+        print(f'User has free_gens={user_data["free_generations"]}, paid_gens={user_data["paid_generations"]}')
         
-        except Exception as e:
-            print(f'Error processing photo: {e}')
-            import traceback
-            print(f'Traceback: {traceback.format_exc()}')
-            send_message(chat_id, '❌ Произошла ошибка при обработке фото. Попробуй еще раз.')
+        if user_data['free_generations'] > 0:
+            keyboard = get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0)
+            print(f'Showing photo edit keyboard with {len(keyboard["inline_keyboard"])} buttons')
+            send_message(chat_id, text_message, keyboard)
+        elif user_data['paid_generations'] > 0:
+            keyboard = get_paid_models_keyboard()
+            print(f'Showing paid models keyboard with {len(keyboard["inline_keyboard"])} buttons')
+            send_message(chat_id, text_message, keyboard)
+        else:
+            send_message(chat_id, '❌ У тебя закончились генерации!')
+            clear_user_session(chat_id)
         
         return
     
