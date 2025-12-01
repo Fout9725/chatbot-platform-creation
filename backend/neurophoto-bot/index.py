@@ -434,7 +434,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'}
+                {'type': 'text', 'text': f'Based on this image, create a NEW, MODIFIED version with the following changes: {prompt}\n\nIMPORTANT: Generate a completely new image that looks DIFFERENT from the original. Apply the requested modifications significantly. You MUST return a modified image, not the same image. Make visible, obvious changes.'}
             ]
         else:
             content = prompt
@@ -1596,7 +1596,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'}
+                {'type': 'text', 'text': f'Based on this image, create a NEW, MODIFIED version with the following changes: {prompt}\n\nIMPORTANT: Generate a completely new image that looks DIFFERENT from the original. Apply the requested modifications significantly. You MUST return a modified image, not the same image. Make visible, obvious changes.'}
             ]
         else:
             content = prompt
