@@ -1306,7 +1306,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': prompt}
+                {'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'}
             ]
         else:
             content = prompt
@@ -1333,8 +1333,18 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         
         if response.status_code == 200:
             data = response.json()
-            print(f'Response data keys: {list(data.keys())}')
-            print(f'Response preview: {str(data)[:500]}')
+            
+            # Полное логирование для отладки
+            import json as json_module
+            print(f'=== FULL API RESPONSE (PAID) ===')
+            print(f'Top-level keys: {list(data.keys())}')
+            if data.get('choices'):
+                msg = data['choices'][0].get('message', {})
+                print(f'Message keys: {list(msg.keys())}')
+                print(f'Content type: {type(msg.get("content"))}')
+                print(f'Has images field? {"images" in msg}')
+            print(json_module.dumps(data, indent=2, default=str))
+            print(f'=== END RESPONSE ===')
             
             # Проверяем на ошибку внутри успешного ответа
             if data.get('error'):
