@@ -42,9 +42,6 @@ IMAGE_EFFECTS = {
     'moody': {'name': '🌙 Мрачный', 'prompt': 'moody atmosphere, dark tones, mysterious lighting'}
 }
 
-user_sessions = {}
-user_photo_context = {}
-
 def get_telegram_api() -> str:
     return f'https://api.telegram.org/bot{TELEGRAM_TOKEN}'
 
@@ -207,6 +204,62 @@ def save_generation_history(telegram_id: int, prompt: str, model: str, effect: O
         if conn:
             conn.close()
         return False
+
+def save_user_session(telegram_id: int, state: str, photo_url: Optional[str] = None, photo_prompt: Optional[str] = None, user_instruction: Optional[str] = None) -> bool:
+    '''Сохраняет сессию пользователя в БД'''
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET session_state = %s, session_photo_url = %s, session_photo_prompt = %s, session_user_instruction = %s, session_updated_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+            (state, photo_url, photo_prompt, user_instruction, telegram_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Error saving session: {e}')
+        if conn:
+            conn.close()
+        return False
+
+def get_user_session(telegram_id: int) -> Optional[Dict]:
+    '''Получает сессию пользователя из БД'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT session_state, session_photo_url, session_photo_prompt, session_user_instruction FROM t_p60354232_chatbot_platform_cre.neurophoto_users WHERE telegram_id = %s",
+            (telegram_id,)
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if row and row[0]:
+            return {
+                'state': row[0],
+                'photo_url': row[1],
+                'photo_prompt': row[2],
+                'user_instruction': row[3]
+            }
+        return None
+    except Exception as e:
+        print(f'Error getting session: {e}')
+        if conn:
+            conn.close()
+        return None
+
+def clear_user_session(telegram_id: int) -> bool:
+    '''Очищает сессию пользователя'''
+    return save_user_session(telegram_id, None, None, None, None)
 
 def get_user_history(telegram_id: int, limit: int = 10) -> list:
     conn = get_db_connection()
@@ -589,8 +642,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
 • Добавь драматическое освещение
 • Преврати в черно-белое с высоким контрастом'''
     
-    user_sessions[chat_id] = {'state': 'waiting_prompt'}
-    user_photo_context[chat_id] = None
+    clear_user_session(chat_id)
     
     keyboard = None
     if chat_id in ADMIN_IDS:
@@ -686,8 +738,8 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
     elif data.startswith('photo_edit_'):
         model_key = data.replace('photo_edit_', '')
         
-        session = user_sessions.get(chat_id, {})
-        if session.get('state') != 'waiting_model_for_photo':
+        session = get_user_session(chat_id)
+        if not session or session.get('state') != 'waiting_model_for_photo':
             send_message(chat_id, '❌ Сессия истекла. Отправь фото заново.')
             return
         
@@ -742,50 +794,18 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             refund_generation(chat_id, is_paid)
             send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
         
-        user_photo_context[chat_id] = None
-        user_sessions[chat_id] = {'state': 'waiting_prompt'}
+        clear_user_session(chat_id)
         return
     
     elif data.startswith('effect_'):
-        session = user_sessions.get(chat_id, {})
-        original_prompt = session.get('prompt', '')
-        model_key = session.get('model', 'gemini-flash')
-        is_paid = session.get('is_paid', False)
-        
-        if data == 'effect_none':
-            send_message(chat_id, '✅ Отлично! Фото сохранено без эффектов.', get_admin_keyboard() if chat_id in ADMIN_IDS else None)
-            send_message(chat_id, '📝 Хочешь создать еще одно фото? Просто напиши новое описание!')
-            user_sessions[chat_id] = {'state': 'waiting_prompt'}
-            return
-        
-        effect_key = data.replace('effect_', '')
-        effect_info = IMAGE_EFFECTS.get(effect_key)
-        
-        if not effect_info:
-            send_message(chat_id, '❌ Неизвестный эффект')
-            return
-        
-        enhanced_prompt = f"{original_prompt}, {effect_info['prompt']}"
-        
-        send_message(chat_id, f'🎨 Применяю эффект {effect_info["name"]}...')
-        send_chat_action(chat_id, 'upload_photo')
-        
-        image_url = generate_image(enhanced_prompt, model_key)
-        
-        if image_url:
-            save_generation_history(chat_id, enhanced_prompt, model_key, effect_key, image_url, is_paid)
-            
-            caption = f'''✨ Эффект применен!
-
-Эффект: {effect_info["name"]}'''
-            send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
-        else:
-            send_message(chat_id, '❌ Не удалось применить эффект. Попробуй другой')
+        # Effects temporarily disabled - need refactoring
+        send_message(chat_id, '❌ Эффекты временно недоступны. Создай новое фото!')
+        clear_user_session(chat_id)
         return
     
     elif data == 'new_photo':
         text = '📝 Отлично! Опиши новую нейрофотографию, которую хочешь создать:'
-        user_sessions[chat_id] = {'state': 'waiting_prompt'}
+        clear_user_session(chat_id)
         send_message(chat_id, text, get_admin_keyboard() if chat_id in ADMIN_IDS else None)
         return
     
@@ -843,9 +863,8 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
         
         photo_url = download_telegram_photo(file_id)
         if photo_url:
-            user_photo_context[chat_id] = photo_url
+            save_user_session(chat_id, 'waiting_prompt_for_photo', photo_url, None, None)
         
-        user_sessions[chat_id] = {'state': 'waiting_prompt_for_photo'}
         return
     
     if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
@@ -903,28 +922,7 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
         
         combined_prompt = f'{image_description}. Now apply these changes: {caption}'
         
-        user_sessions[chat_id] = {
-            'state': 'waiting_model_for_photo',
-            'photo_prompt': combined_prompt,
-            'photo_url': photo_url,
-            'user_instruction': caption
-        }
-        
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
-                    (combined_prompt, chat_id)
-                )
-                conn.commit()
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print(f'Error saving combined prompt: {e}')
-                if conn:
-                    conn.close()
+        save_user_session(chat_id, 'waiting_model_for_photo', photo_url, combined_prompt, caption)
         
         text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{caption}"\n\n🎨 Теперь выбери модель для генерации:'
         
@@ -940,8 +938,7 @@ def handle_photo(chat_id: int, photo_data: Dict, caption: Optional[str], first_n
             send_message(chat_id, text_message, keyboard)
         else:
             send_message(chat_id, '❌ У тебя закончились генерации!')
-            user_sessions[chat_id] = {'state': 'waiting_prompt'}
-            user_photo_context[chat_id] = None
+            clear_user_session(chat_id)
     
     except Exception as e:
         print(f'Error in handle_photo: {e}')
@@ -1186,18 +1183,18 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
         send_message(chat_id, history_text)
         return
     
-    session_state = user_sessions.get(chat_id, {}).get('state')
+    session = get_user_session(chat_id)
     
-    if session_state == 'waiting_prompt_for_photo':
+    if session and session.get('state') == 'waiting_prompt_for_photo':
         user_data = get_or_create_user(chat_id, username, first_name)
         if not user_data:
             send_message(chat_id, '❌ Ошибка подключения к базе данных')
             return
         
-        photo_url = user_photo_context.get(chat_id)
+        photo_url = session.get('photo_url')
         if not photo_url:
             send_message(chat_id, '❌ Фото не найдено. Отправь фото заново.')
-            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+            clear_user_session(chat_id)
             return
         
         if user_data['free_generations'] <= 0 and user_data['paid_generations'] <= 0:
@@ -1249,28 +1246,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             
             combined_prompt = f'{image_description}. Now apply these changes: {text}'
             
-            user_sessions[chat_id] = {
-                'state': 'waiting_model_for_photo',
-                'photo_prompt': combined_prompt,
-                'photo_url': photo_url,
-                'user_instruction': text
-            }
-            
-            conn = get_db_connection()
-            if conn:
-                try:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
-                        (combined_prompt, chat_id)
-                    )
-                    conn.commit()
-                    cur.close()
-                    conn.close()
-                except Exception as e:
-                    print(f'Error saving combined prompt: {e}')
-                    if conn:
-                        conn.close()
+            save_user_session(chat_id, 'waiting_model_for_photo', photo_url, combined_prompt, text)
             
             text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{text}"\n\n🎨 Теперь выбери модель для генерации:'
             
@@ -1286,8 +1262,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
                 send_message(chat_id, text_message, keyboard)
             else:
                 send_message(chat_id, '❌ У тебя закончились генерации!')
-                user_sessions[chat_id] = {'state': 'waiting_prompt'}
-                user_photo_context[chat_id] = None
+                clear_user_session(chat_id)
         
         except Exception as e:
             print(f'Error processing photo: {e}')
