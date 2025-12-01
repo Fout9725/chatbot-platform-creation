@@ -601,18 +601,8 @@ def get_photo_edit_models_keyboard(has_paid: bool = False) -> Dict:
 
 def get_effects_keyboard() -> Dict:
     buttons = []
-    effects_list = list(IMAGE_EFFECTS.items())
-    
-    for i in range(0, len(effects_list), 2):
-        row = []
-        for j in range(2):
-            if i + j < len(effects_list):
-                key, effect_info = effects_list[i + j]
-                row.append({'text': effect_info['name'], 'callback_data': f'effect_{key}'})
-        buttons.append(row)
-    
-    buttons.append([{'text': '✅ Оставить как есть', 'callback_data': 'effect_none'}])
-    buttons.append([{'text': '🔄 Создать новое фото', 'callback_data': 'new_photo'}])
+    buttons.append([{'text': '🔄 Редактировать результат', 'callback_data': 'reedit_result'}])
+    buttons.append([{'text': '🎨 Создать новое фото', 'callback_data': 'new_photo'}])
     buttons.append([{'text': '📜 Моя история', 'callback_data': 'show_history'}])
     
     return {'inline_keyboard': buttons}
@@ -764,10 +754,14 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             save_generation_history(chat_id, prompt, model_key, None, image_url, is_paid)
             caption = f'✨ Готово!\n\nМодель: {model_info["name"]}'
             send_photo_url(chat_id, image_url, caption, get_effects_keyboard())
+            
+            # Сохраняем результат для возможности повторного редактирования
+            save_user_session(chat_id, 'result_ready', image_url, None, None)
         else:
             # Возвращаем генерацию обратно
             refund_generation(chat_id, is_paid)
             send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз или выбери другую модель.')
+            clear_user_session(chat_id)
         return
     
     elif data.startswith('photo_edit_'):
@@ -841,15 +835,41 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
             caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
             send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+            
+            # Сохраняем результат для возможности повторного редактирования
+            save_user_session(chat_id, 'result_ready', image_url, None, None)
         else:
             refund_generation(chat_id, is_paid)
             send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+            clear_user_session(chat_id)
+        return
+    
+    elif data == 'reedit_result':
+        session = get_user_session(chat_id)
+        if not session or session.get('state') != 'result_ready':
+            send_message(chat_id, '❌ Результат не найден. Создай новое фото!')
+            clear_user_session(chat_id)
+            return
         
-        clear_user_session(chat_id)
+        result_url = session.get('photo_url')
+        if not result_url:
+            send_message(chat_id, '❌ Результат не найден. Создай новое фото!')
+            clear_user_session(chat_id)
+            return
+        
+        text = '''✅ Отлично! Теперь напиши, как изменить этот результат:
+
+Например:
+• Добавь больше света
+• Сделай фон другого цвета
+• Измени стиль на винтаж
+• Добавь эффект HDR'''
+        
+        send_message(chat_id, text)
+        save_user_session(chat_id, 'waiting_prompt_for_photo', result_url, None, None)
         return
     
     elif data.startswith('effect_'):
-        # Effects temporarily disabled - need refactoring
         send_message(chat_id, '❌ Эффекты временно недоступны. Создай новое фото!')
         clear_user_session(chat_id)
         return
