@@ -487,6 +487,25 @@ def get_models_keyboard(has_free: bool = True, has_paid: bool = True) -> Dict:
     
     return {'inline_keyboard': buttons}
 
+def get_photo_edit_models_keyboard(has_paid: bool = False) -> Dict:
+    '''Клавиатура для выбора модели при редактировании фото'''
+    buttons = []
+    
+    for key, model_info in IMAGE_MODELS.items():
+        if not model_info.get('supports_editing', False):
+            continue
+        
+        if model_info['paid'] and not has_paid:
+            continue
+        
+        emoji = '💎' if model_info['paid'] else '🆓'
+        buttons.append([{
+            'text': f'{model_info["name"]} — {model_info["time"]} {emoji}',
+            'callback_data': f'photo_edit_{key}'
+        }])
+    
+    return {'inline_keyboard': buttons}
+
 def get_effects_keyboard() -> Dict:
     buttons = []
     effects_list = list(IMAGE_EFFECTS.items())
@@ -657,6 +676,69 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             # Возвращаем генерацию обратно
             refund_generation(chat_id, is_paid)
             send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз или выбери другую модель.')
+        return
+    
+    elif data.startswith('photo_edit_'):
+        model_key = data.replace('photo_edit_', '')
+        
+        session = user_sessions.get(chat_id, {})
+        if session.get('state') != 'waiting_model_for_photo':
+            send_message(chat_id, '❌ Сессия истекла. Отправь фото заново.')
+            return
+        
+        photo_prompt = session.get('photo_prompt')
+        photo_url = session.get('photo_url')
+        user_instruction = session.get('user_instruction')
+        
+        if not photo_prompt or not photo_url:
+            send_message(chat_id, '❌ Данные фото не найдены. Отправь фото заново.')
+            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+            return
+        
+        user_data = get_or_create_user(chat_id, username, first_name)
+        if not user_data:
+            send_message(chat_id, '❌ Ошибка подключения к базе данных')
+            return
+        
+        model_info = IMAGE_MODELS.get(model_key)
+        if not model_info:
+            send_message(chat_id, '❌ Неизвестная модель')
+            return
+        
+        is_paid = model_info['paid']
+        
+        if is_paid and user_data['paid_generations'] <= 0:
+            send_message(chat_id, '❌ У тебя нет платных генераций!')
+            return
+        
+        if not is_paid and user_data['free_generations'] <= 0:
+            send_message(chat_id, '❌ У тебя закончились бесплатные генерации!')
+            return
+        
+        if not use_generation(chat_id, is_paid):
+            send_message(chat_id, '❌ Ошибка списания генерации')
+            return
+        
+        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...\n\n⏳ Это займёт {model_info["time"]}')
+        send_chat_action(chat_id, 'upload_photo')
+        
+        print(f'Step 2: Generating edited image with {model_info["name"]} for user {chat_id}...')
+        
+        if is_paid:
+            image_url = generate_image_paid_long(photo_prompt, model_key)
+        else:
+            image_url = generate_image(photo_prompt, model_key)
+        
+        if image_url:
+            save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
+            caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
+            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+        else:
+            refund_generation(chat_id, is_paid)
+            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+        
+        user_photo_context[chat_id] = None
+        user_sessions[chat_id] = {'state': 'waiting_prompt'}
         return
     
     elif data.startswith('effect_'):
@@ -1143,33 +1225,41 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             image_description = vision_data['choices'][0]['message']['content']
             print(f'Image description: {image_description[:200]}...')
             
-            send_message(chat_id, f'✅ Анализ завершен!\n\n🎨 Генерирую новое фото на основе твоих инструкций...')
-            send_chat_action(chat_id, 'upload_photo')
-            
             combined_prompt = f'{image_description}. Now apply these changes: {text}'
             
-            is_paid = user_data['paid_generations'] > 0 and user_data['free_generations'] <= 0
-            model_key = 'gemini-flash'
+            user_sessions[chat_id] = {
+                'state': 'waiting_model_for_photo',
+                'photo_prompt': combined_prompt,
+                'photo_url': photo_url,
+                'user_instruction': text
+            }
             
-            if not use_generation(chat_id, is_paid):
-                send_message(chat_id, '❌ Ошибка списания генерации')
-                return
+            conn = get_db_connection()
+            if conn:
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET last_prompt = %s WHERE telegram_id = %s",
+                        (combined_prompt, chat_id)
+                    )
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                except Exception as e:
+                    print(f'Error saving combined prompt: {e}')
+                    if conn:
+                        conn.close()
             
-            model_info = IMAGE_MODELS.get(model_key)
-            print(f'Step 2: Generating image with {model_info["name"]}...')
+            text_message = f'✅ Анализ завершен!\n\nТвоя инструкция: "{text}"\n\n🎨 Теперь выбери модель для генерации:'
             
-            image_url = generate_image(combined_prompt, model_key)
-            
-            if image_url:
-                save_generation_history(chat_id, text, model_key, None, image_url, is_paid)
-                caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {text[:100]}'
-                send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+            if user_data['free_generations'] > 0:
+                send_message(chat_id, text_message, get_photo_edit_models_keyboard(has_paid=user_data['paid_generations'] > 0))
+            elif user_data['paid_generations'] > 0:
+                send_message(chat_id, text_message, get_paid_models_keyboard())
             else:
-                refund_generation(chat_id, is_paid)
-                send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
-            
-            user_photo_context[chat_id] = None
-            user_sessions[chat_id] = {'state': 'waiting_prompt'}
+                send_message(chat_id, '❌ У тебя закончились генерации!')
+                user_sessions[chat_id] = {'state': 'waiting_prompt'}
+                user_photo_context[chat_id] = None
         
         except Exception as e:
             print(f'Error processing photo: {e}')
