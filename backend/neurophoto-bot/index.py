@@ -430,7 +430,7 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': prompt}
+                {'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'}
             ]
         else:
             content = prompt
@@ -503,6 +503,16 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
                 if isinstance(content, str) and content.startswith('data:image'):
                     print(f'Image generated successfully from content: {content[:100]}...')
                     return content
+                
+                # Проверяем, если content - это массив с изображениями
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'image_url':
+                                img_url = item.get('image_url', {}).get('url')
+                                if img_url:
+                                    print(f'Image found in content array: {img_url[:100]}...')
+                                    return img_url
                 
                 print(f'No image in response. Message keys: {list(message.keys())}')
                 print(f'Content type: {type(content)}, value: {str(content)[:500]}')
@@ -1340,6 +1350,17 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
                 content = message.get('content', '')
                 if isinstance(content, str) and content.startswith('data:image'):
                     return content
+                
+                # Проверяем, если content - это массив с изображениями
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'image_url':
+                                img_url = item.get('image_url', {}).get('url')
+                                if img_url:
+                                    return img_url
+            
+            print(f'No image found in response. Content type: {type(data.get("choices", [{}])[0].get("message", {}).get("content"))}')
         
         return None
     except requests.exceptions.Timeout:
