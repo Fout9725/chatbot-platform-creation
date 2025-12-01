@@ -468,7 +468,11 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
             # Полное логирование ответа для отладки
             import json
             print(f'=== FULL API RESPONSE ===')
-            print(json.dumps(data, indent=2, default=str)[:3000])
+            print(f'Top-level keys: {list(data.keys())}')
+            print(f'Has images in root? {data.get("images")}')
+            if data.get('choices'):
+                print(f'Message keys in choices[0]: {list(data["choices"][0].get("message", {}).keys())}')
+            print(json.dumps(data, indent=2, default=str))
             print(f'=== END RESPONSE ===')
             
             # Проверяем на ошибку внутри успешного ответа
