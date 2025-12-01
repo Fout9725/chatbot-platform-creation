@@ -21,6 +21,7 @@ print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(
 
 # Хранилище для медиа-групп (несколько фото одновременно)
 MEDIA_GROUPS = {}
+MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращения двойной обработки
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
@@ -1864,7 +1865,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 handle_photo(chat_id, photo_data, caption, first_name, username, media_group_id)
                 
                 # Если это медиа-группа, запускаем обработку через 3 секунды
-                if media_group_id:
+                # Только первое фото запускает поток
+                if media_group_id and media_group_id not in MEDIA_GROUPS_PROCESSING:
+                    MEDIA_GROUPS_PROCESSING.add(media_group_id)
                     import time
                     import threading
                     def process_media_group():
@@ -1878,7 +1881,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                                 group_data['first_name'],
                                 group_data['username']
                             )
-                            del MEDIA_GROUPS[media_group_id]
+                            # Очищаем после обработки
+                            MEDIA_GROUPS.pop(media_group_id, None)
+                            MEDIA_GROUPS_PROCESSING.discard(media_group_id)
                     
                     threading.Thread(target=process_media_group, daemon=True).start()
             elif 'text' in message:
