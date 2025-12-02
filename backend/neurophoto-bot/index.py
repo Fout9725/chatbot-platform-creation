@@ -682,8 +682,9 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 
 Ты выбрал бесплатную генерацию.
 
-Доступная модель:
-• Gemini Flash - быстрая и качественная генерация
+Доступные модели:
+• FLUX Schnell - быстрая генерация
+• Stable Diffusion XL - качественная генерация
 
 Нажми кнопку ниже для старта генерации 👇'''
         send_message(chat_id, text, get_free_model_keyboard())
@@ -697,8 +698,10 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 Ты выбрал платную генерацию.
 
 Доступные премиум модели:
-• GPT-5 Mini - быстрая платная модель
-• GPT-5 Premium - максимальное качество
+• FLUX Pro - профессиональная генерация
+• DALL-E 3 - качество от OpenAI
+• FLUX 1.1 Pro - новейшая модель
+• FLUX.2 Flex / Pro - топовое качество
 
 Выбери модель для генерации 👇'''
             send_message(chat_id, text, get_paid_models_keyboard())
@@ -796,6 +799,28 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         model_info = IMAGE_MODELS.get(model_key)
         if not model_info:
             send_message(chat_id, '❌ Неизвестная модель')
+            return
+        
+        # Проверяем поддержку редактирования фото
+        if not model_info.get('supports_editing', False):
+            supported_models = '\n'.join([
+                f"• {m['name']}" 
+                for k, m in IMAGE_MODELS.items() 
+                if m.get('supports_editing', False)
+            ])
+            
+            text = f'''❌ *Модель {model_info["name"]} не поддерживает обработку фото*
+
+Эта модель работает только с текстовыми описаниями.
+
+*Доступные варианты:*
+
+1️⃣ Попробуй другую модель с поддержкой редактирования:
+{supported_models}
+
+2️⃣ Или начни заново с текстовым описанием (/start)'''
+            
+            send_message(chat_id, text, get_photo_edit_models_keyboard())
             return
         
         is_paid = model_info['paid']

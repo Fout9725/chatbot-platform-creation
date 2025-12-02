@@ -144,13 +144,18 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
         
         payload = {
             'model': model_id,
-            'prompt': prompt,
-            'n': 1,
-            'size': '1024x1024'
+            'messages': [{
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': prompt}
+                ]
+            }],
+            'temperature': 1.0,
+            'max_tokens': 1024
         }
         
         response = requests.post(
-            'https://openrouter.ai/api/v1/images/generations',
+            'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
             timeout=25
@@ -162,15 +167,22 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
             data = response.json()
             print(f'Response data: {json.dumps(data)[:200]}')
             
-            if data.get('data') and len(data['data']) > 0:
-                image_data = data['data'][0]
-                if isinstance(image_data, dict) and image_data.get('url'):
-                    return image_data['url']
-                elif isinstance(image_data, str):
-                    return image_data
-            
-            if data.get('url'):
-                return data['url']
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                content = message.get('content')
+                
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'image_url' and item.get('image_url', {}).get('url'):
+                                return item['image_url']['url']
+                            elif item.get('type') == 'image' and item.get('source', {}).get('url'):
+                                return item['source']['url']
+                elif isinstance(content, str):
+                    if content.startswith('http'):
+                        return content
+                    elif content.startswith('data:image'):
+                        return content
         else:
             error_text = response.text[:500] if response.text else 'No error message'
             print(f'OpenRouter error: {error_text}')
@@ -205,13 +217,18 @@ def generate_image_sync(prompt: str, model: str = 'flux-schnell') -> Optional[st
         
         payload = {
             'model': model_id,
-            'prompt': prompt,
-            'n': 1,
-            'size': '1024x1024'
+            'messages': [{
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': prompt}
+                ]
+            }],
+            'temperature': 1.0,
+            'max_tokens': 1024
         }
         
         response = requests.post(
-            'https://openrouter.ai/api/v1/images/generations',
+            'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
             timeout=15
@@ -223,15 +240,22 @@ def generate_image_sync(prompt: str, model: str = 'flux-schnell') -> Optional[st
             data = response.json()
             print(f'Sync response data: {json.dumps(data)[:200]}')
             
-            if data.get('data') and len(data['data']) > 0:
-                image_data = data['data'][0]
-                if isinstance(image_data, dict) and image_data.get('url'):
-                    return image_data['url']
-                elif isinstance(image_data, str):
-                    return image_data
-            
-            if data.get('url'):
-                return data['url']
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                content = message.get('content')
+                
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'image_url' and item.get('image_url', {}).get('url'):
+                                return item['image_url']['url']
+                            elif item.get('type') == 'image' and item.get('source', {}).get('url'):
+                                return item['source']['url']
+                elif isinstance(content, str):
+                    if content.startswith('http'):
+                        return content
+                    elif content.startswith('data:image'):
+                        return content
         
         elif response.status_code == 429:
             print('Rate limit hit')
