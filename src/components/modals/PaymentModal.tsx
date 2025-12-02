@@ -9,6 +9,9 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { AI_MODELS } from '@/config/aiModels';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -26,6 +29,7 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
   const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [email, setEmail] = useState('');
+  const [selectedModel, setSelectedModel] = useState('google/gemini-2.0-flash-exp:free');
   const [processing, setProcessing] = useState(false);
 
   const handlePayment = async () => {
@@ -50,7 +54,8 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
           user_id: user?.id || '',
           bot_id: botId,
           bot_name: botName,
-          purchase_mode: mode
+          purchase_mode: mode,
+          ai_model: selectedModel
         }),
         urlReturn: `${window.location.origin}/dashboard?payment=success&bot_id=${botId}&bot_name=${encodeURIComponent(botName)}`,
         urlNotification: `https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4`
@@ -98,6 +103,40 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ai-model">Выберите AI модель</Label>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger id="ai-model">
+                <SelectValue placeholder="Выберите модель" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Бесплатные модели</div>
+                {AI_MODELS.filter(m => m.free && m.type === 'text').map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Free</Badge>
+                      <span>{model.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Платные модели</div>
+                {AI_MODELS.filter(m => !m.free && m.type === 'text').map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">Paid</Badge>
+                      <span>{model.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedModel && (
+              <p className="text-xs text-muted-foreground">
+                {AI_MODELS.find(m => m.id === selectedModel)?.description}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

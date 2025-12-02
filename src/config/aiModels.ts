@@ -9,6 +9,14 @@ export interface AIModel {
 
 export const AI_MODELS: AIModel[] = [
   {
+    id: 'qwen/qwen3-235b-a22:free',
+    name: 'Qwen3 235B A22',
+    provider: 'OpenRouter',
+    type: 'text',
+    free: true,
+    description: 'Мощная мультиязычная модель для консультаций и помощи'
+  },
+  {
     id: 'qwen/qwen3-coder:free',
     name: 'Qwen3 Coder',
     provider: 'OpenRouter',
