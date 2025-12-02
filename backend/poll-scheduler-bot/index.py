@@ -4,7 +4,9 @@ from typing import Dict, Any, Optional, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import urllib.request
+import urllib.parse
 from datetime import datetime
+import requests
 
 def get_db_connection():
     dsn = os.environ.get('DATABASE_URL')
@@ -20,7 +22,7 @@ def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[Dict] 
     
     data = {
         'chat_id': chat_id,
-        'text': text,
+        'text': text[:4096],  # Telegram limit
         'parse_mode': 'Markdown'
     }
     
@@ -28,15 +30,9 @@ def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[Dict] 
         data['reply_markup'] = reply_markup
     
     try:
-        req = urllib.request.Request(
-            telegram_url,
-            data=json.dumps(data).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        
-        with urllib.request.urlopen(req) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result.get('ok', False)
+        response = requests.post(telegram_url, json=data, timeout=10)
+        result = response.json()
+        return result.get('ok', False)
     except Exception as e:
         print(f'Error sending message: {e}')
         return False
@@ -51,25 +47,70 @@ def send_telegram_poll(chat_id: int, question: str, options: List[str], allows_m
     
     data = {
         'chat_id': chat_id,
-        'question': question,
-        'options': options,
+        'question': question[:300],  # Telegram limit
+        'options': [opt[:100] for opt in options[:10]],  # Limit each option and total count
         'is_anonymous': False,
         'allows_multiple_answers': allows_multiple_answers
     }
     
     try:
-        req = urllib.request.Request(
-            telegram_url,
-            data=json.dumps(data).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        
-        with urllib.request.urlopen(req) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result.get('ok', False)
+        response = requests.post(telegram_url, json=data, timeout=10)
+        result = response.json()
+        return result.get('ok', False)
     except Exception as e:
         print(f'Error sending poll: {e}')
         return False
+
+def ask_ai_assistant(user_message: str) -> str:
+    '''AI помощник для обработки вопросов и неожиданных запросов'''
+    openrouter_key = os.environ.get('OPENROUTER_API_KEY')
+    if not openrouter_key:
+        return 'Извини, AI помощник временно недоступен. Используй кнопки меню.'
+    
+    system_prompt = '''Ты - AI помощник бота для автоматизации опросов в Telegram.
+
+Твои задачи:
+1. Помогать пользователям создавать шаблоны опросов
+2. Объяснять как работает бот
+3. Отвечать на вопросы про функции бота
+
+Функции бота:
+• Создание шаблонов опросов с постоянным списком людей
+• Редактирование 1-2 позиций перед отправкой
+• Планирование автоматической отправки опросов
+
+Отвечай кратко и по делу. Если пользователь отправил случайный текст или что-то непонятное - вежливо подскажи использовать кнопки меню.'''
+    
+    try:
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {openrouter_key}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://poehali.dev',
+                'X-Title': 'PollSchedulerBot'
+            },
+            json={
+                'model': 'qwen/qwen-2.5-72b-instruct:free',
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_message[:500]}
+                ],
+                'temperature': 0.7,
+                'max_tokens': 300
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('choices') and len(data['choices']) > 0:
+                return data['choices'][0]['message']['content']
+        
+        return 'Извини, не могу обработать запрос. Используй кнопки меню 👇'
+    except Exception as e:
+        print(f'AI assistant error: {e}')
+        return 'Используй кнопки меню для работы с ботом 👇'
 
 def get_main_keyboard():
     return {
