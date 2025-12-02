@@ -304,7 +304,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     if text == '➕ Создать шаблон':
-        send_telegram_message(chat_id, '📝 Введи название шаблона (например: "Обед" или "Утренний"):', {'remove_keyboard': True})
+        send_telegram_message(chat_id, '📝 Введи название шаблона (например: "Обед" или "Утренний"):', {'remove_keyboard': True, 'selective': False})
         save_user_state(user_id, 'waiting_template_name', {})
         
         return {
@@ -315,7 +315,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if current_state == 'waiting_template_name':
         template_name = text.strip()
-        send_telegram_message(chat_id, '📋 Введи вопрос для опроса (например: "Кто будет сегодня на обеде?"):', {'remove_keyboard': True})
+        send_telegram_message(chat_id, '📋 Введи вопрос для опроса (например: "Кто будет сегодня на обеде?"):', {'remove_keyboard': True, 'selective': False})
         save_user_state(user_id, 'waiting_question', {'template_name': template_name})
         
         return {
@@ -334,7 +334,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 Петров П.П.
 Сидоров С.С.
 
-Когда закончишь, отправь /done''', {'remove_keyboard': True})
+Когда закончишь, отправь /done''', {'remove_keyboard': True, 'selective': False})
         save_user_state(user_id, 'waiting_people_list', state_data)
         
         return {

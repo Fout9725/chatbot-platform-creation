@@ -24,11 +24,11 @@ MEDIA_GROUPS = {}
 MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращения двойной обработки
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
-    'grok-fast': {'id': 'x-ai/grok-4.1-fast:free', 'name': '🆓 Grok 4.1 Fast', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
-    'gemini-3-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '🎨 Gemini 3 Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image', 'name': '🌟 Gemini 2.5 Flash', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
-    'gemini-2.5-preview': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '✨ Gemini 2.5 Preview', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
+    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
+    'flux-1.1-pro': {'id': 'black-forest-labs/flux-1.1-pro', 'name': '🌟 FLUX 1.1 Pro', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
+    'dall-e-3': {'id': 'openai/dall-e-3', 'name': '✨ DALL-E 3', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
     'flux-2-flex': {'id': 'black-forest-labs/flux.2-flex', 'name': '🎯 FLUX.2 Flex', 'paid': True, 'time': '15-25 сек', 'supports_editing': True},
     'flux-2-pro': {'id': 'black-forest-labs/flux.2-pro', 'name': '💎 FLUX.2 Pro', 'paid': True, 'time': '20-35 сек', 'supports_editing': True}
 }

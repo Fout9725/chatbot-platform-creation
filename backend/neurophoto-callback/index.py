@@ -15,11 +15,11 @@ TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
-    'gemini-3-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '🎨 Gemini 3 Pro', 'paid': True},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True},
-    'gpt-5-mini': {'id': 'openai/gpt-5-image-mini', 'name': '⚡ GPT-5 Mini', 'paid': True},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image', 'name': '🌟 Gemini 2.5 Flash', 'paid': True}
+    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True},
+    'dall-e-3': {'id': 'openai/dall-e-3', 'name': '🤖 DALL-E 3', 'paid': True},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '⚡ Stable Diffusion XL', 'paid': False},
+    'flux-1.1-pro': {'id': 'black-forest-labs/flux-1.1-pro', 'name': '🌟 FLUX 1.1 Pro', 'paid': True}
 }
 
 def get_telegram_api() -> str:
@@ -169,7 +169,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             telegram_id, chat_id, prompt, model, is_paid = result
-            model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+            model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['flux-schnell'])
             
             image_url = None
             if body.get('images') and len(body['images']) > 0:
