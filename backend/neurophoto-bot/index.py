@@ -212,6 +212,32 @@ def save_generation_history(telegram_id: int, prompt: str, model: str, effect: O
             conn.close()
         return False
 
+def add_to_queue(telegram_id: int, chat_id: int, username: str, first_name: str, prompt: str, model: str, is_paid: bool) -> Optional[int]:
+    '''Добавляет задачу генерации в очередь'''
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO t_p60354232_chatbot_platform_cre.neurophoto_queue (telegram_id, chat_id, username, first_name, prompt, model, is_paid, status, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', CURRENT_TIMESTAMP) RETURNING id",
+            (telegram_id, chat_id, username, first_name, prompt, model, is_paid)
+        )
+        queue_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f'Task added to queue with ID: {queue_id}')
+        return queue_id
+    except Exception as e:
+        print(f'Database error in add_to_queue: {e}')
+        import traceback
+        traceback.print_exc()
+        if conn:
+            conn.close()
+        return None
+
 def save_user_session(telegram_id: int, state: str, photo_url: Optional[str] = None, photo_prompt: Optional[str] = None, user_instruction: Optional[str] = None) -> bool:
     '''Сохраняет сессию пользователя в БД'''
     conn = get_db_connection()

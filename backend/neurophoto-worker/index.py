@@ -34,11 +34,13 @@ def time_limit(seconds: int):
         signal.alarm(0)
 
 IMAGE_MODELS = {
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False},
     'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False},
     'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True},
-    'dall-e-3': {'id': 'openai/dall-e-3', 'name': '🤖 DALL-E 3', 'paid': True},
-    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '⚡ Stable Diffusion XL', 'paid': False},
-    'flux-1.1-pro': {'id': 'black-forest-labs/flux-1.1-pro', 'name': '🌟 FLUX 1.1 Pro', 'paid': True}
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True},
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True},
+    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True}
 }
 
 def get_telegram_api() -> str:
@@ -146,43 +148,71 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
             'model': model_id,
             'messages': [{
                 'role': 'user',
-                'content': [
-                    {'type': 'text', 'text': prompt}
-                ]
+                'content': prompt
             }],
-            'temperature': 1.0,
-            'max_tokens': 1024
+            'modalities': ['image'],  # Только image для генерации изображений
+            'stream': False,
+            'max_tokens': 4096
         }
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25
+            timeout=90  # Увеличиваем таймаут до 90 секунд для медленных моделей
         )
         
         print(f'OpenRouter response status: {response.status_code}')
         
         if response.status_code == 200:
             data = response.json()
-            print(f'Response data: {json.dumps(data)[:200]}')
+            print(f'API response keys: {list(data.keys())}')
             
+            # Проверяем на ошибку внутри успешного ответа
+            if data.get('error'):
+                error_msg = data['error'].get('message', 'Unknown error')
+                print(f'OpenRouter API internal error: {error_msg}')
+                return None
+            
+            # Проверяем поле images (base64 data URLs)
+            if data.get('images') and len(data['images']) > 0:
+                image_data = data['images'][0]
+                print(f'Image generated successfully (base64)')
+                return image_data
+            
+            # Проверяем choices[0].message для альтернативных форматов
             if data.get('choices') and len(data['choices']) > 0:
                 message = data['choices'][0].get('message', {})
-                content = message.get('content')
                 
+                # Проверяем поле images в message
+                if message.get('images') and len(message['images']) > 0:
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        print(f'Found image in message.images (string)')
+                        return image_data
+                    elif isinstance(image_data, dict):
+                        url = image_data.get('image_url', {}).get('url') or image_data.get('url')
+                        if url:
+                            print(f'Found image in message.images (dict)')
+                            return url
+                
+                # Проверяем content
+                content = message.get('content', '')
+                if isinstance(content, str) and content.startswith('data:image'):
+                    print(f'Found image in content (string)')
+                    return content
+                
+                # Проверяем, если content - это массив с изображениями
                 if isinstance(content, list):
                     for item in content:
-                        if isinstance(item, dict):
-                            if item.get('type') == 'image_url' and item.get('image_url', {}).get('url'):
-                                return item['image_url']['url']
-                            elif item.get('type') == 'image' and item.get('source', {}).get('url'):
-                                return item['source']['url']
-                elif isinstance(content, str):
-                    if content.startswith('http'):
-                        return content
-                    elif content.startswith('data:image'):
-                        return content
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            img_url = item.get('image_url', {}).get('url')
+                            if img_url:
+                                print(f'Found image in content array')
+                                return img_url
+            
+            print(f'!!! NO IMAGE IN RESPONSE !!!')
+            print(f'Full response: {json.dumps(data, indent=2, default=str)[:1000]}')
         else:
             error_text = response.text[:500] if response.text else 'No error message'
             print(f'OpenRouter error: {error_text}')
@@ -190,6 +220,102 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
         return None
     except requests.exceptions.Timeout:
         print(f'Timeout after 25s')
+        return None
+    except Exception as e:
+        print(f'Error: {e}')
+        return None
+
+def generate_image_paid_long_with_image(prompt: str, model: str, image_url: str) -> Optional[str]:
+    '''
+    Генерация платной модели с редактированием изображения
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['flux-schnell'])
+    model_id = model_info['id']
+    
+    print(f'Paid generation with image editing {model_info["name"]}: {prompt[:50]}...')
+    
+    if not OPENROUTER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        # Создаем content с изображением и текстом
+        content = [
+            {'type': 'image_url', 'image_url': {'url': image_url}},
+            {'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'}
+        ]
+        
+        payload = {
+            'model': model_id,
+            'messages': [{
+                'role': 'user',
+                'content': content
+            }],
+            'modalities': ['image'],  # Только image для генерации изображений
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=90
+        )
+        
+        print(f'OpenRouter response status: {response.status_code}')
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f'API response keys: {list(data.keys())}')
+            
+            # Проверяем на ошибку
+            if data.get('error'):
+                error_msg = data['error'].get('message', 'Unknown error')
+                print(f'OpenRouter API internal error: {error_msg}')
+                return None
+            
+            # Проверяем все возможные места где может быть изображение
+            if data.get('images'):
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images'):
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        return image_data
+                    elif isinstance(image_data, dict):
+                        url = image_data.get('image_url', {}).get('url') or image_data.get('url')
+                        if url:
+                            return url
+                
+                content_resp = message.get('content', '')
+                if isinstance(content_resp, str) and content_resp.startswith('data:image'):
+                    return content_resp
+                
+                if isinstance(content_resp, list):
+                    for item in content_resp:
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            url = item.get('image_url', {}).get('url')
+                            if url:
+                                return url
+            
+            print(f'!!! NO IMAGE IN RESPONSE !!!')
+        else:
+            error_text = response.text[:500] if response.text else 'No error message'
+            print(f'OpenRouter error: {error_text}')
+        
+        return None
+    except requests.exceptions.Timeout:
+        print(f'Timeout after 90s')
         return None
     except Exception as e:
         print(f'Error: {e}')
@@ -322,6 +448,28 @@ def process_queue_item(item: Dict) -> bool:
     try:
         cur = conn.cursor()
         
+        # Парсим prompt - если это JSON, значит есть photo_url для редактирования
+        photo_url_to_edit = None
+        photo_urls_list = None
+        is_multiple = False
+        actual_prompt = prompt
+        
+        try:
+            prompt_data = json.loads(prompt)
+            if isinstance(prompt_data, dict):
+                actual_prompt = prompt_data.get('prompt', prompt)
+                photo_url_data = prompt_data.get('photo_url')
+                is_multiple = prompt_data.get('is_multiple', False)
+                
+                if photo_url_data:
+                    if is_multiple:
+                        photo_urls_list = photo_url_data.split(',')
+                    else:
+                        photo_url_to_edit = photo_url_data
+        except:
+            # Если не JSON, используем prompt как есть
+            pass
+        
         if retry_count == 0:
             cur.execute(
                 "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_queue SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = %s",
@@ -331,7 +479,16 @@ def process_queue_item(item: Dict) -> bool:
             send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]}...')
         
         if is_paid:
-            image_url = generate_image_paid_long(prompt, model)
+            # Для редактирования фото используем специальный формат с image_url в content
+            if photo_urls_list:
+                # Множественные фото - пока используем обычный промпт (не поддерживается в worker)
+                image_url = generate_image_paid_long(f'{actual_prompt}\n\nGenerate an image based on this description.', model)
+            elif photo_url_to_edit:
+                # Одно фото - редактирование
+                image_url = generate_image_paid_long_with_image(actual_prompt, model, photo_url_to_edit)
+            else:
+                # Обычная генерация из текста
+                image_url = generate_image_paid_long(actual_prompt, model)
             
             if image_url:
                 cur.execute(
