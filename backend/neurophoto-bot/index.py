@@ -872,8 +872,9 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         print(f'Photos count: {len(photo_urls)}')
         print(f'User instruction: {user_instruction}')
         
-        # ТОЛЬКО GPT-5 Image: Используем очередь (модель очень медленная, 60+ секунд)
-        if model_key == 'gpt-5-image':
+        # Медленные модели (30+ секунд): Используем очередь чтобы избежать таймаута Cloud Function
+        slow_models = ['gpt-5-image', 'nano-banana-pro']
+        if model_key in slow_models:
             photo_data = ','.join(photo_urls) if is_multiple_photos else photo_url
             
             queue_prompt = json.dumps({
@@ -885,7 +886,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             queue_id = add_to_queue(chat_id, chat_id, username, first_name, queue_prompt, model_key, is_paid)
             
             if queue_id:
-                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\nМодель {model_info["name"]} работает медленно (60+ секунд)\n\n💡 Результат придёт автоматически, можешь продолжать использовать бота')
+                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\nМодель {model_info["name"]} работает медленно (30+ секунд)\n\n💡 Результат придёт автоматически через 20-60 секунд')
                 clear_user_session(chat_id)
             else:
                 refund_generation(chat_id, is_paid)
