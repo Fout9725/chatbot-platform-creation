@@ -415,11 +415,18 @@ def download_telegram_photo(file_id: str) -> Optional[str]:
         print(f'Error downloading photo: {e}')
         return None
 
-def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional[str] = None) -> Optional[str]:
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional[str] = None) -> Optional[str]:
+    model_info = IMAGE_MODELS.get(model)
+    if not model_info:
+        print(f'ERROR: Model "{model}" not found in IMAGE_MODELS! Available models: {list(IMAGE_MODELS.keys())}')
+        print(f'Using flux-schnell as fallback')
+        model_info = IMAGE_MODELS['flux-schnell']
     model_id = model_info['id']
     
-    print(f'Generating image with {model_info["name"]} ({model_id}): {prompt[:100]}...')
+    print(f'=== STARTING IMAGE GENERATION ===')
+    print(f'Model: {model_info["name"]} ({model_id})')
+    print(f'Prompt: {prompt[:100]}...')
+    print(f'Has image_url: {bool(image_url)}')
     
     if not OPENROUTER_API_KEY:
         print('OPENROUTER_API_KEY not configured')
@@ -534,11 +541,13 @@ def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional
                 # Логируем весь message для отладки
                 import json
                 print(f'Full message object: {json.dumps(message, indent=2, default=str)[:2000]}')
-                print(f'No image in response. Message keys: {list(message.keys())}')
+                print(f'!!! NO IMAGE IN RESPONSE !!! Message keys: {list(message.keys())}')
                 print(f'Content type: {type(content)}, value: {str(content)[:500]}')
         else:
-            print(f'OpenRouter API error: {response.status_code}, {response.text[:500]}')
+            print(f'!!! OpenRouter API HTTP ERROR: {response.status_code} !!!')
+            print(f'Error body: {response.text[:1000]}')
         
+        print(f'=== GENERATION FAILED - RETURNING None ===')
         return None
     except Exception as e:
         print(f'OpenRouter API error: {e}')
@@ -555,11 +564,11 @@ def get_tariff_keyboard() -> Dict:
     }
 
 def get_free_model_keyboard() -> Dict:
-    return {
-        'inline_keyboard': [
-            [{'text': '🆓 Gemini Flash (генерировать)', 'callback_data': 'gen_gemini-flash'}]
-        ]
-    }
+    buttons = []
+    for key, model_info in IMAGE_MODELS.items():
+        if not model_info['paid']:
+            buttons.append([{'text': f'{model_info["name"]} — {model_info["time"]}', 'callback_data': f'gen_{key}'}])
+    return {'inline_keyboard': buttons}
 
 def get_paid_models_keyboard() -> Dict:
     buttons = []
@@ -573,9 +582,9 @@ def get_models_keyboard(has_free: bool = True, has_paid: bool = True) -> Dict:
     buttons = []
     
     if has_free:
-        free_model = IMAGE_MODELS.get('gemini-flash')
-        if free_model:
-            buttons.append([{'text': f'{free_model["name"]} — {free_model["time"]}', 'callback_data': 'gen_gemini-flash'}])
+        for key, model_info in IMAGE_MODELS.items():
+            if not model_info['paid']:
+                buttons.append([{'text': f'{model_info["name"]} — {model_info["time"]}', 'callback_data': f'gen_{key}'}])
     
     if has_paid:
         for key, model_info in IMAGE_MODELS.items():
@@ -1146,6 +1155,7 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
 /userinfo <@username или id> - информация о пользователе
 /addgen <@username или id> <count> - добавить платные генерации
 /addfree <@username или id> <count> - добавить бесплатные генерации
+/clearsessions - сбросить все активные сессии пользователей
 /broadcast <текст> - рассылка всем пользователям'''
             
             send_message(chat_id, admin_text)
@@ -1318,6 +1328,31 @@ def handle_message(chat_id: int, text: str, first_name: str, username: Optional[
             send_message(chat_id, f'❌ Ошибка: {e}')
         return
     
+    if text.startswith('/clearsessions'):
+        if chat_id not in ADMIN_IDS:
+            send_message(chat_id, '❌ У тебя нет доступа к этой команде')
+            return
+        
+        try:
+            conn = get_db_connection()
+            if not conn:
+                send_message(chat_id, '❌ Ошибка подключения к БД')
+                return
+            
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE t_p60354232_chatbot_platform_cre.neurophoto_users SET session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL, session_user_instruction = NULL WHERE session_state IS NOT NULL"
+            )
+            conn.commit()
+            cleared_count = cur.rowcount
+            cur.close()
+            conn.close()
+            
+            send_message(chat_id, f'✅ Сброшено {cleared_count} активных сессий')
+        except Exception as e:
+            send_message(chat_id, f'❌ Ошибка: {e}')
+        return
+    
     if text.startswith('/history'):
         history = get_user_history(chat_id, 10)
         
@@ -1451,7 +1486,10 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
     '''
     Генерация платной модели с несколькими изображениями
     '''
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_info = IMAGE_MODELS.get(model)
+    if not model_info:
+        print(f'Paid model {model} not found in IMAGE_MODELS, using flux-pro as fallback')
+        model_info = IMAGE_MODELS['flux-pro']
     model_id = model_info['id']
     
     print(f'Paid generation with {model_info["name"]} and {len(image_urls)} images: {prompt[:50]}...')
@@ -1536,7 +1574,10 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
     '''
     Генерация бесплатной модели с несколькими изображениями
     '''
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_info = IMAGE_MODELS.get(model)
+    if not model_info:
+        print(f'Model {model} not found in IMAGE_MODELS, using flux-schnell as fallback')
+        model_info = IMAGE_MODELS['flux-schnell']
     model_id = model_info['id']
     
     print(f'Generating with {model_info["name"]} and {len(image_urls)} images: {prompt[:100]}...')
@@ -1622,7 +1663,10 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
     '''
     Генерация платной модели с длинным таймаутом 25 сек
     '''
-    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['gemini-flash'])
+    model_info = IMAGE_MODELS.get(model)
+    if not model_info:
+        print(f'Paid model {model} not found in IMAGE_MODELS, using flux-pro as fallback')
+        model_info = IMAGE_MODELS['flux-pro']
     model_id = model_info['id']
     
     print(f'Paid generation with {model_info["name"]}: {prompt[:50]}...')
