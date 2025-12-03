@@ -865,17 +865,17 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             return
         
         photo_count_text = f'{len(photo_urls)} фото' if is_multiple_photos else 'фото'
+        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]} ({photo_count_text})...\n\n⏳ Это займёт {model_info["time"]}')
+        send_chat_action(chat_id, 'upload_photo')
         
         print(f'Generating edited image with {model_info["name"]} for user {chat_id}...')
         print(f'Photos count: {len(photo_urls)}')
         print(f'User instruction: {user_instruction}')
         
-        # ПЛАТНЫЕ МОДЕЛИ: Используем очередь чтобы избежать таймаута Cloud Function (30 сек)
-        if is_paid:
-            # Добавляем photo_url в JSON для обработки в worker
+        # ТОЛЬКО GPT-5 Image: Используем очередь (модель очень медленная, 60+ секунд)
+        if model_key == 'gpt-5-image':
             photo_data = ','.join(photo_urls) if is_multiple_photos else photo_url
             
-            # Сохраняем photo_url в prompt как JSON
             queue_prompt = json.dumps({
                 'prompt': user_instruction,
                 'photo_url': photo_data,
@@ -885,33 +885,37 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             queue_id = add_to_queue(chat_id, chat_id, username, first_name, queue_prompt, model_key, is_paid)
             
             if queue_id:
-                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\n🎨 Модель: {model_info["name"]}\n⏳ Ожидаемое время: {model_info["time"]}\n\n💡 Результат придёт автоматически')
+                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\nМодель {model_info["name"]} работает медленно (60+ секунд)\n\n💡 Результат придёт автоматически, можешь продолжать использовать бота')
                 clear_user_session(chat_id)
             else:
                 refund_generation(chat_id, is_paid)
                 send_message(chat_id, '❌ Ошибка добавления в очередь. Генерация возвращена на баланс.')
                 clear_user_session(chat_id)
-        # БЕСПЛАТНЫЕ МОДЕЛИ: Генерируем синхронно (быстро)
+            return
+        
+        # ВСЕ ОСТАЛЬНЫЕ МОДЕЛИ: Генерируем синхронно
+        if is_paid:
+            if is_multiple_photos:
+                image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
+            else:
+                image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
         else:
-            send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]} ({photo_count_text})...\n\n⏳ Это займёт {model_info["time"]}')
-            send_chat_action(chat_id, 'upload_photo')
-            
             if is_multiple_photos:
                 image_url = generate_image_multi(user_instruction, model_key, photo_urls)
             else:
                 image_url = generate_image(user_instruction, model_key, photo_url)
+        
+        if image_url:
+            save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
+            caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
+            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
             
-            if image_url:
-                save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
-                caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
-                send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
-                
-                # Сохраняем результат для возможности повторного редактирования
-                save_user_session(chat_id, 'result_ready', image_url, None, None)
-            else:
-                refund_generation(chat_id, is_paid)
-                send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
-                clear_user_session(chat_id)
+            # Сохраняем результат для возможности повторного редактирования
+            save_user_session(chat_id, 'result_ready', image_url, None, None)
+        else:
+            refund_generation(chat_id, is_paid)
+            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+            clear_user_session(chat_id)
         return
     
     elif data == 'reedit_result':
