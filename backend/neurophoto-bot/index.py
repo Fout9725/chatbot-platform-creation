@@ -32,6 +32,7 @@ IMAGE_MODELS = {
     'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
     'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
     'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True},
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True},
     'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True}
 }
 
@@ -471,7 +472,7 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'content': content
                 }
             ],
-            'modalities': ['text', 'image']
+            'modalities': ['image']  # Только image для генерации изображений
         }
         
         timeout = 25 if not model_info['paid'] else 90
@@ -871,7 +872,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         print(f'User instruction: {user_instruction}')
         
         # Медленные модели (30+ секунд): Запускаем в фоне чтобы сразу ответить 200 OK Telegram
-        slow_models = ['gpt-5-image']
+        slow_models = ['gpt-5-image', 'nano-banana-pro']
         if model_key in slow_models:
             send_chat_action(chat_id, 'upload_photo')
             
@@ -1559,7 +1560,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['text', 'image'],
+            'modalities': ['image'],  # Только image для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
@@ -1672,7 +1673,7 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['text', 'image']
+            'modalities': ['image']  # Только image для генерации изображений
         }
         
         timeout = 25
@@ -1762,7 +1763,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['text', 'image'],
+            'modalities': ['image'],  # Только image для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
