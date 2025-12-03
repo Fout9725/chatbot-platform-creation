@@ -30,7 +30,10 @@ IMAGE_MODELS = {
     'flux-1.1-pro': {'id': 'black-forest-labs/flux-1.1-pro', 'name': '🌟 FLUX 1.1 Pro', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
     'dall-e-3': {'id': 'openai/dall-e-3', 'name': '✨ DALL-E 3', 'paid': True, 'time': '10-20 сек', 'supports_editing': True},
     'flux-2-flex': {'id': 'black-forest-labs/flux.2-flex', 'name': '🎯 FLUX.2 Flex', 'paid': True, 'time': '15-25 сек', 'supports_editing': True},
-    'flux-2-pro': {'id': 'black-forest-labs/flux.2-pro', 'name': '💎 FLUX.2 Pro', 'paid': True, 'time': '20-35 сек', 'supports_editing': True}
+    'flux-2-pro': {'id': 'black-forest-labs/flux.2-pro', 'name': '💎 FLUX.2 Pro', 'paid': True, 'time': '20-35 сек', 'supports_editing': True},
+    'gemini-3-pro': {'id': 'google/gemini-3-pro', 'name': '🧠 Gemini 3 PRO', 'paid': True, 'time': '15-25 сек', 'supports_editing': True},
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash', 'name': '⚡ Gemini 2.5 Flash', 'paid': True, 'time': '8-15 сек', 'supports_editing': True},
+    'gemini-2.5-preview': {'id': 'google/gemini-2.5-preview', 'name': '🔮 Gemini 2.5 Preview', 'paid': True, 'time': '10-20 сек', 'supports_editing': True}
 }
 
 IMAGE_EFFECTS = {
