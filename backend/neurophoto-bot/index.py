@@ -23,6 +23,9 @@ print(f'OPENROUTER_API_KEY configured: {bool(OPENROUTER_API_KEY)}, length: {len(
 MEDIA_GROUPS = {}
 MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращения двойной обработки
 
+# Кеш обработанных callback_query для предотвращения дублирования
+PROCESSED_CALLBACKS = set()  # Хранит ID последних 100 обработанных callback
+
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True},
     'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
@@ -356,6 +359,21 @@ def send_chat_action(chat_id: int, action: str = 'upload_photo') -> None:
         'action': action
     })
 
+def answer_callback_query(callback_query_id: str, text: Optional[str] = None, show_alert: bool = False) -> None:
+    '''Отвечает на callback query чтобы убрать "часики" в Telegram'''
+    try:
+        data = {
+            'callback_query_id': callback_query_id
+        }
+        if text:
+            data['text'] = text
+            data['show_alert'] = show_alert
+        
+        response = requests.post(f'{get_telegram_api()}/answerCallbackQuery', json=data, timeout=5)
+        print(f'answerCallbackQuery response: {response.status_code}')
+    except Exception as e:
+        print(f'Error answering callback: {e}')
+
 def trigger_worker() -> None:
     '''
     Запускает обработку очереди (GET запрос к этой же функции)
@@ -685,7 +703,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
     
     send_message(chat_id, welcome_text, keyboard)
 
-def handle_callback(chat_id: int, data: str, first_name: str, username: Optional[str] = None) -> None:
+def handle_callback(chat_id: int, data: str, first_name: str, username: Optional[str] = None, callback_query_id: Optional[str] = None) -> None:
     if data == 'tariff_free':
         text = '''🆓 *Бесплатный тариф*
 
@@ -1521,7 +1539,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=30
+            timeout=90
         )
         
         print(f'API response status: {response.status_code}')
@@ -1563,6 +1581,9 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         print(f'No image found in response')
         return None
     
+    except requests.exceptions.Timeout:
+        print(f'!!! TIMEOUT: Model took longer than 90 seconds !!!')
+        return None
     except Exception as e:
         print(f'Error: {e}')
         return None
@@ -1700,7 +1721,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25
+            timeout=90
         )
         
         print(f'API response status: {response.status_code}')
@@ -1764,7 +1785,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         
         return None
     except requests.exceptions.Timeout:
-        print(f'Timeout after 25s')
+        print(f'!!! TIMEOUT: Model took longer than 90 seconds !!!')
         return None
     except Exception as e:
         print(f'Error: {e}')
@@ -1930,12 +1951,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif 'callback_query' in body:
             callback_query = body['callback_query']
+            callback_query_id = callback_query['id']
             chat_id = callback_query['message']['chat']['id']
             first_name = callback_query['from'].get('first_name', 'Друг')
             username = callback_query['from'].get('username')
             data = callback_query['data']
             
-            handle_callback(chat_id, data, first_name, username)
+            # Проверяем, не обрабатывали ли мы этот callback уже
+            if callback_query_id in PROCESSED_CALLBACKS:
+                print(f'!!! DUPLICATE CALLBACK: {callback_query_id} already processed, skipping')
+                answer_callback_query(callback_query_id, '⏳ Генерация уже в процессе...', show_alert=False)
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'ok': True}),
+                    'isBase64Encoded': False
+                }
+            
+            # Добавляем в кеш обработанных (ограничиваем размер до 100)
+            PROCESSED_CALLBACKS.add(callback_query_id)
+            if len(PROCESSED_CALLBACKS) > 100:
+                # Удаляем самый старый (первый)
+                PROCESSED_CALLBACKS.pop()
+            
+            # Сразу отвечаем на callback чтобы убрать "часики"
+            answer_callback_query(callback_query_id)
+            
+            # Обрабатываем callback
+            handle_callback(chat_id, data, first_name, username, callback_query_id)
         
         return {
             'statusCode': 200,
