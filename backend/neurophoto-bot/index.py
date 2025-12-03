@@ -871,33 +871,26 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         print(f'Photos count: {len(photo_urls)}')
         print(f'User instruction: {user_instruction}')
         
-        # Медленные модели (30+ секунд): Запускаем в фоне чтобы сразу ответить 200 OK Telegram
+        # Медленные модели (30+ секунд): Используем очередь для обработки с таймаутом 90 секунд
         slow_models = ['gpt-5-image', 'nano-banana-pro']
         if model_key in slow_models:
-            send_chat_action(chat_id, 'upload_photo')
+            photo_data = ','.join(photo_urls) if is_multiple_photos else photo_url
             
-            # Запускаем генерацию асинхронно через HTTP-запрос к себе
-            try:
-                background_data = {
-                    'background_generation': True,
-                    'chat_id': chat_id,
-                    'username': username,
-                    'first_name': first_name,
-                    'model_key': model_key,
-                    'user_instruction': user_instruction,
-                    'photo_url': photo_url,
-                    'photo_urls': photo_urls,
-                    'is_multiple_photos': is_multiple_photos,
-                    'is_paid': is_paid
-                }
-                
-                # Отправляем фоновый запрос (не ждём ответа)
-                requests.post(BOT_URL, json=background_data, timeout=2)
-                print(f'Background generation started for {model_info["name"]}')
-            except:
-                # Игнорируем ошибку таймаута - запрос ушёл
-                pass
+            queue_prompt = json.dumps({
+                'prompt': user_instruction,
+                'photo_url': photo_data,
+                'is_multiple': is_multiple_photos
+            })
             
+            queue_id = add_to_queue(chat_id, chat_id, username, first_name, queue_prompt, model_key, is_paid)
+            
+            if queue_id:
+                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\nМодель {model_info["name"]} работает медленно (30-60 секунд)\n\n💡 Результат придёт автоматически, можешь продолжать использовать бота')
+                clear_user_session(chat_id)
+            else:
+                refund_generation(chat_id, is_paid)
+                send_message(chat_id, '❌ Ошибка добавления в очередь. Генерация возвращена на баланс.')
+                clear_user_session(chat_id)
             return
         
         send_chat_action(chat_id, 'upload_photo')
@@ -1993,59 +1986,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         body = json.loads(event.get('body', '{}'))
-        
-        # Обработчик фоновой генерации для медленных моделей
-        if body.get('background_generation'):
-            print('=== BACKGROUND GENERATION REQUEST ===')
-            chat_id = body['chat_id']
-            username = body['username']
-            first_name = body['first_name']
-            model_key = body['model_key']
-            user_instruction = body['user_instruction']
-            photo_url = body['photo_url']
-            photo_urls = body['photo_urls']
-            is_multiple_photos = body['is_multiple_photos']
-            is_paid = body['is_paid']
-            
-            model_info = IMAGE_MODELS.get(model_key)
-            
-            # Генерируем изображение
-            try:
-                send_chat_action(chat_id, 'upload_photo')
-                
-                if is_paid:
-                    if is_multiple_photos:
-                        image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
-                    else:
-                        image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
-                else:
-                    if is_multiple_photos:
-                        image_url = generate_image_multi(user_instruction, model_key, photo_urls)
-                    else:
-                        image_url = generate_image(user_instruction, model_key, photo_url)
-                
-                if image_url:
-                    save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
-                    caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
-                    send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
-                    save_user_session(chat_id, 'result_ready', image_url, None, None)
-                else:
-                    refund_generation(chat_id, is_paid)
-                    send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
-                    clear_user_session(chat_id)
-            except Exception as e:
-                print(f'Background generation error: {e}')
-                refund_generation(chat_id, is_paid)
-                send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.')
-                clear_user_session(chat_id)
-            
-            # Возвращаем 200 OK
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'ok': True, 'background': True}),
-                'isBase64Encoded': False
-            }
         
         if 'message' in body:
             message = body['message']
