@@ -1571,6 +1571,18 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         
         data = response.json()
         
+        # Полное логирование для отладки
+        import json as json_module
+        print(f'=== FULL API RESPONSE (MULTI) ===')
+        print(f'Top-level keys: {list(data.keys())}')
+        if data.get('choices'):
+            msg = data['choices'][0].get('message', {})
+            print(f'Message keys: {list(msg.keys())}')
+            print(f'Content type: {type(msg.get("content"))}')
+            print(f'Has images field? {"images" in msg}')
+        print(json_module.dumps(data, indent=2, default=str))
+        print(f'=== END RESPONSE ===')
+        
         # Проверяем на ошибку
         if data.get('error'):
             print(f'OpenRouter API error: {data["error"]}')
@@ -1578,6 +1590,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         
         # Проверяем все возможные места где может быть изображение
         if data.get('images'):
+            print(f'Found image in data.images[0]')
             return data['images'][0]
         
         if data.get('choices') and len(data['choices']) > 0:
@@ -1586,20 +1599,28 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
             if message.get('images'):
                 image_data = message['images'][0]
                 if isinstance(image_data, str):
+                    print(f'Found image in message.images[0] (string)')
                     return image_data
                 elif isinstance(image_data, dict):
-                    return image_data.get('image_url', {}).get('url') or image_data.get('url')
+                    url = image_data.get('image_url', {}).get('url') or image_data.get('url')
+                    if url:
+                        print(f'Found image in message.images[0] (dict)')
+                        return url
             
             content_resp = message.get('content', '')
             if isinstance(content_resp, str) and content_resp.startswith('data:image'):
+                print(f'Found image in message.content (string)')
                 return content_resp
             
             if isinstance(content_resp, list):
                 for item in content_resp:
                     if isinstance(item, dict) and item.get('type') == 'image_url':
-                        return item.get('image_url', {}).get('url')
+                        url = item.get('image_url', {}).get('url')
+                        if url:
+                            print(f'Found image in message.content[].image_url.url')
+                            return url
         
-        print(f'No image found in response')
+        print(f'!!! NO IMAGE FOUND IN RESPONSE !!!')
         return None
     
     except requests.exceptions.Timeout:
