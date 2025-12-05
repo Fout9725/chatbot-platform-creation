@@ -498,7 +498,7 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'content': content
                 }
             ],
-            'modalities': ['text', 'image']  # text + image для генерации
+            'modalities': ['image', 'text']  # image + text для генерации изображений
         }
         
         timeout = 25 if not model_info['paid'] else 90
@@ -1782,7 +1782,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image'],  # Только image для генерации изображений
+            'modalities': ['image', 'text'],  # image + text для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
