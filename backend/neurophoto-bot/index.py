@@ -9,7 +9,6 @@ import json
 import os
 import requests
 import psycopg2
-import threading
 from typing import Dict, Any, Optional
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
@@ -491,7 +490,6 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
         else:
             content = prompt
         
-        # Для Nano Banana Pro НЕ используем modalities (не поддерживается)
         payload = {
             'model': model_id,
             'messages': [
@@ -499,12 +497,9 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'role': 'user',
                     'content': content
                 }
-            ]
+            ],
+            'modalities': ['image', 'text']  # image + text для генерации изображений
         }
-        
-        # Только для Gemini Flash и других моделей добавляем modalities
-        if model not in ['nano-banana-pro', 'gemini-2.5-flash'] and 'gemini' in model:
-            payload['modalities'] = ['image']
         
         timeout = 25 if not model_info['paid'] else 90
         response = requests.post(
@@ -734,47 +729,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
     
     send_message(chat_id, welcome_text, keyboard)
 
-def async_generate_and_send(chat_id: int, user_instruction: str, model_key: str, photo_urls: list, is_paid: bool, is_multiple: bool, model_name: str) -> None:
-    '''Фоновая генерация изображения и отправка результата'''
-    try:
-        print(f'[ASYNC] Starting generation for user {chat_id}, model {model_key}')
-        
-        # Генерируем изображение
-        if is_paid:
-            if is_multiple:
-                image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
-            else:
-                image_url = generate_image_paid_long(user_instruction, model_key, photo_urls[0] if photo_urls else None)
-        else:
-            if is_multiple:
-                image_url = generate_image_multi(user_instruction, model_key, photo_urls)
-            else:
-                image_url = generate_image(user_instruction, model_key, photo_urls[0] if photo_urls else None)
-        
-        # Отправляем результат
-        if image_url:
-            print(f'[ASYNC] Image generated successfully for user {chat_id}')
-            save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
-            caption_text = f'✨ Готово!\n\nМодель: {model_name}\nТвоя инструкция: {user_instruction[:100]}'
-            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
-            
-            # Сохраняем результат для возможности повторного редактирования
-            save_user_session(chat_id, 'result_ready', image_url, None, None)
-        else:
-            print(f'[ASYNC] Generation failed for user {chat_id}')
-            # Возвращаем генерацию обратно
-            refund_generation(chat_id, is_paid)
-            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
-            clear_user_session(chat_id)
-    except Exception as e:
-        print(f'[ASYNC] Error in background generation: {e}')
-        import traceback
-        traceback.print_exc()
-        refund_generation(chat_id, is_paid)
-        send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.')
-
 def handle_callback(chat_id: int, data: str, first_name: str, username: Optional[str] = None, callback_query_id: Optional[str] = None) -> None:
-    
     if data == 'tariff_free':
         text = '''🆓 *Бесплатный тариф*
 
@@ -944,18 +899,6 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         
         send_chat_action(chat_id, 'upload_photo')
         
-        # Для Nano Banana Pro запускаем генерацию в фоне (долгая генерация 30-45 сек)
-        if model_key == 'nano-banana-pro':
-            print(f'[ASYNC MODE] Launching background generation for Nano Banana Pro')
-            thread = threading.Thread(
-                target=async_generate_and_send,
-                args=(chat_id, user_instruction, model_key, photo_urls, is_paid, is_multiple_photos, model_info["name"]),
-                daemon=True
-            )
-            thread.start()
-            # Сразу возвращаем ответ Telegram, генерация продолжается в фоне
-            return
-        
         # ВСЕ ОСТАЛЬНЫЕ МОДЕЛИ: Генерируем синхронно
         if is_paid:
             if is_multiple_photos:
@@ -976,7 +919,6 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             # Сохраняем результат для возможности повторного редактирования
             save_user_session(chat_id, 'result_ready', image_url, None, None)
         else:
-            # Возвращаем генерацию обратно
             refund_generation(chat_id, is_paid)
             send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
             clear_user_session(chat_id)
@@ -1613,22 +1555,18 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
-        # Для Nano Banana Pro НЕ используем modalities (не поддерживается API)
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для других Gemini/FLUX моделей добавляем modalities
-        if model not in ['nano-banana-pro', 'gemini-2.5-flash']:
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90  # 90 секунд для медленных моделей
+            timeout=60  # 60 секунд - максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
@@ -1789,7 +1727,7 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
 
 def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] = None) -> Optional[str]:
     '''
-    Генерация платной модели с длинным таймаутом
+    Генерация платной модели с длинным таймаутом 25 сек
     '''
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
@@ -1819,22 +1757,18 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         else:
             content = f'Generate an image: {prompt}'
         
-        # Для Nano Banana Pro НЕ используем modalities (не поддерживается API)
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для других Gemini/FLUX моделей добавляем modalities
-        if model not in ['nano-banana-pro', 'gemini-2.5-flash']:
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90  # 90 секунд для медленных моделей
+            timeout=60  # 60 секунд - максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
@@ -2039,22 +1973,18 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение (не описать)
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
-        # Для Nano Banana Pro НЕ используем modalities (не поддерживается API)
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для других Gemini/FLUX моделей добавляем modalities
-        if model not in ['nano-banana-pro', 'gemini-2.5-flash']:
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90  # 90 секунд для медленных моделей
+            timeout=60  # 60 секунд максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
