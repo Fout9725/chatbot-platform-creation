@@ -27,13 +27,13 @@ MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращени�
 PROCESSED_CALLBACKS = set()  # Хранит ID последних 100 обработанных callback
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True, 'model_type': 'gemini'},
-    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True, 'model_type': 'flux'},
-    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False, 'model_type': 'stable-diffusion'},
-    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False, 'model_type': 'flux'},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True, 'model_type': 'gemini'},
-    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True, 'model_type': 'gemini'},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True, 'model_type': 'openai'}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': True},
+    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True, 'model_type': 'flux', 'use_modalities': False},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False, 'model_type': 'stable-diffusion', 'use_modalities': False},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False, 'model_type': 'flux', 'use_modalities': False},
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': False},
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': False},
+    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True, 'model_type': 'openai', 'use_modalities': False}
 }
 
 IMAGE_EFFECTS = {
@@ -497,11 +497,14 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'role': 'user',
                     'content': content
                 }
-            ],
-            'modalities': ['image', 'text']  # image + text для генерации изображений
+            ]
         }
         
-        timeout = 25 if not model_info['paid'] else 90
+        # Только для моделей с флагом use_modalities добавляем modalities
+        if model_info.get('use_modalities', False):
+            payload['modalities'] = ['image']
+        
+        timeout = 25
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
@@ -1562,8 +1565,8 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
             'stream': False
         }
         
-        # Только для Gemini моделей добавляем modalities
-        if model_info.get('model_type') == 'gemini':
+        # Только для моделей с флагом use_modalities добавляем modalities
+        if model_info.get('use_modalities', False):
             payload['modalities'] = ['image']
         
         response = requests.post(
@@ -1677,9 +1680,12 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
         
         payload = {
             'model': model_id,
-            'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image']  # Только image для генерации изображений
+            'messages': [{'role': 'user', 'content': content}]
         }
+        
+        # Только для моделей с флагом use_modalities добавляем modalities
+        if model_info.get('use_modalities', False):
+            payload['modalities'] = ['image']
         
         timeout = 25
         response = requests.post(
@@ -1772,8 +1778,8 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'stream': False
         }
         
-        # Только для Gemini моделей добавляем modalities
-        if model_info.get('model_type') == 'gemini':
+        # Только для моделей с флагом use_modalities добавляем modalities
+        if model_info.get('use_modalities', False):
             payload['modalities'] = ['image']
         
         response = requests.post(
@@ -2002,8 +2008,8 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
             'stream': False
         }
         
-        # Только для Gemini моделей добавляем modalities
-        if model_info.get('model_type') == 'gemini':
+        # Только для моделей с флагом use_modalities добавляем modalities
+        if model_info.get('use_modalities', False):
             payload['modalities'] = ['image']
         
         response = requests.post(
