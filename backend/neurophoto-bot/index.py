@@ -27,13 +27,13 @@ MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращени�
 PROCESSED_CALLBACKS = set()  # Хранит ID последних 100 обработанных callback
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': True},
-    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True, 'model_type': 'flux', 'use_modalities': False},
-    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False, 'model_type': 'stable-diffusion', 'use_modalities': False},
-    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False, 'model_type': 'flux', 'use_modalities': False},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': False},
-    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True, 'model_type': 'gemini', 'use_modalities': False},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True, 'model_type': 'openai', 'use_modalities': False}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image']},
+    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True, 'model_type': 'flux', 'modalities': None},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False, 'model_type': 'stable-diffusion', 'modalities': None},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False, 'model_type': 'flux', 'modalities': None},
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image', 'text']},
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image', 'text']},
+    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True, 'model_type': 'openai', 'modalities': None}
 }
 
 IMAGE_EFFECTS = {
