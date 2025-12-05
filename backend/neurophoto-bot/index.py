@@ -9,7 +9,6 @@ import json
 import os
 import requests
 import psycopg2
-import threading
 from typing import Dict, Any, Optional
 
 TELEGRAM_TOKEN = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
@@ -730,58 +729,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
     
     send_message(chat_id, welcome_text, keyboard)
 
-def async_generate_and_send(chat_id: int, user_instruction: str, model_key: str, photo_urls: list, 
-                            is_paid: bool, is_multiple: bool, model_name: str) -> None:
-    '''Фоновая генерация изображения и отправка результата'''
-    try:
-        print(f'[ASYNC] Starting generation for chat_id={chat_id}, model={model_name}')
-        
-        # Генерируем изображение
-        if is_paid:
-            if is_multiple:
-                image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
-            else:
-                image_url = generate_image_paid_long(user_instruction, model_key, photo_urls[0] if photo_urls else None)
-        else:
-            if is_multiple:
-                image_url = generate_image_multi(user_instruction, model_key, photo_urls)
-            else:
-                image_url = generate_image(user_instruction, model_key, photo_urls[0] if photo_urls else None)
-        
-        print(f'[ASYNC] Generation completed for chat_id={chat_id}, success={bool(image_url)}')
-        
-        # Отправляем результат
-        if image_url:
-            save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
-            caption_text = f'✨ Готово!\n\nМодель: {model_name}\nТвоя инструкция: {user_instruction[:100]}'
-            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
-            save_user_session(chat_id, 'result_ready', image_url, None, None)
-        else:
-            # Возвращаем генерацию обратно
-            refund_generation(chat_id, is_paid)
-            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз или выбери другую модель.')
-            clear_user_session(chat_id)
-    except Exception as e:
-        print(f'[ASYNC] Error in async_generate_and_send: {e}')
-        # Возвращаем генерацию обратно в случае ошибки
-        refund_generation(chat_id, is_paid)
-        send_message(chat_id, f'❌ Ошибка при генерации: {str(e)}\n\nГенерация возвращена на баланс.')
-        clear_user_session(chat_id)
-
 def handle_callback(chat_id: int, data: str, first_name: str, username: Optional[str] = None, callback_query_id: Optional[str] = None) -> None:
-    # Защита от дубликатов callback - если уже обработали этот callback, игнорируем
-    if callback_query_id and callback_query_id in PROCESSED_CALLBACKS:
-        print(f'[DUPLICATE] Ignoring duplicate callback: {callback_query_id}')
-        return
-    
-    # Добавляем callback в кеш обработанных
-    if callback_query_id:
-        PROCESSED_CALLBACKS.add(callback_query_id)
-        # Ограничиваем размер кеша 1000 элементами
-        if len(PROCESSED_CALLBACKS) > 1000:
-            # Удаляем первый элемент (самый старый)
-            PROCESSED_CALLBACKS.pop()
-        print(f'[CALLBACK] Processing new callback: {callback_query_id}, data: {data}')
     
     if data == 'tariff_free':
         text = '''🆓 *Бесплатный тариф*
@@ -944,7 +892,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
             return
         
         photo_count_text = f'{len(photo_urls)} фото' if is_multiple_photos else 'фото'
-        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]} ({photo_count_text})...\n\n⏳ Это займёт {model_info["time"]}\n\n✅ Я уже работаю над твоим запросом! Результат придёт автоматически.')
+        send_message(chat_id, f'🎨 Начинаю генерацию с {model_info["name"]} ({photo_count_text})...\n\n⏳ Это займёт {model_info["time"]}')
         
         print(f'Generating edited image with {model_info["name"]} for user {chat_id}...')
         print(f'Photos count: {len(photo_urls)}')
@@ -952,14 +900,30 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         
         send_chat_action(chat_id, 'upload_photo')
         
-        # Запускаем генерацию в фоновом потоке чтобы не блокировать ответ Telegram
-        thread = threading.Thread(
-            target=async_generate_and_send,
-            args=(chat_id, user_instruction, model_key, photo_urls, is_paid, is_multiple_photos, model_info["name"]),
-            daemon=True
-        )
-        thread.start()
-        print(f'[THREAD] Started background generation thread for chat_id={chat_id}')
+        # ВСЕ ОСТАЛЬНЫЕ МОДЕЛИ: Генерируем синхронно
+        if is_paid:
+            if is_multiple_photos:
+                image_url = generate_image_paid_long_multi(user_instruction, model_key, photo_urls)
+            else:
+                image_url = generate_image_paid_long(user_instruction, model_key, photo_url)
+        else:
+            if is_multiple_photos:
+                image_url = generate_image_multi(user_instruction, model_key, photo_urls)
+            else:
+                image_url = generate_image(user_instruction, model_key, photo_url)
+        
+        if image_url:
+            save_generation_history(chat_id, user_instruction, model_key, None, image_url, is_paid)
+            caption_text = f'✨ Готово!\n\nМодель: {model_info["name"]}\nТвоя инструкция: {user_instruction[:100]}'
+            send_photo_url(chat_id, image_url, caption_text, get_effects_keyboard())
+            
+            # Сохраняем результат для возможности повторного редактирования
+            save_user_session(chat_id, 'result_ready', image_url, None, None)
+        else:
+            # Возвращаем генерацию обратно
+            refund_generation(chat_id, is_paid)
+            send_message(chat_id, '❌ Ошибка генерации. Генерация возвращена на баланс.\n\nПопробуй ещё раз.')
+            clear_user_session(chat_id)
         return
     
     elif data == 'reedit_result':
