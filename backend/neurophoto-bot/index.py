@@ -28,12 +28,10 @@ PROCESSED_CALLBACKS = set()  # Хранит ID последних 100 обраб
 
 IMAGE_MODELS = {
     'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True},
-    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
     'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
     'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
     'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True},
-    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True}
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True}
 }
 
 IMAGE_EFFECTS = {
@@ -456,12 +454,12 @@ def download_telegram_photo(file_id: str) -> Optional[str]:
         print(f'Error downloading photo: {e}')
         return None
 
-def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional[str] = None) -> Optional[str]:
+def generate_image(prompt: str, model: str = 'gemini-flash', image_url: Optional[str] = None) -> Optional[str]:
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
         print(f'ERROR: Model "{model}" not found in IMAGE_MODELS! Available models: {list(IMAGE_MODELS.keys())}')
-        print(f'Using flux-schnell as fallback')
-        model_info = IMAGE_MODELS['flux-schnell']
+        print(f'Using gemini-flash as fallback')
+        model_info = IMAGE_MODELS['gemini-flash']
     model_id = model_info['id']
     
     print(f'=== STARTING IMAGE GENERATION ===')
@@ -664,7 +662,15 @@ def get_effects_keyboard() -> Dict:
 def get_admin_keyboard() -> Dict:
     return {
         'inline_keyboard': [
-            [{'text': '⚙️ Админ-панель', 'callback_data': 'admin_panel'}]
+            [{'text': '⚙️ Админ-панель', 'callback_data': 'admin_panel'}],
+            [{'text': '📖 Инструкция', 'callback_data': 'show_instructions'}]
+        ]
+    }
+
+def get_instructions_keyboard() -> Dict:
+    return {
+        'inline_keyboard': [
+            [{'text': '📖 Инструкция', 'callback_data': 'show_instructions'}]
         ]
     }
 
@@ -723,9 +729,7 @@ def handle_start(chat_id: int, first_name: str, username: Optional[str] = None) 
     
     clear_user_session(chat_id)
     
-    keyboard = None
-    if chat_id in ADMIN_IDS:
-        keyboard = get_admin_keyboard()
+    keyboard = get_admin_keyboard() if chat_id in ADMIN_IDS else get_instructions_keyboard()
     
     send_message(chat_id, welcome_text, keyboard)
 
@@ -736,7 +740,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 Ты выбрал бесплатную генерацию.
 
 Доступные модели:
-• FLUX Schnell - быстрая генерация
+• Gemini Flash - быстрая генерация с редактированием
 • Stable Diffusion XL - качественная генерация
 
 Нажми кнопку ниже для старта генерации 👇'''
@@ -752,9 +756,8 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 
 Доступные премиум модели:
 • FLUX Pro - профессиональная генерация
-• DALL-E 3 - качество от OpenAI
-• FLUX 1.1 Pro - новейшая модель
-• FLUX.2 Flex / Pro - топовое качество
+• Nano Banana - быстрая премиум модель
+• Nano Banana Pro - максимальное качество
 
 Выбери модель для генерации 👇'''
             send_message(chat_id, text, get_paid_models_keyboard())
@@ -1006,6 +1009,52 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
 /addgen <id> <count> - добавить генерации
 /userinfo <id> - инфо о пользователе'''
         send_message(chat_id, text)
+        return
+    
+    elif data == 'show_instructions':
+        instructions_text = '''📖 *Инструкция по моделям*
+
+🆓 *БЕСПЛАТНЫЕ МОДЕЛИ:*
+
+*🆓 Gemini Flash* (5-10 сек)
+• Быстрая генерация изображений
+• Поддерживает редактирование фото
+• 10 бесплатных генераций при старте
+
+*🆓 Stable Diffusion XL* (8-12 сек)
+• Качественная генерация
+• Только текстовые описания (без редактирования фото)
+
+💎 *ПЛАТНЫЕ МОДЕЛИ:*
+
+*🎨 FLUX Pro* (20-30 сек)
+• Профессиональное качество
+• Только текстовые описания
+
+*⚡ Nano Banana* (8-15 сек)
+• Быстрая премиум генерация
+• Поддерживает редактирование фото
+• Работает с несколькими фото
+
+*💎 Nano Banana Pro* (30-45 сек)
+• Максимальное качество
+• Поддерживает редактирование фото
+• Работает с несколькими фото одновременно
+• Лучшие результаты для сложных задач
+
+⚠️ *ОГРАНИЧЕНИЯ:*
+• Бесплатные модели: только одно фото за раз
+• Платные модели: поддерживают несколько фото
+• Модели с редактированием: можно изменять ваши фото
+• Без редактирования: только генерация по описанию
+
+💡 *КАК ИСПОЛЬЗОВАТЬ:*
+1. Для генерации: напиши описание
+2. Для редактирования фото: отправь фото + подпись с инструкцией
+3. Для нескольких фото: отправь группу фото + подпись'''
+        
+        keyboard = get_admin_keyboard() if chat_id in ADMIN_IDS else get_instructions_keyboard()
+        send_message(chat_id, instructions_text, keyboard)
         return
 
 def handle_media_group(chat_id: int, photo_file_ids: list, caption: Optional[str], first_name: str, username: Optional[str] = None) -> None:
@@ -1642,8 +1691,8 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
     '''
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
-        print(f'Model {model} not found in IMAGE_MODELS, using flux-schnell as fallback')
-        model_info = IMAGE_MODELS['flux-schnell']
+        print(f'Model {model} not found in IMAGE_MODELS, using gemini-flash as fallback')
+        model_info = IMAGE_MODELS['gemini-flash']
     model_id = model_info['id']
     
     print(f'Generating with {model_info["name"]} and {len(image_urls)} images: {prompt[:100]}...')
@@ -1845,8 +1894,8 @@ def generate_image_multi(prompt: str, model: str, photo_urls: list) -> Optional[
     '''
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
-        print(f'Model {model} not found, using flux-schnell')
-        model_info = IMAGE_MODELS['flux-schnell']
+        print(f'Model {model} not found, using gemini-flash')
+        model_info = IMAGE_MODELS['gemini-flash']
     model_id = model_info['id']
     
     print(f'Free generation with {model_info["name"]} and {len(photo_urls)} images: {prompt[:50]}...')
