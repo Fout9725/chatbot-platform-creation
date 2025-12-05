@@ -1552,13 +1552,13 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         for img_url in image_urls:
             content.append({'type': 'image_url', 'image_url': {'url': img_url}})
         
-        # Короткий промпт для image-генерации (Gemini не любит длинные инструкции)
-        content.append({'type': 'text', 'text': prompt})
+        # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение
+        content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image', 'text'],  # image + text для генерации изображений
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
         
@@ -1752,15 +1752,15 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': prompt}
+                {'type': 'text', 'text': f'Generate an image: {prompt}'}
             ]
         else:
-            content = prompt
+            content = f'Generate an image: {prompt}'
         
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image', 'text'],  # image + text для генерации изображений
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
         
@@ -1970,13 +1970,13 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
         for url in photo_urls:
             content.append({'type': 'image_url', 'image_url': {'url': url}})
         
-        # Короткий промпт - Gemini лучше работает с простыми инструкциями
-        content.append({'type': 'text', 'text': prompt})
+        # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение (не описать)
+        content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image', 'text'],  # image первым для приоритета генерации изображения
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
         
