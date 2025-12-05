@@ -27,13 +27,13 @@ MEDIA_GROUPS_PROCESSING = set()  # Флаги для предотвращени�
 PROCESSED_CALLBACKS = set()  # Хранит ID последних 100 обработанных callback
 
 IMAGE_MODELS = {
-    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image']},
-    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True, 'model_type': 'flux', 'modalities': None},
-    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False, 'model_type': 'stable-diffusion', 'modalities': None},
-    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False, 'model_type': 'flux', 'modalities': None},
-    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image', 'text']},
-    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True, 'model_type': 'gemini', 'modalities': ['image', 'text']},
-    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True, 'model_type': 'openai', 'modalities': None}
+    'gemini-flash': {'id': 'google/gemini-2.0-flash-exp:free', 'name': '🆓 Gemini Flash', 'paid': False, 'time': '5-10 сек', 'supports_editing': True},
+    'flux-schnell': {'id': 'black-forest-labs/flux-schnell-free', 'name': '🆓 FLUX Schnell', 'paid': False, 'time': '10-15 сек', 'supports_editing': True},
+    'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
+    'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
+    'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True},
+    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True},
+    'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True}
 }
 
 IMAGE_EFFECTS = {
@@ -497,14 +497,11 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'role': 'user',
                     'content': content
                 }
-            ]
+            ],
+            'modalities': ['image', 'text']  # image + text для генерации изображений
         }
         
-        # Только для моделей с флагом use_modalities добавляем modalities
-        if model_info.get('use_modalities', False):
-            payload['modalities'] = ['image']
-        
-        timeout = 25
+        timeout = 25 if not model_info['paid'] else 90
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
@@ -1558,16 +1555,12 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
-        # Разные параметры для разных типов моделей
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для моделей с флагом use_modalities добавляем modalities
-        if model_info.get('use_modalities', False):
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
@@ -1579,11 +1572,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         print(f'API response status: {response.status_code}')
         
         if response.status_code != 200:
-            print(f'=== API ERROR ({response.status_code}) ===')
-            print(f'Full error response: {response.text}')
-            print(f'Request model: {model_id}')
-            print(f'Request payload: {json.dumps(payload, indent=2)}')
-            print(f'=== END ERROR ===')
+            print(f'API error response: {response.text[:1000]}')
             return None
         
         data = response.json()
@@ -1680,12 +1669,9 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
         
         payload = {
             'model': model_id,
-            'messages': [{'role': 'user', 'content': content}]
+            'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image']  # Только image для генерации изображений
         }
-        
-        # Только для моделей с флагом use_modalities добавляем modalities
-        if model_info.get('use_modalities', False):
-            payload['modalities'] = ['image']
         
         timeout = 25
         response = requests.post(
@@ -1741,7 +1727,7 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
 
 def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] = None) -> Optional[str]:
     '''
-    Генерация платной модели с таймаутом 25 сек
+    Генерация платной модели с длинным таймаутом 25 сек
     '''
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
@@ -1771,32 +1757,24 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         else:
             content = f'Generate an image: {prompt}'
         
-        # Разные параметры для разных типов моделей
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для моделей с флагом use_modalities добавляем modalities
-        if model_info.get('use_modalities', False):
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25  # 25 секунд чтобы успеть вернуть ответ до таймаута Cloud Function (30 сек)
+            timeout=60  # 60 секунд - максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
         
         if response.status_code != 200:
-            print(f'=== API ERROR ({response.status_code}) ===')
-            print(f'Full error response: {response.text}')
-            print(f'Request model: {model_id}')
-            print(f'Request payload: {json.dumps(payload, indent=2, default=str)}')
-            print(f'=== END ERROR ===')
+            print(f'API error response: {response.text[:1000]}')
         
         if response.status_code == 200:
             data = response.json()
@@ -1850,20 +1828,14 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
                                 if img_url:
                                     return img_url
             
-            print(f'!!! NO IMAGE IN RESPONSE !!!')
-            print(f'Content type: {type(data.get("choices", [{}])[0].get("message", {}).get("content"))}')
-            print(f'Full response keys: {list(data.keys())}')
-            return None
-        else:
-            print(f'!!! API ERROR: Status {response.status_code} !!!')
-            print(f'Error response: {response.text[:500]}')
+            print(f'No image found in response. Content type: {type(data.get("choices", [{}])[0].get("message", {}).get("content"))}')
         
         return None
     except requests.exceptions.Timeout:
-        print(f'!!! TIMEOUT (generate_image_paid_long): Model took longer than 25 seconds !!!')
+        print(f'!!! TIMEOUT: Model took longer than 90 seconds !!!')
         return None
     except Exception as e:
-        print(f'!!! EXCEPTION (generate_image_paid_long): {e} !!!')
+        print(f'Error: {e}')
         return None
 
 def generate_image_multi(prompt: str, model: str, photo_urls: list) -> Optional[str]:
@@ -2001,22 +1973,18 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение (не описать)
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
-        # Разные параметры для разных типов моделей
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
+            'modalities': ['image'],  # ТОЛЬКО image - без text
             'stream': False
         }
-        
-        # Только для моделей с флагом use_modalities добавляем modalities
-        if model_info.get('use_modalities', False):
-            payload['modalities'] = ['image']
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=25  # 25 секунд чтобы успеть вернуть ответ до таймаута Cloud Function (30 сек)
+            timeout=60  # 60 секунд максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
@@ -2065,17 +2033,11 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
                                 if img_url:
                                     return img_url
             
-            print(f'!!! NO IMAGE FOUND IN RESPONSE (generate_image_paid_long_multi) !!!')
-        else:
-            print(f'!!! API ERROR (generate_image_paid_long_multi): Status {response.status_code} !!!')
-            print(f'Error response: {response.text[:500]}')
+            print(f'!!! NO IMAGE FOUND IN RESPONSE !!!')
         
         return None
-    except requests.exceptions.Timeout:
-        print(f'!!! TIMEOUT (generate_image_paid_long_multi): Model took longer than 25 seconds !!!')
-        return None
     except Exception as e:
-        print(f'!!! EXCEPTION (generate_image_paid_long_multi): {e} !!!')
+        print(f'Error: {e}')
         return None
 
 def process_queue_internal(limit: int = 5) -> Dict[str, Any]:
@@ -2271,24 +2233,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif 'callback_query' in body:
             callback_query = body['callback_query']
             callback_query_id = callback_query['id']
-            
-            # Защита от дубликатов: проверяем не обрабатывали ли уже этот callback
-            if callback_query_id in PROCESSED_CALLBACKS:
-                print(f'Duplicate callback detected: {callback_query_id}')
-                return {
-                    'statusCode': 200,
-                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'ok': True, 'duplicate': True}),
-                    'isBase64Encoded': False
-                }
-            
-            # Добавляем в кеш обработанных
-            PROCESSED_CALLBACKS.add(callback_query_id)
-            # Ограничиваем размер кеша 100 элементами
-            if len(PROCESSED_CALLBACKS) > 100:
-                # Удаляем самый старый элемент (первый добавленный)
-                PROCESSED_CALLBACKS.pop()
-            
             chat_id = callback_query['message']['chat']['id']
             first_name = callback_query['from'].get('first_name', 'Друг')
             username = callback_query['from'].get('username')
@@ -2296,8 +2240,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Сразу отвечаем на callback чтобы убрать "часики"
             answer_callback_query(callback_query_id)
-            
-            print(f'Processing callback: {callback_query_id} - {data}')
             
             # Обрабатываем callback
             handle_callback(chat_id, data, first_name, username, callback_query_id)
