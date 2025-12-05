@@ -1552,14 +1552,14 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         for img_url in image_urls:
             content.append({'type': 'image_url', 'image_url': {'url': img_url}})
         
-        content.append({'type': 'text', 'text': f'{prompt}\n\nIMPORTANT: You MUST generate and return an image, not text description. Return only the generated image.'})
+        # Короткий промпт для image-генерации (Gemini не любит длинные инструкции)
+        content.append({'type': 'text', 'text': prompt})
         
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
             'modalities': ['image', 'text'],  # image + text для генерации изображений
-            'stream': False,
-            'max_tokens': 4096
+            'stream': False
         }
         
         response = requests.post(
@@ -1752,7 +1752,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         if image_url:
             content = [
                 {'type': 'image_url', 'image_url': {'url': image_url}},
-                {'type': 'text', 'text': f'You are an expert photo editor. I will show you an image and you need to MODIFY it according to my instructions.\n\nYour task:\n1. Analyze the image I provided\n2. Apply these specific changes: {prompt}\n3. Return the MODIFIED version\n\nIMPORTANT RULES:\n- You MUST make VISIBLE changes to the image\n- The output should be DIFFERENT from the original\n- Apply the changes SIGNIFICANTLY and OBVIOUSLY\n- If I ask to add light - make it MUCH brighter\n- If I ask to change color - make STRONG color changes\n- If I ask for style changes - apply them DRAMATICALLY\n\nNow, modify the image according to this instruction: {prompt}'}
+                {'type': 'text', 'text': prompt}
             ]
         else:
             content = prompt
@@ -1761,8 +1761,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
             'modalities': ['image', 'text'],  # image + text для генерации изображений
-            'stream': False,
-            'max_tokens': 4096
+            'stream': False
         }
         
         response = requests.post(
@@ -1971,24 +1970,21 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
         for url in photo_urls:
             content.append({'type': 'image_url', 'image_url': {'url': url}})
         
-        content.append({
-            'type': 'text',
-            'text': f'You are an expert photo editor. I will show you {len(photo_urls)} images and you need to COMBINE and MODIFY them according to my instructions.\n\nYour task:\n1. Analyze all {len(photo_urls)} images I provided\n2. Combine them creatively into ONE image\n3. Apply these specific changes: {prompt}\n4. Return the MODIFIED combined version\n\nIMPORTANT RULES:\n- You MUST use ALL images provided\n- Combine them in a natural, creative way\n- Apply the changes SIGNIFICANTLY and OBVIOUSLY\n- The result should be ONE cohesive image\n\nNow, combine and modify the images according to this instruction: {prompt}'
-        })
+        # Короткий промпт - Gemini лучше работает с простыми инструкциями
+        content.append({'type': 'text', 'text': prompt})
         
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['text', 'image'],
-            'stream': False,
-            'max_tokens': 4096
+            'modalities': ['image', 'text'],  # image первым для приоритета генерации изображения
+            'stream': False
         }
         
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=60  # 60 секунд максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
