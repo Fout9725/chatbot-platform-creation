@@ -1735,7 +1735,7 @@ def generate_image_multi(prompt: str, model: str, image_urls: list) -> Optional[
 
 def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] = None) -> Optional[str]:
     '''
-    Генерация платной модели с длинным таймаутом 25 сек
+    Генерация платной модели с таймаутом 25 сек
     '''
     model_info = IMAGE_MODELS.get(model)
     if not model_info:
@@ -1780,7 +1780,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=60  # 60 секунд - максимум для Cloud Function
+            timeout=25  # 25 секунд чтобы успеть вернуть ответ до таймаута Cloud Function (30 сек)
         )
         
         print(f'API response status: {response.status_code}')
@@ -1844,14 +1844,20 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
                                 if img_url:
                                     return img_url
             
-            print(f'No image found in response. Content type: {type(data.get("choices", [{}])[0].get("message", {}).get("content"))}')
+            print(f'!!! NO IMAGE IN RESPONSE !!!')
+            print(f'Content type: {type(data.get("choices", [{}])[0].get("message", {}).get("content"))}')
+            print(f'Full response keys: {list(data.keys())}')
+            return None
+        else:
+            print(f'!!! API ERROR: Status {response.status_code} !!!')
+            print(f'Error response: {response.text[:500]}')
         
         return None
     except requests.exceptions.Timeout:
-        print(f'!!! TIMEOUT: Model took longer than 90 seconds !!!')
+        print(f'!!! TIMEOUT (generate_image_paid_long): Model took longer than 25 seconds !!!')
         return None
     except Exception as e:
-        print(f'Error: {e}')
+        print(f'!!! EXCEPTION (generate_image_paid_long): {e} !!!')
         return None
 
 def generate_image_multi(prompt: str, model: str, photo_urls: list) -> Optional[str]:
@@ -2004,7 +2010,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=60  # 60 секунд максимум для Cloud Function
+            timeout=25  # 25 секунд чтобы успеть вернуть ответ до таймаута Cloud Function (30 сек)
         )
         
         print(f'API response status: {response.status_code}')
@@ -2053,11 +2059,17 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
                                 if img_url:
                                     return img_url
             
-            print(f'!!! NO IMAGE FOUND IN RESPONSE !!!')
+            print(f'!!! NO IMAGE FOUND IN RESPONSE (generate_image_paid_long_multi) !!!')
+        else:
+            print(f'!!! API ERROR (generate_image_paid_long_multi): Status {response.status_code} !!!')
+            print(f'Error response: {response.text[:500]}')
         
         return None
+    except requests.exceptions.Timeout:
+        print(f'!!! TIMEOUT (generate_image_paid_long_multi): Model took longer than 25 seconds !!!')
+        return None
     except Exception as e:
-        print(f'Error: {e}')
+        print(f'!!! EXCEPTION (generate_image_paid_long_multi): {e} !!!')
         return None
 
 def process_queue_internal(limit: int = 5) -> Dict[str, Any]:
@@ -2253,6 +2265,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif 'callback_query' in body:
             callback_query = body['callback_query']
             callback_query_id = callback_query['id']
+            
+            # Защита от дубликатов: проверяем не обрабатывали ли уже этот callback
+            if callback_query_id in PROCESSED_CALLBACKS:
+                print(f'Duplicate callback detected: {callback_query_id}')
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'ok': True, 'duplicate': True}),
+                    'isBase64Encoded': False
+                }
+            
+            # Добавляем в кеш обработанных
+            PROCESSED_CALLBACKS.add(callback_query_id)
+            # Ограничиваем размер кеша 100 элементами
+            if len(PROCESSED_CALLBACKS) > 100:
+                # Удаляем самый старый элемент (первый добавленный)
+                PROCESSED_CALLBACKS.pop()
+            
             chat_id = callback_query['message']['chat']['id']
             first_name = callback_query['from'].get('first_name', 'Друг')
             username = callback_query['from'].get('username')
@@ -2260,6 +2290,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Сразу отвечаем на callback чтобы убрать "часики"
             answer_callback_query(callback_query_id)
+            
+            print(f'Processing callback: {callback_query_id} - {data}')
             
             # Обрабатываем callback
             handle_callback(chat_id, data, first_name, username, callback_query_id)
