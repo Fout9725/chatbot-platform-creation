@@ -1572,7 +1572,11 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         print(f'API response status: {response.status_code}')
         
         if response.status_code != 200:
-            print(f'API error response: {response.text[:1000]}')
+            print(f'=== API ERROR ({response.status_code}) ===')
+            print(f'Full error response: {response.text}')
+            print(f'Request model: {model_id}')
+            print(f'Request payload: {json.dumps(payload, indent=2)}')
+            print(f'=== END ERROR ===')
             return None
         
         data = response.json()
@@ -1774,7 +1778,11 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         print(f'API response status: {response.status_code}')
         
         if response.status_code != 200:
-            print(f'API error response: {response.text[:1000]}')
+            print(f'=== API ERROR ({response.status_code}) ===')
+            print(f'Full error response: {response.text}')
+            print(f'Request model: {model_id}')
+            print(f'Request payload: {json.dumps(payload, indent=2, default=str)}')
+            print(f'=== END ERROR ===')
         
         if response.status_code == 200:
             data = response.json()
