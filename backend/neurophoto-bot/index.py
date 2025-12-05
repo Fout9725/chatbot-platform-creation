@@ -2238,23 +2238,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             username = callback_query['from'].get('username')
             data = callback_query['data']
             
-            # Проверяем, не обрабатывали ли мы этот callback уже
-            if callback_query_id in PROCESSED_CALLBACKS:
-                print(f'!!! DUPLICATE CALLBACK: {callback_query_id} already processed, skipping')
-                answer_callback_query(callback_query_id, '⏳ Генерация уже в процессе...', show_alert=False)
-                return {
-                    'statusCode': 200,
-                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'ok': True}),
-                    'isBase64Encoded': False
-                }
-            
-            # Добавляем в кеш обработанных (ограничиваем размер до 100)
-            PROCESSED_CALLBACKS.add(callback_query_id)
-            if len(PROCESSED_CALLBACKS) > 100:
-                # Удаляем самый старый (первый)
-                PROCESSED_CALLBACKS.pop()
-            
             # Сразу отвечаем на callback чтобы убрать "часики"
             answer_callback_query(callback_query_id)
             
