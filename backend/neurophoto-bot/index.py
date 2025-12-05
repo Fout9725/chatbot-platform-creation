@@ -897,28 +897,6 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         print(f'Photos count: {len(photo_urls)}')
         print(f'User instruction: {user_instruction}')
         
-        # Медленные модели (30+ секунд): Используем очередь для обработки с таймаутом 90 секунд
-        slow_models = ['gpt-5-image', 'nano-banana-pro']
-        if model_key in slow_models:
-            photo_data = ','.join(photo_urls) if is_multiple_photos else photo_url
-            
-            queue_prompt = json.dumps({
-                'prompt': user_instruction,
-                'photo_url': photo_data,
-                'is_multiple': is_multiple_photos
-            })
-            
-            queue_id = add_to_queue(chat_id, chat_id, username, first_name, queue_prompt, model_key, is_paid)
-            
-            if queue_id:
-                send_message(chat_id, f'✅ Задача добавлена в очередь!\n\nМодель {model_info["name"]} работает медленно (30-60 секунд)\n\n💡 Результат придёт автоматически, можешь продолжать использовать бота')
-                clear_user_session(chat_id)
-            else:
-                refund_generation(chat_id, is_paid)
-                send_message(chat_id, '❌ Ошибка добавления в очередь. Генерация возвращена на баланс.')
-                clear_user_session(chat_id)
-            return
-        
         send_chat_action(chat_id, 'upload_photo')
         
         # ВСЕ ОСТАЛЬНЫЕ МОДЕЛИ: Генерируем синхронно
@@ -1579,7 +1557,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image'],  # Только image для генерации изображений
+            'modalities': ['image', 'text'],  # image + text для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
@@ -1588,7 +1566,7 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=60  # 60 секунд - максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
@@ -1791,7 +1769,7 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=60  # 60 секунд - максимум для Cloud Function
         )
         
         print(f'API response status: {response.status_code}')
