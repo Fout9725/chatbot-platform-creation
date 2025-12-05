@@ -32,7 +32,7 @@ IMAGE_MODELS = {
     'stable-diffusion': {'id': 'stability-ai/stable-diffusion-xl', 'name': '🆓 Stable Diffusion XL', 'paid': False, 'time': '8-12 сек', 'supports_editing': False},
     'flux-pro': {'id': 'black-forest-labs/flux-pro', 'name': '🎨 FLUX Pro', 'paid': True, 'time': '20-30 сек', 'supports_editing': False},
     'gemini-2.5-flash': {'id': 'google/gemini-2.5-flash-image-preview', 'name': '⚡ Nano Banana', 'paid': True, 'time': '8-15 сек', 'supports_editing': True},
-    'nano-banana-pro': {'id': 'google/gemini-3-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True},
+    'nano-banana-pro': {'id': 'google/gemini-2.5-pro-image-preview', 'name': '💎 Nano Banana Pro', 'paid': True, 'time': '30-45 сек', 'supports_editing': True},
     'gpt-5-image': {'id': 'openai/gpt-5-image', 'name': '🤖 GPT-5 Image', 'paid': True, 'time': '15-25 сек', 'supports_editing': True}
 }
 
