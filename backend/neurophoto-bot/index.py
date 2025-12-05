@@ -490,6 +490,15 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
         else:
             content = prompt
         
+        # Определяем modalities в зависимости от модели
+        if 'nano-banana' in model or 'gemini-2.5' in model or 'gemini-3' in model:
+            modalities = ['image', 'text']
+        elif 'gemini' in model:
+            modalities = ['image']
+        else:
+            # Для OpenAI и FLUX - не добавляем modalities вообще
+            modalities = None
+        
         payload = {
             'model': model_id,
             'messages': [
@@ -497,9 +506,11 @@ def generate_image(prompt: str, model: str = 'flux-schnell', image_url: Optional
                     'role': 'user',
                     'content': content
                 }
-            ],
-            'modalities': ['image', 'text']  # image + text для генерации изображений
+            ]
         }
+        
+        if modalities:
+            payload['modalities'] = modalities
         
         timeout = 25 if not model_info['paid'] else 90
         response = requests.post(
@@ -1557,10 +1568,13 @@ def generate_image_paid_long_multi(prompt: str, model: str, image_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
+        # Nano Banana Pro требует ['image', 'text'], остальные - только ['image']
+        modalities = ['image', 'text'] if 'nano-banana' in model or 'gemini-2.5' in model or 'gemini-3' in model else ['image']
+        
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image'],  # ТОЛЬКО image - без text
+            'modalities': modalities,
             'stream': False
         }
         
@@ -1759,10 +1773,13 @@ def generate_image_paid_long(prompt: str, model: str, image_url: Optional[str] =
         else:
             content = f'Generate an image: {prompt}'
         
+        # Nano Banana Pro требует ['image', 'text'], остальные - только ['image']
+        modalities = ['image', 'text'] if 'nano-banana' in model or 'gemini-2.5' in model or 'gemini-3' in model else ['image']
+        
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image'],  # ТОЛЬКО image - без text
+            'modalities': modalities,
             'stream': False
         }
         
@@ -1975,10 +1992,13 @@ def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) ->
         # Явно указываем что нужно СГЕНЕРИРОВАТЬ изображение (не описать)
         content.append({'type': 'text', 'text': f'Generate an image based on these photos: {prompt}'})
         
+        # Nano Banana Pro требует ['image', 'text'], остальные - только ['image']
+        modalities = ['image', 'text'] if 'nano-banana' in model or 'gemini-2.5' in model or 'gemini-3' in model else ['image']
+        
         payload = {
             'model': model_id,
             'messages': [{'role': 'user', 'content': content}],
-            'modalities': ['image'],  # ТОЛЬКО image - без text
+            'modalities': modalities,
             'stream': False
         }
         
