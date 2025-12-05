@@ -150,7 +150,7 @@ def generate_image_paid_long(prompt: str, model: str) -> Optional[str]:
                 'role': 'user',
                 'content': prompt
             }],
-            'modalities': ['image'],  # Только image для генерации изображений
+            'modalities': ['image', 'text'],  # image + text для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
@@ -257,7 +257,7 @@ def generate_image_paid_long_with_image(prompt: str, model: str, image_url: str)
                 'role': 'user',
                 'content': content
             }],
-            'modalities': ['image'],  # Только image для генерации изображений
+            'modalities': ['image', 'text'],  # image + text для генерации изображений
             'stream': False,
             'max_tokens': 4096
         }
@@ -319,6 +319,117 @@ def generate_image_paid_long_with_image(prompt: str, model: str, image_url: str)
         return None
     except Exception as e:
         print(f'Error: {e}')
+        return None
+
+def generate_image_paid_long_multi(prompt: str, model: str, photo_urls: list) -> Optional[str]:
+    '''
+    Генерация платной модели с редактированием НЕСКОЛЬКИХ изображений
+    Отправляет все фото в одном запросе
+    '''
+    model_info = IMAGE_MODELS.get(model, IMAGE_MODELS['flux-schnell'])
+    model_id = model_info['id']
+    
+    print(f'Paid generation with {len(photo_urls)} images using {model_info["name"]}: {prompt[:50]}...')
+    
+    if not OPENROUTER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://poehali.dev',
+            'X-Title': 'NeurophotoBot'
+        }
+        
+        # Создаем content с несколькими изображениями и текстом
+        content = []
+        for url in photo_urls:
+            content.append({'type': 'image_url', 'image_url': {'url': url}})
+        
+        content.append({
+            'type': 'text',
+            'text': f'You are an expert photo editor. I will show you {len(photo_urls)} images and you need to COMBINE and MODIFY them according to my instructions.\n\nYour task:\n1. Analyze all {len(photo_urls)} images I provided\n2. Combine them creatively into ONE image\n3. Apply these specific changes: {prompt}\n4. Return the MODIFIED combined version\n\nIMPORTANT RULES:\n- You MUST use ALL images provided\n- Combine them in a natural, creative way\n- Apply the changes SIGNIFICANTLY and OBVIOUSLY\n- The result should be ONE cohesive image\n- RETURN ONLY THE IMAGE, not text description\n\nNow, combine and modify the images according to this instruction: {prompt}'
+        })
+        
+        payload = {
+            'model': model_id,
+            'messages': [{
+                'role': 'user',
+                'content': content
+            }],
+            'modalities': ['image', 'text'],
+            'stream': False,
+            'max_tokens': 4096
+        }
+        
+        response = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=90
+        )
+        
+        print(f'OpenRouter response status: {response.status_code}')
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f'API response keys: {list(data.keys())}')
+            
+            # Логируем полный ответ для отладки
+            import json as json_module
+            print(f'=== FULL RESPONSE (MULTI) ===')
+            print(json_module.dumps(data, indent=2, default=str)[:1000])
+            print(f'=== END ===')
+            
+            # Проверяем на ошибку
+            if data.get('error'):
+                error_msg = data['error'].get('message', 'Unknown error')
+                print(f'OpenRouter API internal error: {error_msg}')
+                return None
+            
+            # Проверяем все возможные места где может быть изображение
+            if data.get('images'):
+                print(f'Found image in root images field')
+                return data['images'][0]
+            
+            if data.get('choices') and len(data['choices']) > 0:
+                message = data['choices'][0].get('message', {})
+                
+                if message.get('images'):
+                    image_data = message['images'][0]
+                    if isinstance(image_data, str):
+                        print(f'Found image in message.images (string)')
+                        return image_data
+                    elif isinstance(image_data, dict):
+                        url = image_data.get('image_url', {}).get('url') or image_data.get('url')
+                        if url:
+                            print(f'Found image in message.images (dict)')
+                            return url
+                
+                content_resp = message.get('content', '')
+                if isinstance(content_resp, str) and content_resp.startswith('data:image'):
+                    print(f'Found image in content (string)')
+                    return content_resp
+                
+                if isinstance(content_resp, list):
+                    for item in content_resp:
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            url = item.get('image_url', {}).get('url')
+                            if url:
+                                print(f'Found image in content array')
+                                return url
+            
+            print(f'!!! NO IMAGE IN RESPONSE (multi) !!!')
+        else:
+            print(f'API error: {response.status_code} - {response.text[:200]}')
+        
+        return None
+    except requests.exceptions.Timeout:
+        print(f'Timeout after 90s (multi)')
+        return None
+    except Exception as e:
+        print(f'Error (multi): {e}')
         return None
 
 def generate_image_sync(prompt: str, model: str = 'flux-schnell') -> Optional[str]:
@@ -481,8 +592,8 @@ def process_queue_item(item: Dict) -> bool:
         if is_paid:
             # Для редактирования фото используем специальный формат с image_url в content
             if photo_urls_list:
-                # Множественные фото - пока используем обычный промпт (не поддерживается в worker)
-                image_url = generate_image_paid_long(f'{actual_prompt}\n\nGenerate an image based on this description.', model)
+                # Множественные фото - используем функцию для multi-image
+                image_url = generate_image_paid_long_multi(actual_prompt, model, photo_urls_list)
             elif photo_url_to_edit:
                 # Одно фото - редактирование
                 image_url = generate_image_paid_long_with_image(actual_prompt, model, photo_url_to_edit)
