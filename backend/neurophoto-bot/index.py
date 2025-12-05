@@ -898,7 +898,7 @@ def handle_callback(chat_id: int, data: str, first_name: str, username: Optional
         print(f'User instruction: {user_instruction}')
         
         # Медленные модели (30+ секунд): Используем очередь для обработки с таймаутом 90 секунд
-        slow_models = ['gpt-5-image']
+        slow_models = ['gpt-5-image', 'nano-banana-pro']
         if model_key in slow_models:
             photo_data = ','.join(photo_urls) if is_multiple_photos else photo_url
             
