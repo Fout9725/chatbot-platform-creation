@@ -25,6 +25,7 @@ import Legal from "./pages/Legal";
 import Admin from "./pages/Admin";
 import AdminNew from "./pages/AdminNew";
 import AIAssistant from "./components/AIAssistant";
+import OfferConstructor from "./pages/OfferConstructor";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
           <Route path="/legal" element={<Legal />} />
           <Route path="/admin" element={<AdminNew />} />
           <Route path="/admin-old" element={<Admin />} />
+          <Route path="/offer-constructor" element={<OfferConstructor />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
