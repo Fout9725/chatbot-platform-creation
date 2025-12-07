@@ -40,19 +40,19 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
     }
     
     try {
-      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+      const response = await fetch('https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631');
       const data = await response.json();
       
-      if (data.users && data.users.length > 0) {
-        const dbUsers: User[] = data.users.map((u: any) => ({
+      if (Array.isArray(data) && data.length > 0) {
+        const dbUsers: User[] = data.map((u: any) => ({
           id: u.id.toString(),
-          name: u.name || 'Пользователь',
+          name: u.full_name || u.username || 'Пользователь',
           email: u.email,
-          plan: u.plan || 'free',
-          role: u.role || 'user',
+          plan: (u.metadata?.plan || 'free') as 'free' | 'optimal' | 'premium' | 'partner',
+          role: (u.role || 'user') as 'user' | 'admin',
           registeredAt: u.created_at ? new Date(u.created_at).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
-          activeBots: 0,
-          status: 'active'
+          activeBots: u.metadata?.active_bots || 0,
+          status: u.is_active ? 'active' : 'blocked'
         }));
         setUsers(dbUsers);
         
@@ -91,39 +91,92 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
     return matchesSearch && matchesPlan && matchesStatus;
   });
 
-  const handleBlockUser = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'active' ? 'blocked' : 'active' }
-        : user
-    ));
+  const handleBlockUser = async (userId: string) => {
     const user = users.find(u => u.id === userId);
-    toast({
-      title: user?.status === 'active' ? 'Пользователь заблокирован' : 'Пользователь разблокирован',
-      description: `${user?.name} ${user?.status === 'active' ? 'больше не может' : 'снова может'} использовать платформу`,
-    });
+    const newStatus = user?.status === 'active' ? false : true;
+    
+    try {
+      const response = await fetch('https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, is_active: newStatus })
+      });
+      
+      if (response.ok) {
+        setUsers(users.map(u => 
+          u.id === userId 
+            ? { ...u, status: newStatus ? 'active' : 'blocked' }
+            : u
+        ));
+        toast({
+          title: newStatus ? 'Пользователь разблокирован' : 'Пользователь заблокирован',
+          description: `${user?.name} ${newStatus ? 'снова может' : 'больше не может'} использовать платформу`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить статус пользователя',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleChangePlan = (userId: string, newPlan: 'free' | 'optimal' | 'premium' | 'partner') => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, plan: newPlan } : user
-    ));
+  const handleChangePlan = async (userId: string, newPlan: 'free' | 'optimal' | 'premium' | 'partner') => {
     const user = users.find(u => u.id === userId);
-    toast({
-      title: 'Тариф изменён',
-      description: `${user?.name} переведён на тариф ${newPlan}`,
-    });
+    const metadata = { ...(user as any)?.metadata, plan: newPlan };
+    
+    try {
+      const response = await fetch('https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, metadata })
+      });
+      
+      if (response.ok) {
+        setUsers(users.map(u => 
+          u.id === userId ? { ...u, plan: newPlan } : u
+        ));
+        toast({
+          title: 'Тариф изменён',
+          description: `${user?.name} переведён на тариф ${newPlan}`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить тариф',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleChangeRole = (userId: string, newRole: 'user' | 'admin') => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, role: newRole } : user
-    ));
+  const handleChangeRole = async (userId: string, newRole: 'user' | 'admin') => {
     const user = users.find(u => u.id === userId);
-    toast({
-      title: 'Роль изменена',
-      description: `${user?.name} назначена роль ${newRole === 'admin' ? 'администратора' : 'пользователя'}`,
-    });
+    
+    try {
+      const response = await fetch('https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, role: newRole })
+      });
+      
+      if (response.ok) {
+        setUsers(users.map(u => 
+          u.id === userId ? { ...u, role: newRole } : u
+        ));
+        toast({
+          title: 'Роль изменена',
+          description: `${user?.name} назначена роль ${newRole === 'admin' ? 'администратора' : 'пользователя'}`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить роль',
+        variant: 'destructive'
+      });
+    }
   };
 
   const getPlanBadgeVariant = (plan: string) => {

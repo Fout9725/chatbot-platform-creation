@@ -1,4 +1,5 @@
 {
+  "user-registration": "https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631",
   "test-image-models": "https://functions.poehali.dev/f11618e1-f952-4a03-b312-b788a0eb4a4e",
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",

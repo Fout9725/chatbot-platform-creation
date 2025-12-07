@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request (CORS preflight)",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Register new user",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "test@example.com",
+        "password": "testpassword123",
+        "username": "testuser",
+        "full_name": "Test User",
+        "phone": "+7 999 123 45 67"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "user": {
+          "email": "string",
+          "username": "string"
+        }
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get all users",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    }
+  ]
+}
