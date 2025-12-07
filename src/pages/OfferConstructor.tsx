@@ -120,21 +120,34 @@ export default function OfferConstructor() {
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-8 max-w-2xl mx-auto">
-                  {[
-                    { icon: 'Target', text: 'Создать оффер с нуля' },
-                    { icon: 'FileText', text: 'Разобрать мой текущий оффер' },
-                    { icon: 'BookOpen', text: 'Научи меня делать офферы' },
-                    { icon: 'Heart', text: 'Боюсь продавать, помоги' }
-                  ].map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setInput(item.text)}
-                      className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
-                    >
-                      <Icon name={item.icon as any} size={20} className="text-purple-600" />
-                      <span className="text-sm font-medium text-gray-700">{item.text}</span>
-                    </button>
-                  ))}
+                  <button
+                    onClick={() => setInput('Создать оффер с нуля')}
+                    className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                  >
+                    <Icon name="Target" size={20} className="text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">Создать оффер с нуля</span>
+                  </button>
+                  <button
+                    onClick={() => setInput('Разобрать мой текущий оффер')}
+                    className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                  >
+                    <Icon name="FileText" size={20} className="text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">Разобрать мой текущий оффер</span>
+                  </button>
+                  <button
+                    onClick={() => setInput('Научи меня делать офферы')}
+                    className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                  >
+                    <Icon name="BookOpen" size={20} className="text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">Научи меня делать офферы</span>
+                  </button>
+                  <button
+                    onClick={() => setInput('Боюсь продавать, помоги')}
+                    className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                  >
+                    <Icon name="Heart" size={20} className="text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">Боюсь продавать, помоги</span>
+                  </button>
                 </div>
               </div>
             )}
