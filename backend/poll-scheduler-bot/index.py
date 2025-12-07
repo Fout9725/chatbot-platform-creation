@@ -282,29 +282,45 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
-            'body': ''
+            'body': '',
+            'isBase64Encoded': False
         }
     
     if method != 'POST':
         return {
             'statusCode': 405,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': 'Method not allowed'})
+            'body': json.dumps({'error': 'Method not allowed'}),
+            'isBase64Encoded': False
         }
     
-    update = json.loads(event.get('body', '{}'))
-    
-    if 'message' not in update:
+    try:
+        update = json.loads(event.get('body', '{}'))
+        print(f'Received update: {json.dumps(update)}')
+        
+        if 'message' not in update:
+            print('No message in update, skipping')
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        message = update['message']
+        chat_id = message['chat']['id']
+        user_id = message['from']['id']
+        text = message.get('text', '')
+        
+        print(f'Processing message from user {user_id}, chat {chat_id}: {text}')
+    except Exception as e:
+        print(f'Error parsing update: {e}')
         return {
-            'statusCode': 200,
+            'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'error': str(e)}),
+            'isBase64Encoded': False
         }
-    
-    message = update['message']
-    chat_id = message['chat']['id']
-    user_id = message['from']['id']
-    text = message.get('text', '')
     
     if text == '/start':
         welcome_text = '''👋 Привет! Я помогу автоматизировать твои опросы в Telegram.
@@ -327,7 +343,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     user_state = get_user_state(user_id)
@@ -341,7 +358,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if text == '➕ Создать шаблон':
@@ -351,7 +369,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'waiting_template_name':
@@ -362,7 +381,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'waiting_question':
@@ -381,7 +401,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'waiting_people_list':
@@ -428,7 +449,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if text == '📋 Мои шаблоны':
@@ -454,7 +476,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'viewing_templates' and text.startswith('📝 '):
@@ -496,7 +519,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'template_selected' and text == '✏️ Редактировать и отправить':
@@ -535,7 +559,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'editing_template':
@@ -577,7 +602,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'template_selected' and text == '📅 Запланировать отправку':
@@ -597,7 +623,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if current_state == 'waiting_schedule_time':
@@ -647,7 +674,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     if text == '🕐 Мои запланированные':
@@ -673,7 +701,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'ok': True})
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
         }
     
     send_telegram_message(chat_id, '❓ Не понимаю. Используй кнопки ниже:', get_main_keyboard())
