@@ -50,31 +50,31 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-2">
               <Link to="/docs">
-                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                <Button variant="ghost" size="sm" className="hidden md:flex">
                   <Icon name="BookOpen" size={18} className="mr-2" />
                   <span className="hidden lg:inline">Документация</span>
                 </Button>
               </Link>
               {user?.role === 'admin' && (
                 <Link to="/admin">
-                  <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                  <Button variant="ghost" size="sm" className="hidden md:flex">
                     <Icon name="Shield" size={18} className="mr-2" />
                     <span className="hidden lg:inline">Админ-панель</span>
                   </Button>
                 </Link>
               )}
               <Link to="/notifications">
-                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                <Button variant="ghost" size="sm" className="hidden md:flex">
                   <Icon name="Bell" size={18} className="mr-2" />
                   <span className="hidden lg:inline">Уведомления</span>
                 </Button>
               </Link>
-              <Button type="button" disabled={false} variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
+              <Button variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
               </Button>
               {!isAuthenticated && (
-                <Button type="button" disabled={false} variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
+                <Button variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
                   <Icon name="ShieldCheck" size={18} className="md:mr-2" />
                   <span className="hidden md:inline">Админ</span>
                 </Button>
@@ -199,12 +199,12 @@ const Index = () => {
             
             <div className="flex flex-col sm:flex-row gap-3">
               <Link to="/partner" className="flex-1">
-                <Button type="button" disabled={false} className="w-full" size="lg">
+                <Button className="w-full" size="lg">
                   <Icon name="Rocket" size={18} className="mr-2" />
                   Стать партнёром
                 </Button>
               </Link>
-              <Button type="button" disabled={false} variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
+              <Button variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
               </Button>
@@ -272,14 +272,9 @@ const Index = () => {
                 </TabsList>
                 
                 <Button
-                  type="button"
-                  disabled={false}
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setIsModeModalOpen(true);
-                  }}
+                  onClick={() => setIsModeModalOpen(true)}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Конструктор</span>
@@ -287,14 +282,9 @@ const Index = () => {
                 </Button>
 
                 <Button
-                  type="button"
-                  disabled={false}
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.open('/my-bots', '_blank');
-                  }}
+                  onClick={() => navigate('/my-bots')}
                 >
                   <Icon name="Folder" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Мои боты</span>

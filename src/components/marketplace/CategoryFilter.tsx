@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { mockBots } from './mockBots';
 
 interface CategoryFilterProps {
@@ -18,21 +18,19 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
       {categories.map((category) => {
         const count = getCategoryCount(category);
         return (
-          <Badge
+          <Button
             key={category}
             variant={selectedCategory === category ? 'default' : 'outline'}
-            className={`cursor-pointer transition-all text-xs md:text-sm px-3 py-1.5 md:px-4 md:py-2 select-none active:scale-95 ${
+            size="sm"
+            className={`transition-all text-xs md:text-sm active:scale-95 ${
               selectedCategory === category
                 ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md'
                 : 'hover:bg-accent hover:border-primary/50'
             }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCategoryChange(category);
-            }}
+            onClick={() => onCategoryChange(category)}
           >
             {category} <span className="ml-1.5 opacity-70">({count})</span>
-          </Badge>
+          </Button>
         );
       })}
     </div>
