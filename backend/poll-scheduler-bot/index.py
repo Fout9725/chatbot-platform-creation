@@ -77,6 +77,7 @@ def ask_ai_assistant(user_message: str) -> str:
 1. Помогать пользователям создавать шаблоны опросов
 2. Объяснять как работает бот
 3. Отвечать на вопросы про функции бота
+4. Предлагать креативные идеи для опросов
 
 Функции бота:
 • Создание шаблонов опросов с постоянным списком людей
@@ -95,7 +96,7 @@ def ask_ai_assistant(user_message: str) -> str:
                 'X-Title': 'PollSchedulerBot'
             },
             json={
-                'model': 'qwen/qwen-2.5-72b-instruct:free',
+                'model': 'tngtech/deepseek-r1t2-chimera:free',
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_message[:500]}
@@ -103,7 +104,7 @@ def ask_ai_assistant(user_message: str) -> str:
                 'temperature': 0.7,
                 'max_tokens': 300
             },
-            timeout=10
+            timeout=15
         )
         
         if response.status_code == 200:
@@ -486,6 +487,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
+    if text == '📅 Запланировать':
+        templates = get_user_templates(user_id)
+        
+        if not templates:
+            send_telegram_message(chat_id, '📭 У тебя пока нет шаблонов. Сначала создай шаблон!', get_main_keyboard())
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        template_list = '📅 *Выбери шаблон для планирования:*\n\n'
+        for i, template in enumerate(templates, 1):
+            template_list += f"{i}. *{template['template_name']}*\n"
+            template_list += f"   Вопрос: {template['poll_question']}\n"
+            template_list += f"   Людей: {len(template['poll_options'])}\n\n"
+        
+        send_telegram_message(chat_id, template_list, get_template_keyboard(templates))
+        save_user_state(user_id, 'schedule_selecting_template', {})
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
     if current_state == 'viewing_templates' and text.startswith('📝 '):
         template_name = text.replace('📝 ', '').strip()
         template = get_template_by_name(user_id, template_name)
@@ -521,6 +550,40 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         send_telegram_message(chat_id, detail_text, keyboard)
         save_user_state(user_id, 'template_selected', {'template_id': template['id'], 'template_name': template['template_name']})
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'schedule_selecting_template' and text.startswith('📝 '):
+        template_name = text.replace('📝 ', '').strip()
+        template = get_template_by_name(user_id, template_name)
+        
+        if not template:
+            send_telegram_message(chat_id, '❌ Шаблон не найден', get_main_keyboard())
+            clear_user_state(user_id)
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        schedule_text = f'''📅 *Планирование: {template['template_name']}*
+
+Введи дату и время отправки:
+*Формат: ДД.ММ.ГГГГ ЧЧ:ММ*
+
+Примеры:
+• 15.12.2024 09:00 (утро)
+• 15.12.2024 13:00 (обед)
+• 15.12.2024 18:00 (вечер)'''
+        
+        send_telegram_message(chat_id, schedule_text, {'remove_keyboard': True})
+        save_user_state(user_id, 'waiting_schedule_time', {'template_id': template['id'], 'template_name': template['template_name']})
         
         return {
             'statusCode': 200,
@@ -711,7 +774,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
-    send_telegram_message(chat_id, '❓ Не понимаю. Используй кнопки ниже:', get_main_keyboard())
+    ai_response = ask_ai_assistant(text)
+    send_telegram_message(chat_id, f'🤖 {ai_response}\n\nИспользуй кнопки ниже:', get_main_keyboard())
     
     return {
         'statusCode': 200,
