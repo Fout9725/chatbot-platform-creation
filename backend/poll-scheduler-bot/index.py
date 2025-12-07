@@ -122,7 +122,8 @@ def get_main_keyboard():
         'keyboard': [
             [{'text': '➕ Создать шаблон'}],
             [{'text': '📋 Мои шаблоны'}, {'text': '📅 Запланировать'}],
-            [{'text': '🕐 Мои запланированные'}]
+            [{'text': '🕐 Мои запланированные'}],
+            [{'text': '👥 Подключить к группе'}]
         ],
         'resize_keyboard': True,
         'one_time_keyboard': False,
@@ -191,6 +192,98 @@ def get_template_by_name(user_id: int, template_name: str) -> Optional[Dict]:
     conn.close()
     
     return template
+
+def delete_template(template_id: int, user_id: int) -> bool:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        DELETE FROM poll_templates
+        WHERE id = %s AND user_id = %s
+    """, (template_id, user_id))
+    
+    deleted = cur.rowcount > 0
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return deleted
+
+def update_template(template_id: int, user_id: int, template_name: str = None, poll_question: str = None, poll_options: List[str] = None) -> bool:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    updates = []
+    params = []
+    
+    if template_name:
+        updates.append('template_name = %s')
+        params.append(template_name)
+    if poll_question:
+        updates.append('poll_question = %s')
+        params.append(poll_question)
+    if poll_options:
+        updates.append('poll_options = %s')
+        params.append(poll_options)
+    
+    if not updates:
+        return False
+    
+    params.extend([template_id, user_id])
+    
+    cur.execute(f"""
+        UPDATE poll_templates
+        SET {', '.join(updates)}
+        WHERE id = %s AND user_id = %s
+    """, params)
+    
+    updated = cur.rowcount > 0
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return updated
+
+def save_group_connection(user_id: int, chat_id: int, chat_title: str, chat_type: str) -> bool:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            INSERT INTO bot_groups (user_id, chat_id, chat_title, chat_type)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_id, chat_id) 
+            DO UPDATE SET chat_title = EXCLUDED.chat_title, chat_type = EXCLUDED.chat_type, updated_at = NOW()
+        """, (user_id, chat_id, chat_title, chat_type))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f'Error saving group connection: {e}')
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+        return False
+
+def get_user_groups(user_id: int) -> List[Dict]:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT chat_id, chat_title, chat_type, created_at
+        FROM bot_groups
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+    """, (user_id,))
+    
+    groups = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return groups
 
 def schedule_poll(template_id: int, user_id: int, chat_id: int, question: str, options: List[str], scheduled_time: datetime) -> int:
     conn = get_db_connection()
@@ -315,17 +408,41 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         
         message = update['message']
-        chat_id = message['chat']['id']
+        chat = message['chat']
+        chat_id = chat['id']
+        chat_type = chat.get('type', 'private')
+        chat_title = chat.get('title', 'Private Chat')
         user_id = message['from']['id']
         text = message.get('text', '')
         
-        print(f'Processing message from user {user_id}, chat {chat_id}: {text}')
+        print(f'Processing message from user {user_id}, chat {chat_id} ({chat_type}): {text}')
     except Exception as e:
         print(f'Error parsing update: {e}')
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps({'error': str(e)}),
+            'isBase64Encoded': False
+        }
+    
+    if text == '/connect' and chat_type in ['group', 'supergroup', 'channel']:
+        if save_group_connection(user_id, chat_id, chat_title, chat_type):
+            send_telegram_message(chat_id, f'✅ Группа *{chat_title}* успешно подключена!\n\nТеперь ты можешь отправлять сюда опросы через личные сообщения с ботом.', None)
+        else:
+            send_telegram_message(chat_id, '❌ Ошибка подключения группы. Попробуй позже.', None)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if chat_type != 'private':
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
             'isBase64Encoded': False
         }
     
@@ -336,6 +453,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 📝 Создавать шаблоны опросов с сохранением списка людей
 ✏️ Редактировать 1-2 позиции перед отправкой
 📅 Планировать автоматическую отправку на нужное время
+👥 Отправлять опросы в группы и каналы
 
 *Как начать:*
 1️⃣ Создай шаблон с постоянным списком (те самые 30 человек)
@@ -543,6 +661,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'keyboard': [
                 [{'text': '✏️ Редактировать и отправить'}],
                 [{'text': '📅 Запланировать отправку'}],
+                [{'text': '⚙️ Изменить шаблон'}, {'text': '🗑️ Удалить'}],
                 [{'text': '🔙 Назад'}]
             ],
             'resize_keyboard': True
@@ -739,6 +858,207 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
         except ValueError:
             send_telegram_message(chat_id, '❌ Неверный формат! Используй: ДД.ММ.ГГГГ ЧЧ:ММ\nПример: 15.12.2024 09:00')
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'template_selected' and text == '🗑️ Удалить':
+        template_id = state_data.get('template_id')
+        template_name = state_data.get('template_name')
+        
+        keyboard = {
+            'keyboard': [
+                [{'text': '✅ Да, удалить'}],
+                [{'text': '❌ Отменить'}]
+            ],
+            'resize_keyboard': True
+        }
+        
+        send_telegram_message(chat_id, f'⚠️ Точно удалить шаблон *{template_name}*?\nЭто действие нельзя отменить!', keyboard)
+        save_user_state(user_id, 'confirm_delete', {'template_id': template_id, 'template_name': template_name})
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'confirm_delete' and text == '✅ Да, удалить':
+        template_id = state_data.get('template_id')
+        template_name = state_data.get('template_name')
+        
+        if delete_template(template_id, user_id):
+            send_telegram_message(chat_id, f'✅ Шаблон *{template_name}* удалён', get_main_keyboard())
+        else:
+            send_telegram_message(chat_id, '❌ Ошибка удаления', get_main_keyboard())
+        
+        clear_user_state(user_id)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'confirm_delete' and text == '❌ Отменить':
+        send_telegram_message(chat_id, '✅ Удаление отменено', get_main_keyboard())
+        clear_user_state(user_id)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'template_selected' and text == '⚙️ Изменить шаблон':
+        template_id = state_data.get('template_id')
+        
+        keyboard = {
+            'keyboard': [
+                [{'text': '🏷️ Изменить название'}],
+                [{'text': '❓ Изменить вопрос'}],
+                [{'text': '👥 Изменить список людей'}],
+                [{'text': '🔙 Назад'}]
+            ],
+            'resize_keyboard': True
+        }
+        
+        send_telegram_message(chat_id, '⚙️ Что хочешь изменить?', keyboard)
+        save_user_state(user_id, 'edit_template_menu', {'template_id': template_id})
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'edit_template_menu' and text == '🏷️ Изменить название':
+        send_telegram_message(chat_id, '🏷️ Введи новое название шаблона:', {'remove_keyboard': True})
+        save_user_state(user_id, 'waiting_new_template_name', state_data)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'waiting_new_template_name':
+        template_id = state_data.get('template_id')
+        new_name = text.strip()
+        
+        if update_template(template_id, user_id, template_name=new_name):
+            send_telegram_message(chat_id, f'✅ Название изменено на *{new_name}*', get_main_keyboard())
+        else:
+            send_telegram_message(chat_id, '❌ Ошибка изменения', get_main_keyboard())
+        
+        clear_user_state(user_id)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'edit_template_menu' and text == '❓ Изменить вопрос':
+        send_telegram_message(chat_id, '❓ Введи новый вопрос для опроса:', {'remove_keyboard': True})
+        save_user_state(user_id, 'waiting_new_question', state_data)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'waiting_new_question':
+        template_id = state_data.get('template_id')
+        new_question = text.strip()
+        
+        if update_template(template_id, user_id, poll_question=new_question):
+            send_telegram_message(chat_id, f'✅ Вопрос изменён на:\n*{new_question}*', get_main_keyboard())
+        else:
+            send_telegram_message(chat_id, '❌ Ошибка изменения', get_main_keyboard())
+        
+        clear_user_state(user_id)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'edit_template_menu' and text == '👥 Изменить список людей':
+        send_telegram_message(chat_id, '👥 Введи новый список людей (каждый с новой строки):\n\nПример:\nАлексей\nМария\nДмитрий', {'remove_keyboard': True})
+        save_user_state(user_id, 'waiting_new_people_list', state_data)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if current_state == 'waiting_new_people_list':
+        template_id = state_data.get('template_id')
+        new_people = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        if len(new_people) < 2:
+            send_telegram_message(chat_id, '❌ Нужно минимум 2 человека. Попробуй ещё раз:', {'remove_keyboard': True})
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        if update_template(template_id, user_id, poll_options=new_people):
+            people_text = '\n'.join([f"{i+1}. {p}" for i, p in enumerate(new_people)])
+            send_telegram_message(chat_id, f'✅ Список изменён ({len(new_people)} чел.):\n\n{people_text}', get_main_keyboard())
+        else:
+            send_telegram_message(chat_id, '❌ Ошибка изменения', get_main_keyboard())
+        
+        clear_user_state(user_id)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
+    if text == '👥 Подключить к группе':
+        bot_username = os.environ.get('POLL_BOT_USERNAME', 'Neiroop_bot')
+        instructions = f'''👥 *Подключение к группе или каналу*
+
+Чтобы бот мог отправлять опросы в группу:
+
+1️⃣ Открой свою группу/канал
+2️⃣ Нажми на название → *Добавить участников*
+3️⃣ Найди бота: `@{bot_username}`
+4️⃣ Добавь бота в группу
+5️⃣ Дай боту права администратора
+6️⃣ Напиши в группе: `/connect`
+
+✅ Готово! Теперь ты сможешь отправлять опросы в эту группу!'''
+        
+        groups = get_user_groups(user_id)
+        if groups:
+            instructions += '\n\n📊 *Твои подключённые группы:*\n'
+            for i, group in enumerate(groups, 1):
+                instructions += f"{i}. {group['chat_title']}\n"
+        
+        send_telegram_message(chat_id, instructions, get_main_keyboard())
         
         return {
             'statusCode': 200,
