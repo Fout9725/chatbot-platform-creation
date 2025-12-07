@@ -9,6 +9,7 @@ import BotConstructorModal from '@/components/modals/BotConstructorModal';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
+import ContactSupport from '@/components/ContactSupport';
 import { useAuth } from '@/contexts/AuthContext';
 const Index = () => {
   const navigate = useNavigate();
@@ -48,26 +49,32 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/docs')}>
-                <Icon name="BookOpen" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Документация</span>
-              </Button>
-              {user?.role === 'admin' && (
-                <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/admin')}>
-                  <Icon name="Shield" size={18} className="mr-2" />
-                  <span className="hidden lg:inline">Админ-панель</span>
+              <Link to="/docs">
+                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                  <Icon name="BookOpen" size={18} className="mr-2" />
+                  <span className="hidden lg:inline">Документация</span>
                 </Button>
+              </Link>
+              {user?.role === 'admin' && (
+                <Link to="/admin">
+                  <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                    <Icon name="Shield" size={18} className="mr-2" />
+                    <span className="hidden lg:inline">Админ-панель</span>
+                  </Button>
+                </Link>
               )}
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/notifications')}>
-                <Icon name="Bell" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Уведомления</span>
-              </Button>
-              <Button variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
+              <Link to="/notifications">
+                <Button type="button" disabled={false} variant="ghost" size="sm" className="hidden md:flex">
+                  <Icon name="Bell" size={18} className="mr-2" />
+                  <span className="hidden lg:inline">Уведомления</span>
+                </Button>
+              </Link>
+              <Button type="button" disabled={false} variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
               </Button>
               {!isAuthenticated && (
-                <Button variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
+                <Button type="button" disabled={false} variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
                   <Icon name="ShieldCheck" size={18} className="md:mr-2" />
                   <span className="hidden md:inline">Админ</span>
                 </Button>
@@ -191,11 +198,13 @@ const Index = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="flex-1" size="lg" onClick={() => navigate('/partner')}>
-                <Icon name="Rocket" size={18} className="mr-2" />
-                Стать партнёром
-              </Button>
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
+              <Link to="/partner" className="flex-1">
+                <Button type="button" disabled={false} className="w-full" size="lg">
+                  <Icon name="Rocket" size={18} className="mr-2" />
+                  Стать партнёром
+                </Button>
+              </Link>
+              <Button type="button" disabled={false} variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
               </Button>
@@ -263,9 +272,14 @@ const Index = () => {
                 </TabsList>
                 
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => setIsModeModalOpen(true)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsModeModalOpen(true);
+                  }}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Конструктор</span>
@@ -273,9 +287,14 @@ const Index = () => {
                 </Button>
 
                 <Button
+                  type="button"
+                  disabled={false}
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => navigate('/my-bots')}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.open('/my-bots', '_blank');
+                  }}
                 >
                   <Icon name="Folder" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Мои боты</span>
@@ -303,6 +322,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      <ContactSupport />
 
       <BotConstructorModal 
         isOpen={isConstructorOpen} 

@@ -118,8 +118,8 @@ const AIAssistant = () => {
 
   if (!isOpen && showGreeting) {
     return (
-      <div className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-5 pointer-events-none">
-        <Card className="w-80 shadow-2xl border-2 border-primary/20 pointer-events-auto">
+      <div className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-5">
+        <Card className="w-80 shadow-2xl border-2 border-primary/20">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="bg-gradient-to-br from-primary to-secondary p-2 rounded-full">
@@ -132,9 +132,11 @@ const AIAssistant = () => {
                 </p>
               </div>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleDismiss}
+                disabled={false}
               >
                 <Icon name="X" size={16} />
               </Button>
@@ -143,15 +145,19 @@ const AIAssistant = () => {
           <CardContent className="pb-4">
             <div className="flex gap-2">
               <Button 
+                type="button"
                 onClick={handleOpen} 
                 className="flex-1"
+                disabled={false}
               >
                 <Icon name="MessageCircle" size={16} className="mr-2" />
                 Открыть чат
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleDismiss}
+                disabled={false}
               >
                 <Icon name="X" size={16} />
               </Button>
@@ -165,9 +171,11 @@ const AIAssistant = () => {
   if (!isOpen) {
     return (
       <Button
+        type="button"
         onClick={handleOpen}
         className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl"
         size="icon"
+        disabled={false}
       >
         <Icon name="Bot" size={24} />
       </Button>
@@ -177,8 +185,10 @@ const AIAssistant = () => {
   if (isMinimized) {
     return (
       <Button
+        type="button"
         onClick={() => setIsMinimized(false)}
         className="fixed bottom-6 right-6 z-50 h-14 rounded-full shadow-2xl px-4"
+        disabled={false}
       >
         <Icon name="Bot" size={20} className="mr-2" />
         <span className="text-sm font-medium">Помощник</span>
@@ -206,19 +216,23 @@ const AIAssistant = () => {
           </div>
           <div className="flex gap-1">
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onClick={() => setIsMinimized(true)}
+              disabled={false}
             >
               <Icon name="Minus" size={16} />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onClick={() => {
                 setIsOpen(false);
                 trackAction('assistant_closed', {});
               }}
+              disabled={false}
             >
               <Icon name="X" size={16} />
             </Button>
@@ -302,6 +316,7 @@ const AIAssistant = () => {
               disabled={isLoading}
             />
             <Button
+              type="button"
               onClick={sendMessage}
               disabled={isLoading || !inputMessage.trim()}
               size="icon"
