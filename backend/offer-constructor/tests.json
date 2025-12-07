@@ -1,0 +1,42 @@
+{
+  "tests": [
+    {
+      "name": "Test basic message",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": "Привет! Хочу создать оффер для моего курса",
+        "history": []
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "response": "string",
+        "model": "tngtech/deepseek-r1t-chimera:free"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test with history",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": "Расскажи подробнее про P.R.S.T.S.",
+        "history": [
+          {
+            "role": "user",
+            "content": "Привет"
+          },
+          {
+            "role": "assistant",
+            "content": "Здравствуй! Я помогу тебе создать сильный оффер."
+          }
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "response": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

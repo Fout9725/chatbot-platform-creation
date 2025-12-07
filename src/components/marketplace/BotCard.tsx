@@ -85,17 +85,31 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
             <Icon name="Info" size={14} className="mr-1" />
             Подробнее
           </Button>
-          <Button
-            type="button"
-            disabled={false}
-            variant="secondary"
-            size="sm"
-            className="flex-1 group/btn"
-            onClick={() => onTest(bot.id)}
-          >
-            <Icon name="PlayCircle" size={14} className="mr-1" />
-            Тест 3 дня
-          </Button>
+          {bot.demoUrl ? (
+            <Button
+              type="button"
+              disabled={false}
+              variant="secondary"
+              size="sm"
+              className="flex-1 group/btn"
+              onClick={() => window.location.href = bot.demoUrl!}
+            >
+              <Icon name="Rocket" size={14} className="mr-1" />
+              Попробовать
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={false}
+              variant="secondary"
+              size="sm"
+              className="flex-1 group/btn"
+              onClick={() => onTest(bot.id)}
+            >
+              <Icon name="PlayCircle" size={14} className="mr-1" />
+              Тест 3 дня
+            </Button>
+          )}
         </div>
         <div className="flex gap-2 w-full">
           <Button

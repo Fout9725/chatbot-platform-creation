@@ -31,6 +31,7 @@ export interface Bot {
   integrations?: Integration[];
   aiModel?: 'gpt-4' | 'gpt-3.5' | 'claude' | 'yandexgpt';
   personality?: string;
+  demoUrl?: string;
 }
 
 export const categories = ['Все', 'Продажи', 'Поддержка', 'HR', 'Маркетинг', 'Финансы', 'Сервис', 'Креатив', 'Юриспруденция'];
