@@ -123,7 +123,9 @@ def get_main_keyboard():
             [{'text': '📋 Мои шаблоны'}, {'text': '📅 Запланировать'}],
             [{'text': '🕐 Мои запланированные'}]
         ],
-        'resize_keyboard': True
+        'resize_keyboard': True,
+        'one_time_keyboard': False,
+        'selective': False
     }
 
 def get_template_keyboard(templates: List[Dict]) -> Dict:
