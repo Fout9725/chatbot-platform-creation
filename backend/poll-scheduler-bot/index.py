@@ -13,9 +13,9 @@ def get_db_connection():
     return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
 
 def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[Dict] = None) -> bool:
-    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    bot_token = os.environ.get('POLL_BOT_TOKEN')
     if not bot_token:
-        print('ERROR: TELEGRAM_BOT_TOKEN not set')
+        print('ERROR: POLL_BOT_TOKEN not set')
         return False
     
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
@@ -38,9 +38,9 @@ def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[Dict] 
         return False
 
 def send_telegram_poll(chat_id: int, question: str, options: List[str], allows_multiple_answers: bool = True) -> bool:
-    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    bot_token = os.environ.get('POLL_BOT_TOKEN')
     if not bot_token:
-        print('ERROR: TELEGRAM_BOT_TOKEN not set')
+        print('ERROR: POLL_BOT_TOKEN not set')
         return False
     
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendPoll'

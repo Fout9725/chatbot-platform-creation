@@ -1,0 +1,32 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request (CORS preflight)",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get webhook info",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "action": "getWebhookInfo",
+        "result": {}
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Set webhook",
+      "method": "POST",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "action": "setWebhook",
+        "webhook_url": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
