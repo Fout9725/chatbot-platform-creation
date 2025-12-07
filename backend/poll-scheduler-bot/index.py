@@ -20,18 +20,22 @@ def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[Dict] 
     
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
     
-    data = {
+    payload = {
         'chat_id': chat_id,
-        'text': text[:4096],  # Telegram limit
+        'text': text[:4096],
         'parse_mode': 'Markdown'
     }
     
     if reply_markup:
-        data['reply_markup'] = reply_markup
+        payload['reply_markup'] = reply_markup
     
     try:
-        response = requests.post(telegram_url, json=data, timeout=10)
+        print(f'Sending message with payload: {json.dumps(payload)}')
+        response = requests.post(telegram_url, json=payload, timeout=10)
         result = response.json()
+        print(f'Telegram API response: {result}')
+        if not result.get('ok', False):
+            print(f'Telegram API error: {result.get("description", "Unknown error")}')
         return result.get('ok', False)
     except Exception as e:
         print(f'Error sending message: {e}')
