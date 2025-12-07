@@ -49,26 +49,20 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link to="/docs">
-                <Button variant="ghost" size="sm" className="hidden md:flex">
-                  <Icon name="BookOpen" size={18} className="mr-2" />
-                  <span className="hidden lg:inline">Документация</span>
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/docs')}>
+                <Icon name="BookOpen" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Документация</span>
+              </Button>
               {user?.role === 'admin' && (
-                <Link to="/admin">
-                  <Button variant="ghost" size="sm" className="hidden md:flex">
-                    <Icon name="Shield" size={18} className="mr-2" />
-                    <span className="hidden lg:inline">Админ-панель</span>
-                  </Button>
-                </Link>
-              )}
-              <Link to="/notifications">
-                <Button variant="ghost" size="sm" className="hidden md:flex">
-                  <Icon name="Bell" size={18} className="mr-2" />
-                  <span className="hidden lg:inline">Уведомления</span>
+                <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/admin')}>
+                  <Icon name="Shield" size={18} className="mr-2" />
+                  <span className="hidden lg:inline">Админ-панель</span>
                 </Button>
-              </Link>
+              )}
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/notifications')}>
+                <Icon name="Bell" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Уведомления</span>
+              </Button>
               <Button variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
@@ -198,12 +192,10 @@ const Index = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link to="/partner" className="flex-1">
-                <Button className="w-full" size="lg">
-                  <Icon name="Rocket" size={18} className="mr-2" />
-                  Стать партнёром
-                </Button>
-              </Link>
+              <Button className="flex-1" size="lg" onClick={() => navigate('/partner')}>
+                <Icon name="Rocket" size={18} className="mr-2" />
+                Стать партнёром
+              </Button>
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
