@@ -190,12 +190,12 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="flex-1" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/partner'); }}>
+            <div className="flex flex-col sm:flex-row gap-3 relative z-50">
+              <Button className="flex-1 relative z-50" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/partner'); }}>
                 <Icon name="Rocket" size={18} className="mr-2" />
                 Стать партнёром
               </Button>
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => { console.log('Calculator button clicked!'); setIsCalculatorOpen(true); }}>
+              <Button variant="outline" size="lg" className="flex-1 relative z-50" onClick={() => { console.log('Calculator button clicked!'); setIsCalculatorOpen(true); }}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
               </Button>
@@ -250,11 +250,11 @@ const Index = () => {
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex-1">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-              <div className="flex gap-2">
-                <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
+              <div className="flex gap-2 relative z-50">
+                <TabsList className="flex-1 grid grid-cols-1 h-auto p-1 relative z-50">
                   <TabsTrigger 
                     value="marketplace" 
-                    className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
+                    className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
                   >
                     <Icon name="Store" size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="hidden sm:inline">Маркетплейс</span>
@@ -264,7 +264,7 @@ const Index = () => {
                 
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
+                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
                   onClick={() => setIsModeModalOpen(true)}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
@@ -274,7 +274,7 @@ const Index = () => {
 
                 <Button
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
+                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
                   onClick={() => navigate('/my-bots')}
                 >
                   <Icon name="Folder" size={16} className="md:w-[18px] md:h-[18px]" />
