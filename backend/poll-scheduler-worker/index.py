@@ -50,7 +50,7 @@ def get_pending_polls() -> List[Dict]:
     now = datetime.now()
     
     cur.execute("""
-        SELECT id, chat_id, poll_question, poll_options
+        SELECT id, chat_id, poll_question, poll_options, scheduled_time
         FROM scheduled_polls
         WHERE status = 'pending' AND scheduled_time <= %s
         ORDER BY scheduled_time ASC
@@ -60,6 +60,10 @@ def get_pending_polls() -> List[Dict]:
     polls = cur.fetchall()
     cur.close()
     conn.close()
+    
+    print(f"Found {len(polls)} pending polls to send")
+    for poll in polls:
+        print(f"  Poll {poll['id']}: chat_id={poll['chat_id']}, scheduled={poll.get('scheduled_time', 'N/A')}")
     
     return polls
 
@@ -116,6 +120,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     for poll in pending_polls:
         results['processed'] += 1
+        
+        print(f"Processing poll {poll['id']}: chat_id={poll['chat_id']}, question={poll['poll_question'][:50]}")
         
         try:
             success = send_telegram_poll(
