@@ -691,18 +691,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        schedule_text = f'''📅 *Планирование: {template['template_name']}*
-
-Введи дату и время отправки:
-*Формат: ДД.ММ.ГГГГ ЧЧ:ММ*
-
-Примеры:
-• 15.12.2024 09:00 (утро)
-• 15.12.2024 13:00 (обед)
-• 15.12.2024 18:00 (вечер)'''
+        # Показываем список групп для выбора
+        groups = get_user_groups(user_id)
         
-        send_telegram_message(chat_id, schedule_text, {'remove_keyboard': True})
-        save_user_state(user_id, 'waiting_schedule_time', {'template_id': template['id'], 'template_name': template['template_name']})
+        if not groups:
+            send_telegram_message(chat_id, '❌ У тебя нет подключенных групп!\n\nИспользуй кнопку "👥 Подключить к группе" и добавь бота в группу как администратора.', get_main_keyboard())
+            clear_user_state(user_id)
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        group_keyboard = {'keyboard': [[{'text': group['chat_title']}] for group in groups] + [[{'text': '🔙 Назад'}]], 'resize_keyboard': True}
+        
+        group_list_text = f'''📅 *Планирование: {template['template_name']}*\n\n👥 Выбери группу для отправки:\n\n'''
+        for i, group in enumerate(groups, 1):
+            group_list_text += f"{i}. {group['chat_title']}\n"
+        
+        send_telegram_message(chat_id, group_list_text, group_keyboard)
+        save_user_state(user_id, 'schedule_selecting_group', {'template_id': template['id'], 'template_name': template['template_name']})
         
         return {
             'statusCode': 200,
@@ -815,6 +824,35 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
+    if current_state == 'schedule_selecting_group':
+        # Проверяем что выбрана группа
+        groups = get_user_groups(user_id)
+        selected_group = next((g for g in groups if g['chat_title'] == text), None)
+        
+        if not selected_group:
+            send_telegram_message(chat_id, '❌ Группа не найдена', get_main_keyboard())
+            clear_user_state(user_id)
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
+        
+        schedule_text = f'''📅 *Планирование: {state_data['template_name']}*\n👥 *Группа: {selected_group['chat_title']}*\n\nВведи дату и время отправки:\n*Формат: ДД.ММ.ГГГГ ЧЧ:ММ*\n\nПримеры:\n• 15.12.2024 09:00 (утро)\n• 15.12.2024 13:00 (обед)\n• 15.12.2024 18:00 (вечер)'''
+        
+        send_telegram_message(chat_id, schedule_text, {'remove_keyboard': True})
+        state_data['target_chat_id'] = selected_group['chat_id']
+        state_data['target_chat_title'] = selected_group['chat_title']
+        save_user_state(user_id, 'waiting_schedule_time', state_data)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'ok': True}),
+            'isBase64Encoded': False
+        }
+    
     if current_state == 'waiting_schedule_time':
         try:
             scheduled_time = datetime.strptime(text.strip(), '%d.%m.%Y %H:%M')
@@ -828,6 +866,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             template_id = state_data.get('template_id')
+            target_chat_id = state_data.get('target_chat_id')
+            target_chat_title = state_data.get('target_chat_title', 'группу')
+            
             templates = get_user_templates(user_id)
             template = next((t for t in templates if t['id'] == template_id), None)
             
@@ -843,7 +884,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             poll_id = schedule_poll(
                 template_id,
                 user_id,
-                chat_id,
+                target_chat_id,
                 template['poll_question'],
                 template['poll_options'],
                 scheduled_time
@@ -852,7 +893,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             clear_user_state(user_id)
             send_telegram_message(
                 chat_id,
-                f"✅ Опрос запланирован на {scheduled_time.strftime('%d.%m.%Y %H:%M')}!",
+                f"✅ Опрос запланирован на {scheduled_time.strftime('%d.%m.%Y %H:%M')}!\n👥 Будет отправлен в: {target_chat_title}",
                 get_main_keyboard()
             )
             
