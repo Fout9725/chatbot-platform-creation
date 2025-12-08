@@ -1,0 +1,14 @@
+name: Poll Scheduler Worker
+
+on:
+  schedule:
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-poll-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call poll-cron-trigger
+        run: |
+          curl -X POST https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71
