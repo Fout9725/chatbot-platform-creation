@@ -191,11 +191,11 @@ const Index = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="flex-1" size="lg" onClick={() => navigate('/partner')}>
+              <Button className="flex-1" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/partner'); }}>
                 <Icon name="Rocket" size={18} className="mr-2" />
                 Стать партнёром
               </Button>
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => setIsCalculatorOpen(true)}>
+              <Button variant="outline" size="lg" className="flex-1" onClick={() => { console.log('Calculator button clicked!'); setIsCalculatorOpen(true); }}>
                 <Icon name="Calculator" size={18} className="mr-2" />
                 Калькулятор дохода
               </Button>
