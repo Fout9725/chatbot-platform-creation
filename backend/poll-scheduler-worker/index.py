@@ -11,7 +11,11 @@ def get_db_connection():
     return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
 
 def send_telegram_poll(chat_id: int, question: str, options: List[str]) -> bool:
-    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    bot_token = os.environ.get('POLL_BOT_TOKEN')
+    if not bot_token:
+        print('ERROR: POLL_BOT_TOKEN not set')
+        return False
+    
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendPoll'
     
     data = {
@@ -22,15 +26,22 @@ def send_telegram_poll(chat_id: int, question: str, options: List[str]) -> bool:
         'allows_multiple_answers': True
     }
     
-    req = urllib.request.Request(
-        telegram_url,
-        data=json.dumps(data).encode('utf-8'),
-        headers={'Content-Type': 'application/json'}
-    )
-    
-    with urllib.request.urlopen(req) as response:
-        result = json.loads(response.read().decode('utf-8'))
-        return result.get('ok', False)
+    try:
+        req = urllib.request.Request(
+            telegram_url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(f'Telegram API response: {result}')
+            if not result.get('ok', False):
+                print(f'Telegram API error: {result.get("description", "Unknown error")}')
+            return result.get('ok', False)
+    except Exception as e:
+        print(f'Error sending poll: {e}')
+        return False
 
 def get_pending_polls() -> List[Dict]:
     conn = get_db_connection()
