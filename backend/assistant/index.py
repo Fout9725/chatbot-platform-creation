@@ -149,10 +149,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        # Приоритет бесплатной модели OpenRouter
+        # Приоритет платных моделей OpenRouter (у вас есть баланс $13.25)
         if openrouter_key:
             request_data = {
-                'model': 'qwen/qwen-2.5-72b-instruct:free',
+                'model': 'openrouter/horizon-beta',
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_message}
