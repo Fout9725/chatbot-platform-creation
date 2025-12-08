@@ -47,15 +47,14 @@ def get_pending_polls() -> List[Dict]:
     conn = get_db_connection()
     cur = conn.cursor()
     
-    now = datetime.now()
-    
+    # Используем CURRENT_TIMESTAMP из базы данных (всегда UTC)
     cur.execute("""
         SELECT id, chat_id, poll_question, poll_options, scheduled_time
         FROM scheduled_polls
-        WHERE status = 'pending' AND scheduled_time <= %s
+        WHERE status = 'pending' AND scheduled_time <= CURRENT_TIMESTAMP
         ORDER BY scheduled_time ASC
         LIMIT 10
-    """, (now,))
+    """)
     
     polls = cur.fetchall()
     cur.close()
