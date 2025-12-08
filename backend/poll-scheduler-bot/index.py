@@ -7,6 +7,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 import requests
+import pytz
 
 def get_db_connection():
     dsn = os.environ.get('DATABASE_URL')
@@ -855,9 +856,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if current_state == 'waiting_schedule_time':
         try:
-            scheduled_time = datetime.strptime(text.strip(), '%d.%m.%Y %H:%M')
+            # Парсим время как московское
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            naive_time = datetime.strptime(text.strip(), '%d.%m.%Y %H:%M')
+            scheduled_time_moscow = moscow_tz.localize(naive_time)
             
-            if scheduled_time <= datetime.now():
+            # Конвертируем в UTC для базы данных
+            scheduled_time_utc = scheduled_time_moscow.astimezone(pytz.UTC)
+            
+            # Проверяем что время в будущем (сравниваем в UTC)
+            now_utc = datetime.now(pytz.UTC)
+            if scheduled_time_utc <= now_utc:
                 send_telegram_message(chat_id, '❌ Время должно быть в будущем!')
                 return {
                     'statusCode': 200,
@@ -881,19 +890,20 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'body': json.dumps({'ok': True})
                 }
             
+            # Сохраняем время в UTC без timezone (как naive datetime)
             poll_id = schedule_poll(
                 template_id,
                 user_id,
                 target_chat_id,
                 template['poll_question'],
                 template['poll_options'],
-                scheduled_time
+                scheduled_time_utc.replace(tzinfo=None)
             )
             
             clear_user_state(user_id)
             send_telegram_message(
                 chat_id,
-                f"✅ Опрос запланирован на {scheduled_time.strftime('%d.%m.%Y %H:%M')}!\n👥 Будет отправлен в: {target_chat_title}",
+                f"✅ Опрос запланирован на {naive_time.strftime('%d.%m.%Y %H:%M')} (МСК)!\n👥 Будет отправлен в: {target_chat_title}",
                 get_main_keyboard()
             )
             
