@@ -27,6 +27,7 @@ import AdminNew from "./pages/AdminNew";
 import AIAssistant from "./components/AIAssistant";
 import OfferConstructor from "./pages/OfferConstructor";
 import PollWorkerTrigger from "./pages/PollWorkerTrigger";
+import PollCronSetup from "./pages/PollCronSetup";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/admin-old" element={<Admin />} />
           <Route path="/offer-constructor" element={<OfferConstructor />} />
           <Route path="/poll-worker" element={<PollWorkerTrigger />} />
+          <Route path="/poll-cron-setup" element={<PollCronSetup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
