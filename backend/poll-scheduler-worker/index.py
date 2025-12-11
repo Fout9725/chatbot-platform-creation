@@ -5,6 +5,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import urllib.request
 from datetime import datetime, timedelta
+import time
+import threading
 
 def get_db_connection():
     dsn = os.environ.get('DATABASE_URL')
@@ -87,9 +89,31 @@ def mark_poll_sent(poll_id: int, success: bool, error_message: str = None) -> No
     cur.close()
     conn.close()
 
+def schedule_next_check():
+    '''Запланировать следующую проверку через 60 секунд'''
+    def call_after_delay():
+        print('Waiting 60 seconds before next check...')
+        time.sleep(60)
+        try:
+            worker_url = 'https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442'
+            req = urllib.request.Request(
+                worker_url,
+                data=json.dumps({'auto': True}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            response = urllib.request.urlopen(req, timeout=3)
+            print(f'Next check scheduled: {response.status}')
+        except Exception as e:
+            print(f'Failed to schedule next check: {e}')
+    
+    # Запускаем в фоновом потоке
+    thread = threading.Thread(target=call_after_delay, daemon=False)
+    thread.start()
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
-    Business: Worker for sending scheduled polls automatically
+    Business: Worker for sending scheduled polls automatically with self-rescheduling
     Args: event - HTTP request or scheduled trigger
           context - cloud function context
     Returns: HTTP response with processing results
@@ -108,6 +132,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': ''
         }
     
+    # Обрабатываем ожидающие опросы
     pending_polls = get_pending_polls()
     
     results = {
@@ -142,6 +167,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             mark_poll_sent(poll['id'], False, error_msg)
             results['failed'] += 1
             results['errors'].append(f"Poll {poll['id']}: {error_msg}")
+    
+    # Планируем следующую проверку
+    schedule_next_check()
     
     return {
         'statusCode': 200,

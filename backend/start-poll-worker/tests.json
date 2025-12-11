@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {
+      "name": "Start worker",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    }
+  ]
+}
