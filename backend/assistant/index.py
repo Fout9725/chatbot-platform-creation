@@ -149,10 +149,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        # Приоритет платных моделей OpenRouter (у вас есть баланс $13.25)
+        # Используем бесплатные модели от OpenRouter
         if openrouter_key:
             request_data = {
-                'model': 'openrouter/horizon-beta',
+                'model': 'google/gemini-2.0-flash-exp:free',
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_message}
