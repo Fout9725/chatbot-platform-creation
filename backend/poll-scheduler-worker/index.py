@@ -4,9 +4,7 @@ from typing import Dict, Any, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import urllib.request
-from datetime import datetime, timedelta
-import time
-import threading
+from datetime import datetime
 
 def get_db_connection():
     dsn = os.environ.get('DATABASE_URL')
@@ -89,32 +87,10 @@ def mark_poll_sent(poll_id: int, success: bool, error_message: str = None) -> No
     cur.close()
     conn.close()
 
-def schedule_next_check():
-    '''Запланировать следующую проверку через 60 секунд'''
-    def call_after_delay():
-        print('Waiting 60 seconds before next check...')
-        time.sleep(60)
-        try:
-            worker_url = 'https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442'
-            req = urllib.request.Request(
-                worker_url,
-                data=json.dumps({'auto': True}).encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
-                method='POST'
-            )
-            response = urllib.request.urlopen(req, timeout=3)
-            print(f'Next check scheduled: {response.status}')
-        except Exception as e:
-            print(f'Failed to schedule next check: {e}')
-    
-    # Запускаем в фоновом потоке
-    thread = threading.Thread(target=call_after_delay, daemon=False)
-    thread.start()
-
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
-    Business: Worker for sending scheduled polls automatically with self-rescheduling
-    Args: event - HTTP request or scheduled trigger
+    Business: Worker for sending scheduled polls automatically
+    Args: event - HTTP request or timer trigger event
           context - cloud function context
     Returns: HTTP response with processing results
     '''
@@ -129,8 +105,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
-            'body': ''
+            'body': '',
+            'isBase64Encoded': False
         }
+    
+    print(f'Worker invoked at {datetime.now()} by trigger or HTTP request')
     
     # Обрабатываем ожидающие опросы
     pending_polls = get_pending_polls()
@@ -139,7 +118,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'processed': 0,
         'sent': 0,
         'failed': 0,
-        'errors': []
+        'errors': [],
+        'timestamp': datetime.now().isoformat()
     }
     
     for poll in pending_polls:
@@ -157,19 +137,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if success:
                 mark_poll_sent(poll['id'], True)
                 results['sent'] += 1
+                print(f"✓ Poll {poll['id']} sent successfully")
             else:
                 mark_poll_sent(poll['id'], False, 'Telegram API returned error')
                 results['failed'] += 1
                 results['errors'].append(f"Poll {poll['id']}: Telegram API error")
+                print(f"✗ Poll {poll['id']} failed: Telegram API error")
                 
         except Exception as e:
             error_msg = str(e)
             mark_poll_sent(poll['id'], False, error_msg)
             results['failed'] += 1
             results['errors'].append(f"Poll {poll['id']}: {error_msg}")
+            print(f"✗ Poll {poll['id']} failed: {error_msg}")
     
-    # Планируем следующую проверку
-    schedule_next_check()
+    print(f"Worker completed: {results['sent']} sent, {results['failed']} failed")
     
     return {
         'statusCode': 200,
