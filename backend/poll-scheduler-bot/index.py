@@ -97,7 +97,7 @@ def ask_ai_assistant(user_message: str) -> str:
                 'X-Title': 'PollSchedulerBot'
             },
             json={
-                'model': 'tngtech/deepseek-r1t2-chimera:free',
+                'model': 'openrouter/horizon-beta',
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_message[:500]}
@@ -958,10 +958,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
-    if current_state == 'confirm_delete' and text == '❌ Отменить':
-        send_telegram_message(chat_id, '✅ Удаление отменено', get_main_keyboard())
-        clear_user_state(user_id)
+    if current_state == 'confirm_delete':
+        if text == '❌ Отменить':
+            send_telegram_message(chat_id, '✅ Удаление отменено', get_main_keyboard())
+            clear_user_state(user_id)
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'ok': True}),
+                'isBase64Encoded': False
+            }
         
+        # Если пользователь написал что-то другое во время confirm_delete
+        send_telegram_message(chat_id, '⚠️ Выбери действие кнопками:', {
+            'keyboard': [
+                [{'text': '✅ Да, удалить'}],
+                [{'text': '❌ Отменить'}]
+            ],
+            'resize_keyboard': True
+        })
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
