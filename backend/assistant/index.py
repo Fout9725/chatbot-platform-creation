@@ -149,10 +149,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        # Используем бесплатные модели от OpenRouter
+        # Используем бесплатные модели от OpenRouter (DeepSeek V3 - самая мощная бесплатная)
         if openrouter_key:
             request_data = {
-                'model': 'google/gemini-2.0-flash-exp:free',
+                'model': 'deepseek/deepseek-chat:free',
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_message}
