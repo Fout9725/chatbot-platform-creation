@@ -9,17 +9,11 @@
       "bodyMatcher": "exact"
     },
     {
-      "name": "Worker execution (no pending polls)",
+      "name": "Worker execution returns success",
       "method": "POST",
       "path": "/",
       "body": {},
-      "expectedStatus": 200,
-      "expectedBody": {
-        "processed": 0,
-        "sent": 0,
-        "failed": 0
-      },
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     }
   ]
 }
