@@ -176,18 +176,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             api_key = groq_key
         
         try:
+            print(f'Making request to {api_url} with model {request_data["model"]}')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
                 headers={
                     'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://poehali.dev',
+                    'X-Title': 'PoehaliAssistant'
                 },
                 method='POST'
             )
             
-            response_text = urllib.request.urlopen(req).read().decode('utf-8')
+            response_text = urllib.request.urlopen(req, timeout=30).read().decode('utf-8')
             response_data = json.loads(response_text)
+            print(f'OpenRouter response: {response_data}')
             
             ai_response = response_data['choices'][0]['message']['content']
             
@@ -198,11 +202,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'response': ai_response})
             }
         except Exception as e:
+            print(f'ERROR in assistant: {str(e)}')
+            import traceback
+            print(f'Traceback: {traceback.format_exc()}')
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Пожалуйста, обратитесь к администратору: @Fou9725'})
+                'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Пожалуйста, обратитесь к администратору: @Fou9725. Ошибка: {str(e)}'})
             }
     
     return {
