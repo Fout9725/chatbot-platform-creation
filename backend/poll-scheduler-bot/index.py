@@ -199,6 +199,13 @@ def delete_template(template_id: int, user_id: int) -> bool:
     conn = get_db_connection()
     cur = conn.cursor()
     
+    # Сначала удаляем все запланированные опросы, связанные с этим шаблоном
+    cur.execute("""
+        DELETE FROM scheduled_polls
+        WHERE template_id = %s AND user_id = %s
+    """, (template_id, user_id))
+    
+    # Теперь можно удалить сам шаблон
     cur.execute("""
         DELETE FROM poll_templates
         WHERE id = %s AND user_id = %s
@@ -944,10 +951,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         template_id = state_data.get('template_id')
         template_name = state_data.get('template_name')
         
-        if delete_template(template_id, user_id):
-            send_telegram_message(chat_id, f'✅ Шаблон *{template_name}* удалён', get_main_keyboard())
-        else:
-            send_telegram_message(chat_id, '❌ Ошибка удаления', get_main_keyboard())
+        try:
+            if delete_template(template_id, user_id):
+                send_telegram_message(chat_id, f'✅ Шаблон *{template_name}* удалён', get_main_keyboard())
+            else:
+                send_telegram_message(chat_id, '❌ Ошибка удаления: шаблон не найден', get_main_keyboard())
+        except Exception as e:
+            print(f'Error deleting template: {e}')
+            send_telegram_message(chat_id, '❌ Ошибка при удалении шаблона. Попробуйте позже.', get_main_keyboard())
         
         clear_user_state(user_id)
         

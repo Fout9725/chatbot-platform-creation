@@ -1,6 +1,4 @@
 {
-  "start-poll-worker": "https://functions.poehali.dev/3cdf4e2a-0644-4151-8013-85a1725c7d9f",
-  "setup-poll-trigger": "https://functions.poehali.dev/518d5910-5a7f-4c0b-86d7-f4d7a1fe056d",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "offer-constructor": "https://functions.poehali.dev/d6cbd773-276e-4b10-983b-b0fd08681386",
   "poll-webhook-setup": "https://functions.poehali.dev/7783247a-ed0d-4433-9b62-24fb9d1e9a04",
