@@ -49,11 +49,11 @@ def get_pending_polls() -> List[Dict]:
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # Используем явное приведение типов для корректного сравнения
+    # Используем UTC время для корректного сравнения (scheduled_time хранится в UTC)
     cur.execute("""
         SELECT id, chat_id, poll_question, poll_options, scheduled_time
         FROM scheduled_polls
-        WHERE status = 'pending' AND scheduled_time <= NOW()::timestamp
+        WHERE status = 'pending' AND scheduled_time <= (NOW() AT TIME ZONE 'UTC')
         ORDER BY scheduled_time ASC
         LIMIT 10
     """)
