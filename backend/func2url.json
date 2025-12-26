@@ -1,17 +1,17 @@
 {
-  "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f",
-  "ai-tools": "https://functions.poehali.dev/a696f2e4-4a9d-42e0-b0b3-05ac55b4531f",
-  "bots-api": "https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2",
-  "ml-chat": "https://functions.poehali.dev/23f5dcaf-616d-4957-922d-ef9968ec1662",
-  "offer-constructor": "https://functions.poehali.dev/d6cbd773-276e-4b10-983b-b0fd08681386",
+  "robokassa-robokassa-webhook": "https://functions.poehali.dev/26465cd3-9f9e-4ba4-a4ab-67690fa4446d",
+  "robokassa-robokassa": "https://functions.poehali.dev/bed28ab3-2127-417a-91cb-6d97e70797de",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
+  "offer-constructor": "https://functions.poehali.dev/d6cbd773-276e-4b10-983b-b0fd08681386",
+  "user-registration": "https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631",
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
-  "prodamus-webhook": "https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4",
-  "telegram-bot": "https://functions.poehali.dev/5b77f8c6-c939-4ae9-bd61-e94167dce816",
-  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e",
-  "user-registration": "https://functions.poehali.dev/74986202-2953-4fed-a89f-114b1f982631",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
-  "robokassa-robokassa": "https://functions.poehali.dev/bed28ab3-2127-417a-91cb-6d97e70797de",
-  "robokassa-robokassa-webhook": "https://functions.poehali.dev/26465cd3-9f9e-4ba4-a4ab-67690fa4446d"
+  "prodamus-webhook": "https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4",
+  "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f",
+  "ai-tools": "https://functions.poehali.dev/a696f2e4-4a9d-42e0-b0b3-05ac55b4531f",
+  "ml-chat": "https://functions.poehali.dev/23f5dcaf-616d-4957-922d-ef9968ec1662",
+  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e",
+  "bots-api": "https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2",
+  "telegram-bot": "https://functions.poehali.dev/5b77f8c6-c939-4ae9-bd61-e94167dce816"
 }
