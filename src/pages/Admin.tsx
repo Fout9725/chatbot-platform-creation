@@ -7,22 +7,20 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useActiveBots } from '@/contexts/ActiveBotsContext';
 import AdminStatsTab from '@/components/admin/AdminStatsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
-import { mockBots } from '@/components/marketplace/mockBots';
 
 const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { activeBots } = useActiveBots();
   const [activeTab, setActiveTab] = useState('stats');
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [activeBots, setActiveBots] = useState<any[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
   const [planPrices, setPlanPrices] = useState({
@@ -58,6 +56,22 @@ const Admin = () => {
       }
     };
     fetchUsers();
+
+    const loadActiveBots = () => {
+      const saved = localStorage.getItem('activeBots');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setActiveBots(parsed || []);
+        } catch (error) {
+          console.error('Ошибка загрузки ботов:', error);
+          setActiveBots([]);
+        }
+      } else {
+        setActiveBots([]);
+      }
+    };
+    loadActiveBots();
 
     const loadPaymentHistory = () => {
       const saved = localStorage.getItem('paymentHistory');
@@ -122,14 +136,6 @@ const Admin = () => {
     })
     .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-  console.log('🔍 Admin Debug:', {
-    users: users.length,
-    activeBots: activeBots.length,
-    activeBotsList: activeBots,
-    paymentHistory: paymentHistory.length,
-    mockBots: mockBots.length
-  });
-
   const platformStats = {
     totalUsers: users.length,
     activeUsers: users.filter(u => u.plan !== 'free').length,
@@ -137,11 +143,9 @@ const Admin = () => {
     activeBots: activeBots.filter((b: any) => b.status === 'active').length,
     totalRevenue: totalRevenue,
     monthlyRevenue: monthlyRevenue,
-    marketplaceBots: mockBots.length,
-    customTemplates: mockBots.filter(b => b.price === 0).length
+    marketplaceBots: 0,
+    customTemplates: 0
   };
-
-  console.log('📊 platformStats:', platformStats);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
