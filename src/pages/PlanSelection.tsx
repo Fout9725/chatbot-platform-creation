@@ -103,13 +103,17 @@ const PlanSelection = () => {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentPlan, setPaymentPlan] = useState<any>(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated, navigate]);
-
   const handleSelectPlan = (planId: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: 'Требуется авторизация',
+        description: 'Войдите или зарегистрируйтесь, чтобы выбрать тариф',
+        variant: 'destructive',
+      });
+      navigate('/');
+      return;
+    }
+
     const selectedPlanData = plans.find(p => p.id === planId);
     if (!selectedPlanData) return;
 
@@ -131,9 +135,24 @@ const PlanSelection = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <div className="container mx-auto px-4 py-12">
+        {!isAuthenticated && (
+          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Icon name="Info" className="text-blue-600" size={24} />
+              <div>
+                <p className="font-semibold">Требуется авторизация</p>
+                <p className="text-sm text-muted-foreground">Войдите или зарегистрируйтесь, чтобы выбрать тариф</p>
+              </div>
+            </div>
+            <Button onClick={() => navigate('/')}>
+              Войти
+            </Button>
+          </div>
+        )}
+        
         <div className="text-center mb-12">
           <Badge className="mb-4" variant="secondary">
-            Шаг 2 из 2
+            {isAuthenticated ? 'Шаг 2 из 2' : 'Тарифы'}
           </Badge>
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Выберите тарифный план
@@ -227,19 +246,21 @@ const PlanSelection = () => {
           ))}
         </div>
 
-        <div className="mt-12 text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            Вы можете изменить тариф в любое время в настройках
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate('/dashboard')}
-            disabled={false}
-          >
-            Пропустить (использовать Бесплатный)
-          </Button>
-        </div>
+        {isAuthenticated && (
+          <div className="mt-12 text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              Вы можете изменить тариф в любое время в настройках
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate('/dashboard')}
+              disabled={false}
+            >
+              Пропустить (использовать Бесплатный)
+            </Button>
+          </div>
+        )}
 
         <div className="mt-16 max-w-4xl mx-auto">
           <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
