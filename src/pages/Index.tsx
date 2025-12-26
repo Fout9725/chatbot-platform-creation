@@ -224,7 +224,7 @@ const Index = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 relative z-50">
-              <Button className="flex-1 relative z-50" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/partner'); }}>
+              <Button className="flex-1 relative z-50" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/plan-selection'); }}>
                 <Icon name="Rocket" size={18} className="mr-2" />
                 Стать партнёром
               </Button>

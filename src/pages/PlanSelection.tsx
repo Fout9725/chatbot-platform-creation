@@ -72,7 +72,7 @@ const plans = [
   {
     id: 'partner',
     name: 'Партнёрский',
-    price: 4990,
+    price: 9990,
     period: 'в месяц',
     icon: 'Users',
     color: 'from-green-500 to-emerald-500',

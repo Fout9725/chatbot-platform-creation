@@ -27,7 +27,7 @@ const Admin = () => {
   const [planPrices, setPlanPrices] = useState({
     optimal: 990,
     premium: 2990,
-    partner: 4990
+    partner: 9990
   });
 
   const [templatePrice, setTemplatePrice] = useState(0);
