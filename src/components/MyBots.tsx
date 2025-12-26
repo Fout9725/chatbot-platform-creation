@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { mockBots } from './marketplace/mockBots';
 import BotSettingsModal from './modals/BotSettingsModal';
 
@@ -23,55 +24,16 @@ interface MyBot {
   daysLeft?: number;
 }
 
-const mockMyBots: MyBot[] = [
-  {
-    id: 1,
-    name: 'Продажный помощник',
-    type: 'ИИ-агент',
-    platform: 'Telegram',
-    status: 'active',
-    users: 342,
-    messages: 1250,
-    lastActive: '2 минуты назад',
-    performance: 87
-  },
-  {
-    id: 2,
-    name: 'Клиентский сервис',
-    type: 'ИИ-сотрудник',
-    platform: 'WhatsApp',
-    status: 'active',
-    users: 156,
-    messages: 890,
-    lastActive: '15 минут назад',
-    performance: 92
-  },
-  {
-    id: 3,
-    name: 'HR помощник',
-    type: 'ИИ-сотрудник',
-    platform: 'Веб-сайт',
-    status: 'paused',
-    users: 45,
-    messages: 203,
-    lastActive: '3 часа назад',
-    performance: 78
-  },
-  {
-    id: 4,
-    name: 'Новый бот',
-    type: 'Чат-бот',
-    platform: 'Instagram',
-    status: 'draft',
-    users: 0,
-    messages: 0,
-    lastActive: 'Никогда',
-    performance: 0
-  }
-];
+const PLAN_LIMITS: Record<string, number> = {
+  free: 1,
+  optimal: 5,
+  premium: 20,
+  partner: Infinity
+};
 
 const MyBots = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { activeBots, deactivateBot } = useActiveBots();
   const [bots, setBots] = useState<MyBot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +42,8 @@ const MyBots = () => {
     botId: 0, 
     botName: '' 
   });
+  
+  const maxBots = PLAN_LIMITS[user?.plan || 'free'];
 
   useEffect(() => {
     loadBots();
@@ -87,68 +51,28 @@ const MyBots = () => {
 
   const loadBots = async () => {
     setLoading(true);
-    try {
-      const response = await fetch('https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2');
-      const data = await response.json();
+    
+    const activatedBots: MyBot[] = activeBots.map(activeBot => {
+      const templateBot = mockBots.find(b => b.id === activeBot.botId);
+      const daysLeft = Math.ceil((activeBot.expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
       
-      const activatedBots: MyBot[] = activeBots.map(activeBot => {
-        const templateBot = mockBots.find(b => b.id === activeBot.botId);
-        const daysLeft = Math.ceil((activeBot.expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        
-        return {
-          id: activeBot.botId,
-          name: activeBot.botName,
-          type: templateBot?.category || 'ИИ-агент',
-          platform: 'Telegram',
-          status: activeBot.status === 'active' ? 'active' : 'paused',
-          users: Math.floor(Math.random() * 100),
-          messages: Math.floor(Math.random() * 500),
-          lastActive: activeBot.status === 'active' ? 'Только что' : 'Тестовый период истек',
-          performance: activeBot.status === 'active' ? 85 : 0,
-          testMode: true,
-          daysLeft
-        };
-      });
-      
-      if (data.bots) {
-        const mappedBots: MyBot[] = data.bots.map((bot: any) => ({
-          id: bot.id,
-          name: bot.name,
-          type: bot.bot_type,
-          platform: bot.platform,
-          status: bot.status as 'active' | 'paused' | 'draft',
-          users: Math.floor(Math.random() * 500),
-          messages: Math.floor(Math.random() * 2000),
-          lastActive: bot.status === 'draft' ? 'Никогда' : '1 час назад',
-          performance: bot.status === 'draft' ? 0 : Math.floor(Math.random() * 40) + 60
-        }));
-        setBots([...activatedBots, ...mappedBots]);
-      } else {
-        setBots(activatedBots);
-      }
-    } catch (error) {
-      const activatedBots: MyBot[] = activeBots.map(activeBot => {
-        const templateBot = mockBots.find(b => b.id === activeBot.botId);
-        const daysLeft = Math.ceil((activeBot.expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        
-        return {
-          id: activeBot.botId,
-          name: activeBot.botName,
-          type: templateBot?.category || 'ИИ-агент',
-          platform: 'Telegram',
-          status: activeBot.status === 'active' ? 'active' : 'paused',
-          users: Math.floor(Math.random() * 100),
-          messages: Math.floor(Math.random() * 500),
-          lastActive: activeBot.status === 'active' ? 'Только что' : 'Тестовый период истек',
-          performance: activeBot.status === 'active' ? 85 : 0,
-          testMode: true,
-          daysLeft
-        };
-      });
-      setBots(activatedBots);
-    } finally {
-      setLoading(false);
-    }
+      return {
+        id: activeBot.botId,
+        name: activeBot.botName,
+        type: templateBot?.category || 'ИИ-агент',
+        platform: 'Telegram',
+        status: activeBot.status === 'active' ? 'active' : 'paused',
+        users: Math.floor(Math.random() * 100),
+        messages: Math.floor(Math.random() * 500),
+        lastActive: activeBot.status === 'active' ? 'Только что' : 'Тестовый период истек',
+        performance: activeBot.status === 'active' ? 85 : 0,
+        testMode: true,
+        daysLeft
+      };
+    });
+    
+    setBots(activatedBots);
+    setLoading(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -195,12 +119,36 @@ const MyBots = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {bots.length >= maxBots && maxBots !== Infinity && (
+        <Card className="bg-orange-50 border-orange-200">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Icon name="AlertCircle" size={24} className="text-orange-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-orange-900 mb-1">Достигнут лимит тарифа</h4>
+                <p className="text-sm text-orange-700">
+                  На вашем тарифе доступно максимум {maxBots} {maxBots === 1 ? 'бот' : 'ботов'}. 
+                  Улучшите тариф, чтобы добавить больше ботов.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-xl md:text-2xl font-bold">Мои ИИ-агенты</h3>
-          <p className="text-sm md:text-base text-muted-foreground">Управляйте своими ИИ-агентами и ИИ-сотрудниками</p>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Управляйте своими ИИ-агентами и ИИ-сотрудниками • {bots.length} из {maxBots === Infinity ? '∞' : maxBots} ботов
+          </p>
         </div>
-        <Button size="default" className="w-full sm:w-auto" onClick={() => window.location.href = '/bot-builder'}>
+        <Button 
+          size="default" 
+          className="w-full sm:w-auto" 
+          onClick={() => window.location.href = '/bot-builder'}
+          disabled={bots.length >= maxBots}
+        >
           <Icon name="Plus" size={18} className="mr-2" />
           Создать ИИ-агента
         </Button>
@@ -216,9 +164,9 @@ const MyBots = () => {
           <Icon name="Bot" size={64} className="mx-auto text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2">У вас пока нет ботов</h3>
           <p className="text-muted-foreground mb-6">Создайте своего первого ИИ-агента</p>
-          <Button size="lg" onClick={() => window.location.href = '/?tab=constructor'}>
+          <Button size="lg" onClick={() => window.location.href = '/'}>
             <Icon name="Plus" size={18} className="mr-2" />
-            Создать первого бота
+            Перейти в маркетплейс
           </Button>
         </div>
       ) : (

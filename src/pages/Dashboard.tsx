@@ -16,14 +16,22 @@ const Dashboard = () => {
   const { activateBot, activeBots } = useActiveBots();
   const [searchParams] = useSearchParams();
   
+  const PLAN_LIMITS: Record<string, number> = {
+    free: 1,
+    optimal: 5,
+    premium: 20,
+    partner: Infinity
+  };
+  
+  const userPlan = user?.plan || 'free';
+  const maxBots = PLAN_LIMITS[userPlan];
+  
   const stats = {
     totalBots: activeBots.length,
     activeUsers: activeBots.filter(bot => bot.status === 'active').length,
     messagesThisMonth: 0,
     earnings: 0
   };
-  
-  const userPlan = user?.plan || 'free';
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -119,7 +127,12 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold">{stats.totalBots}</div>
+                <div>
+                  <div className="text-3xl font-bold">{stats.totalBots}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Лимит: {maxBots === Infinity ? '∞' : maxBots}
+                  </div>
+                </div>
                 <div className="bg-blue-100 p-3 rounded-lg">
                   <Icon name="Bot" className="text-blue-600" size={24} />
                 </div>

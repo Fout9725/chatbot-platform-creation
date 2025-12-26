@@ -20,14 +20,28 @@ const ActiveBotsContext = createContext<ActiveBotsContextType | undefined>(undef
 
 export function ActiveBotsProvider({ children }: { children: ReactNode }) {
   const [activeBots, setActiveBots] = useState<ActiveBot[]>(() => {
+    const DATA_VERSION = '2.0';
+    const currentVersion = localStorage.getItem('activeBots_version');
+    
+    if (currentVersion !== DATA_VERSION) {
+      localStorage.removeItem('activeBots');
+      localStorage.setItem('activeBots_version', DATA_VERSION);
+      return [];
+    }
+    
     const saved = localStorage.getItem('activeBots');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((bot: any) => ({
-        ...bot,
-        activatedAt: new Date(bot.activatedAt),
-        expiresAt: new Date(bot.expiresAt)
-      }));
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((bot: any) => ({
+          ...bot,
+          activatedAt: new Date(bot.activatedAt),
+          expiresAt: new Date(bot.expiresAt)
+        }));
+      } catch (error) {
+        console.error('Error parsing activeBots:', error);
+        return [];
+      }
     }
     return [];
   });

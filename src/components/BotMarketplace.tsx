@@ -71,10 +71,29 @@ const BotMarketplace = () => {
       return;
     }
     
+    const PLAN_LIMITS: Record<string, number> = {
+      free: 1,
+      optimal: 5,
+      premium: 20,
+      partner: Infinity
+    };
+    
+    const userPlan = user?.plan || 'free';
+    const maxBots = PLAN_LIMITS[userPlan];
+    const currentBots = JSON.parse(localStorage.getItem('activeBots') || '[]');
+    
+    if (currentBots.length >= maxBots) {
+      toast({
+        title: "Достигнут лимит тарифа",
+        description: `На тарифе "${userPlan}" доступно максимум ${maxBots} ${maxBots === 1 ? 'бот' : 'ботов'}. Улучшите тариф для добавления новых ботов.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     const bot = mockBots.find(b => b.id === id);
     if (bot) {
-      const existingBot = JSON.parse(localStorage.getItem('activeBots') || '[]')
-        .find((b: any) => b.botId === id);
+      const existingBot = currentBots.find((b: any) => b.botId === id);
       
       if (existingBot) {
         toast({
