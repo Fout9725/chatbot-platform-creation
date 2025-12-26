@@ -216,15 +216,24 @@ const BotBuilder = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate('/dashboard')}
-            className="mb-4"
-          >
-            <Icon name="ArrowLeft" size={18} className="mr-2" />
-            Назад к панели
-          </Button>
+          <div className="flex gap-2 mb-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate('/')}
+            >
+              <Icon name="Home" size={18} className="mr-2" />
+              Главная
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate('/dashboard')}
+            >
+              <Icon name="ArrowLeft" size={18} className="mr-2" />
+              Назад к панели
+            </Button>
+          </div>
 
           <div className="flex items-center justify-between">
             <div>

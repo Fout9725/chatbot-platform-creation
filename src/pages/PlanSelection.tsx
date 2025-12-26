@@ -135,6 +135,17 @@ const PlanSelection = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <div className="container mx-auto px-4 py-12">
+        <div className="mb-6">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => navigate('/')}
+          >
+            <Icon name="Home" size={18} className="mr-2" />
+            Главная
+          </Button>
+        </div>
+
         {!isAuthenticated && (
           <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-3">

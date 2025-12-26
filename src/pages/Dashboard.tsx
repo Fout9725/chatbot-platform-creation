@@ -118,24 +118,30 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Link to="/">
+                <Button type="button" variant="ghost" size="sm" disabled={false}>
+                  <Icon name="Home" size={18} className="mr-2" />
+                  <span className="hidden md:inline">Главная</span>
+                </Button>
+              </Link>
               {user?.role === 'admin' && (
                 <Link to="/admin">
                   <Button type="button" variant="outline" size="sm" disabled={false}>
                     <Icon name="Shield" size={18} className="mr-2" />
-                    Админ
+                    <span className="hidden md:inline">Админ</span>
                   </Button>
                 </Link>
               )}
               <Link to="/notifications">
                 <Button type="button" variant="outline" size="sm" disabled={false}>
                   <Icon name="Bell" size={18} className="mr-2" />
-                  Уведомления
+                  <span className="hidden md:inline">Уведомления</span>
                 </Button>
               </Link>
               <Link to="/profile">
                 <Button type="button" variant="outline" size="sm" disabled={false}>
                   <Icon name="User" size={18} className="mr-2" />
-                  Профиль
+                  <span className="hidden md:inline">Профиль</span>
                 </Button>
               </Link>
             </div>

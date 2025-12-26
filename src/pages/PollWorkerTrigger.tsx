@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 
 const PollWorkerTrigger = () => {
+  const navigate = useNavigate();
   const [lastRun, setLastRun] = useState<string>('Не запускался');
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [result, setResult] = useState<any>(null);
@@ -34,6 +37,17 @@ const PollWorkerTrigger = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white p-8">
+      <div className="max-w-2xl mx-auto mb-4">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => navigate('/')}
+        >
+          <Icon name="Home" size={18} className="mr-2" />
+          Главная
+        </Button>
+      </div>
+      
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
