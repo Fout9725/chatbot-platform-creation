@@ -20,6 +20,8 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('stats');
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [activeBots, setActiveBots] = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
   const [planPrices, setPlanPrices] = useState({
     optimal: 990,
@@ -54,6 +56,38 @@ const Admin = () => {
       }
     };
     fetchUsers();
+
+    const loadActiveBots = () => {
+      const saved = localStorage.getItem('activeBots');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setActiveBots(parsed || []);
+        } catch (error) {
+          console.error('Ошибка загрузки ботов:', error);
+          setActiveBots([]);
+        }
+      } else {
+        setActiveBots([]);
+      }
+    };
+    loadActiveBots();
+
+    const loadPaymentHistory = () => {
+      const saved = localStorage.getItem('paymentHistory');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setPaymentHistory(parsed || []);
+        } catch (error) {
+          console.error('Ошибка загрузки платежей:', error);
+          setPaymentHistory([]);
+        }
+      } else {
+        setPaymentHistory([]);
+      }
+    };
+    loadPaymentHistory();
   }, []);
 
   const handleUpdatePrices = () => {
@@ -87,13 +121,28 @@ const Admin = () => {
     );
   }
 
+  const totalRevenue = paymentHistory
+    .filter((p: any) => p.status === 'success')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const monthlyRevenue = paymentHistory
+    .filter((p: any) => {
+      if (p.status !== 'success') return false;
+      const paymentDate = new Date(p.date);
+      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+    })
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
   const platformStats = {
     totalUsers: users.length,
     activeUsers: users.filter(u => u.plan !== 'free').length,
-    totalBots: 12458,
-    activeBots: 8932,
-    totalRevenue: 2847350,
-    monthlyRevenue: 456780,
+    totalBots: activeBots.length,
+    activeBots: activeBots.filter((b: any) => b.status === 'active').length,
+    totalRevenue: totalRevenue,
+    monthlyRevenue: monthlyRevenue,
     marketplaceBots: 0,
     customTemplates: 0
   };

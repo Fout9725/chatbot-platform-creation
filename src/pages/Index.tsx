@@ -19,6 +19,7 @@ const Index = () => {
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [activeBots, setActiveBots] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -33,6 +34,22 @@ const Index = () => {
       }
     };
     fetchUsers();
+
+    const loadActiveBots = () => {
+      const saved = localStorage.getItem('activeBots');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setActiveBots(parsed || []);
+        } catch (error) {
+          console.error('Ошибка загрузки ботов:', error);
+          setActiveBots([]);
+        }
+      } else {
+        setActiveBots([]);
+      }
+    };
+    loadActiveBots();
   }, []);
 
   const handleTabChange = (value: string) => {
@@ -108,12 +125,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Активных ИИ-агентов</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-primary">0</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-primary">{activeBots.filter((b: any) => b.status === 'active').length}</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Icon name="Rocket" size={12} className="text-purple-500" />
-                Старт платформы
+                {activeBots.length > 0 ? 'Активно работают' : 'Старт платформы'}
               </p>
             </CardContent>
           </Card>
