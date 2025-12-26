@@ -33,10 +33,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'Message is required'})
             }
         
-        # Используем бесплатный HuggingFace Inference API
-        hf_key = os.environ.get('HUGGINGFACE_API_KEY', '')
+        # Используем OpenRouter API с бесплатной моделью Xiaomi
+        openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
         
-        if not hf_key:
+        if not openrouter_key:
             return {
                 'statusCode': 500,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -143,36 +143,39 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        # Используем бесплатную модель HuggingFace (Qwen 2.5 Coder - быстрая и эффективная)
+        # Используем бесплатную модель Xiaomi Mimo от OpenRouter
         request_data = {
-            'inputs': f"{system_prompt}\n\nПользователь: {user_message}\n\nПомощник:",
-            'parameters': {
-                'max_new_tokens': 800,
-                'temperature': 0.7,
-                'return_full_text': False
-            }
+            'model': 'xiaomi/mimo-v2-flash:free',
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_message}
+            ],
+            'temperature': 0.7,
+            'max_tokens': 800
         }
-        api_url = 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct'
-        api_key = hf_key
+        api_url = 'https://openrouter.ai/api/v1/chat/completions'
+        api_key = openrouter_key
         
         try:
-            print(f'Making request to HuggingFace API')
+            print(f'Making request to OpenRouter API with model: xiaomi/mimo-v2-flash:free')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
                 headers={
                     'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://intellektpro.ru',
+                    'X-Title': 'ИнтеллектПро AI Assistant'
                 },
                 method='POST'
             )
             
             response_text = urllib.request.urlopen(req, timeout=30).read().decode('utf-8')
             response_data = json.loads(response_text)
-            print(f'HuggingFace response: {response_data}')
+            print(f'OpenRouter response: {response_data}')
             
-            # HuggingFace возвращает массив с generated_text
-            ai_response = response_data[0]['generated_text'].strip()
+            # OpenRouter возвращает стандартный формат OpenAI
+            ai_response = response_data['choices'][0]['message']['content'].strip()
             
             return {
                 'statusCode': 200,
