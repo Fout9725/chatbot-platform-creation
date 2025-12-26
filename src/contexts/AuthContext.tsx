@@ -9,6 +9,7 @@ interface User {
   hasActivatedBot: boolean;
   sessionExpiry: number;
   role?: 'admin' | 'user';
+  avatar?: string;
 }
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   setUserActivatedBot: () => void;
   setUserPlan: (plan: 'free' | 'optimal' | 'premium' | 'partner') => void;
   checkSession: () => boolean;
+  updateUserAvatar: (avatarUrl: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,6 +201,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return now <= user.sessionExpiry;
   };
 
+  const updateUserAvatar = (avatarUrl: string) => {
+    if (user) {
+      setUser({ ...user, avatar: avatarUrl });
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -208,7 +216,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       setUserActivatedBot,
       setUserPlan,
-      checkSession
+      checkSession,
+      updateUserAvatar
     }}>
       {children}
     </AuthContext.Provider>

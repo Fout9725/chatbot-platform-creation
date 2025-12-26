@@ -9,14 +9,41 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useBotStats } from '@/contexts/BotStatsContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, updateUserAvatar } = useAuth();
   const { toast } = useToast();
+  const { activeBots } = useActiveBots();
+  const { getBotStats } = useBotStats();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  
+  const avatarSeeds = [
+    'Felix', 'Aneka', 'Milo', 'Zoey', 'Oliver', 'Luna', 
+    'Charlie', 'Bella', 'Max', 'Lucy', 'Leo', 'Lily'
+  ];
+  
+  const totalUsers = activeBots.reduce((sum, bot) => {
+    const stats = getBotStats(bot.botId);
+    return sum + stats.users;
+  }, 0);
+  
+  const totalMessages = activeBots.reduce((sum, bot) => {
+    const stats = getBotStats(bot.botId);
+    return sum + stats.messages;
+  }, 0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -80,14 +107,20 @@ const Profile = () => {
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center space-y-4">
                 <Avatar className="w-24 h-24">
-                  <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ivan" />
-                  <AvatarFallback>ИП</AvatarFallback>
+                  <AvatarImage src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} />
+                  <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-semibold text-lg">{name}</h3>
                   <p className="text-sm text-muted-foreground">{email}</p>
                 </div>
-                <Button type="button" disabled={false} variant="outline" className="w-full">
+                <Button 
+                  type="button" 
+                  disabled={false} 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setIsAvatarDialogOpen(true)}
+                >
                   <Icon name="Upload" size={16} className="mr-2" />
                   Изменить фото
                 </Button>
@@ -185,7 +218,7 @@ const Profile = () => {
               <CardTitle className="text-lg">Мои ИИ-агенты</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">12</p>
+              <p className="text-3xl font-bold">{activeBots.length}</p>
               <p className="text-sm text-muted-foreground">Активных ИИ-агентов</p>
             </CardContent>
           </Card>
@@ -196,7 +229,7 @@ const Profile = () => {
               <CardTitle className="text-lg">Сообщения</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">3,542</p>
+              <p className="text-3xl font-bold">{totalMessages.toLocaleString()}</p>
               <p className="text-sm text-muted-foreground">За этот месяц</p>
             </CardContent>
           </Card>
@@ -207,12 +240,47 @@ const Profile = () => {
               <CardTitle className="text-lg">Пользователи</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">847</p>
-              <p className="text-sm text-muted-foreground">Всего клиентов</p>
+              <p className="text-3xl font-bold">{totalUsers.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Уникальных пользователей</p>
             </CardContent>
           </Card>
         </div>
       </main>
+      
+      <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Выберите аватар</DialogTitle>
+            <DialogDescription>
+              Выберите понравившийся аватар из галереи
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-4 py-4">
+            {avatarSeeds.map((seed) => {
+              const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+              return (
+                <button
+                  key={seed}
+                  onClick={() => {
+                    updateUserAvatar(avatarUrl);
+                    setIsAvatarDialogOpen(false);
+                    toast({
+                      title: 'Аватар обновлен',
+                      description: 'Ваш новый аватар сохранен',
+                    });
+                  }}
+                  className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors"
+                >
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage src={avatarUrl} />
+                    <AvatarFallback>{seed.slice(0, 2)}</AvatarFallback>
+                  </Avatar>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
