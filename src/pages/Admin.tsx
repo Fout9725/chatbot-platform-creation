@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { mockBots } from '@/components/marketplace/mockBots';
 import AdminStatsTab from '@/components/admin/AdminStatsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
@@ -143,8 +144,8 @@ const Admin = () => {
     activeBots: activeBots.filter((b: any) => b.status === 'active').length,
     totalRevenue: totalRevenue,
     monthlyRevenue: monthlyRevenue,
-    marketplaceBots: 0,
-    customTemplates: 0
+    marketplaceBots: mockBots.length,
+    customTemplates: mockBots.filter(b => b.price === 0).length
   };
 
   return (
