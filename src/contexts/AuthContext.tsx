@@ -45,21 +45,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (user && user.id) {
-      fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role || 'user',
-          plan: user.plan,
-          avatar: user.avatar
-        })
-      }).catch(error => {
-        console.error('Ошибка синхронизации пользователя при загрузке:', error);
-      });
+    if (user && user.id && user.email) {
+      const syncUser = async () => {
+        try {
+          const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role || 'user',
+              plan: user.plan,
+              avatar: user.avatar
+            })
+          });
+          const data = await response.json();
+          
+          if (data.user && data.user.avatar && data.user.avatar !== user.avatar) {
+            setUser(prev => prev ? { ...prev, avatar: data.user.avatar } : null);
+          }
+        } catch (error) {
+          console.error('Ошибка синхронизации пользователя при загрузке:', error);
+        }
+      };
+      syncUser();
     }
   }, []);
 

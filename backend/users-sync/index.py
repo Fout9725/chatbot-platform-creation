@@ -49,6 +49,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'name': user.get('full_name', 'Пользователь'),
                     'role': user.get('role', 'user'),
                     'plan': user.get('plan_type', 'free'),
+                    'avatar': user.get('avatar_url'),
                     'created_at': user['created_at'].isoformat() if user.get('created_at') else None
                 })
             
@@ -69,6 +70,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             name: str = body_data.get('name', 'Пользователь')
             role: str = body_data.get('role', 'user')
             plan: str = body_data.get('plan', 'free')
+            avatar: str = body_data.get('avatar', '')
             
             if not email:
                 cur.close()
@@ -80,10 +82,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             cur.execute(
-                "INSERT INTO users (email, full_name, role, plan_type) VALUES (%s, %s, %s, %s) "
-                "ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, plan_type = EXCLUDED.plan_type "
-                "RETURNING id",
-                (email, name, role, plan)
+                "INSERT INTO users (email, full_name, role, plan_type, avatar_url) VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, plan_type = EXCLUDED.plan_type, avatar_url = EXCLUDED.avatar_url "
+                "RETURNING id, avatar_url",
+                (email, name, role, plan, avatar)
             )
             result = cur.fetchone()
             conn.commit()
@@ -94,7 +96,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'success': True, 'userId': result['id']})
+                'body': json.dumps({
+                    'success': True, 
+                    'userId': result['id'],
+                    'user': {
+                        'avatar': result.get('avatar_url')
+                    }
+                })
             }
         
         cur.close()

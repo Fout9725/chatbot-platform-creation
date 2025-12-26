@@ -56,12 +56,20 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
     
+    const savedUser = localStorage.getItem('user');
+    const userData = savedUser ? JSON.parse(savedUser) : null;
+    
     toast({
       title: 'Добро пожаловать! 👋',
       description: `Вы успешно вошли в систему`,
     });
     onClose();
-    navigate('/plan-selection');
+    
+    if (userData && userData.plan && userData.plan !== 'free') {
+      navigate('/dashboard');
+    } else {
+      navigate('/plan-selection');
+    }
   };
 
   const handlePhoneAuth = () => {
