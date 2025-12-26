@@ -146,7 +146,7 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="general" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="general">
                     <Icon name="User" size={16} className="mr-2" />
                     Общее
@@ -154,6 +154,14 @@ const Profile = () => {
                   <TabsTrigger value="security">
                     <Icon name="Lock" size={16} className="mr-2" />
                     Безопасность
+                  </TabsTrigger>
+                  <TabsTrigger value="tariff">
+                    <Icon name="CreditCard" size={16} className="mr-2" />
+                    Тариф
+                  </TabsTrigger>
+                  <TabsTrigger value="orders">
+                    <Icon name="ShoppingBag" size={16} className="mr-2" />
+                    Заказы
                   </TabsTrigger>
                 </TabsList>
 
@@ -206,6 +214,190 @@ const Profile = () => {
                     <Icon name="Shield" size={16} className="mr-2" />
                     Изменить пароль
                   </Button>
+                </TabsContent>
+
+                <TabsContent value="tariff" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+                      <div>
+                        <p className="font-semibold">Текущий тариф</p>
+                        <p className="text-2xl font-bold text-primary">{user?.plan === 'free' ? 'Бесплатный' : user?.plan === 'optimal' ? 'Оптимальный' : user?.plan === 'premium' ? 'Премиум' : 'Партнёрский'}</p>
+                      </div>
+                      <Badge variant={user?.plan === 'free' ? 'secondary' : 'default'} className="text-sm">
+                        {user?.plan === 'free' ? '1 бот' : user?.plan === 'optimal' ? '5 ботов' : user?.plan === 'premium' ? '20 ботов' : '∞ ботов'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <Card className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">Оптимальный</CardTitle>
+                            <Badge>Популярный</Badge>
+                          </div>
+                          <CardDescription>Для малого бизнеса</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold mb-4">990₽<span className="text-sm font-normal text-muted-foreground">/мес</span></p>
+                          <ul className="space-y-2 mb-4">
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              До 5 ИИ-агентов
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              Безлимитные сообщения
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              Приоритетная поддержка
+                            </li>
+                          </ul>
+                          <Button className="w-full" disabled={user?.plan === 'optimal'} onClick={() => navigate('/pricing')}>
+                            {user?.plan === 'optimal' ? 'Текущий тариф' : 'Выбрать тариф'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="hover:shadow-lg transition-shadow border-primary">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">Премиум</CardTitle>
+                            <Badge variant="default">Лучшее предложение</Badge>
+                          </div>
+                          <CardDescription>Для среднего бизнеса</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold mb-4">2990₽<span className="text-sm font-normal text-muted-foreground">/мес</span></p>
+                          <ul className="space-y-2 mb-4">
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              До 20 ИИ-агентов
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              Безлимитные сообщения
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              VIP поддержка 24/7
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              Аналитика и отчёты
+                            </li>
+                          </ul>
+                          <Button className="w-full" disabled={user?.plan === 'premium'} onClick={() => navigate('/pricing')}>
+                            {user?.plan === 'premium' ? 'Текущий тариф' : 'Выбрать тариф'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-blue-50">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">Партнёрский</CardTitle>
+                            <Badge variant="secondary">Для партнёров</Badge>
+                          </div>
+                          <CardDescription>Зарабатывайте с нами</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold mb-4">Бесплатно</p>
+                          <ul className="space-y-2 mb-4">
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              Безлимитные ИИ-агенты
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              20% комиссия от рефералов
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-green-500" />
+                              70% от продаж ботов
+                            </li>
+                          </ul>
+                          <Button className="w-full" variant="outline" onClick={() => navigate('/partner')}>
+                            Стать партнёром
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="orders" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">История заказов</CardTitle>
+                        <CardDescription>Ваши покупки и подписки</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {activeBots.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Icon name="ShoppingBag" size={48} className="mx-auto mb-4 opacity-50" />
+                            <p>У вас пока нет заказов</p>
+                            <Button className="mt-4" onClick={() => navigate('/')}>
+                              Перейти в маркетплейс
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {activeBots.map((bot) => {
+                              const stats = getBotStats(bot.botId);
+                              return (
+                                <div key={`order-${bot.botId}`} className="flex items-center justify-between p-4 border rounded-lg">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                      <Icon name="Bot" size={20} className="text-primary" />
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold">{bot.botName}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Активирован {new Date(bot.activatedAt).toLocaleDateString('ru-RU')}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge variant={bot.status === 'active' ? 'default' : 'secondary'}>
+                                      {bot.status === 'active' ? 'Активен' : 'Истёк'}
+                                    </Badge>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {stats.messages} сообщений
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Платёжная информация</CardTitle>
+                        <CardDescription>Управление способами оплаты</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <Icon name="CreditCard" size={24} className="text-muted-foreground" />
+                              <div>
+                                <p className="font-semibold">Карта не привязана</p>
+                                <p className="text-sm text-muted-foreground">Добавьте карту для быстрой оплаты</p>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              Добавить карту
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </TabsContent>
               </Tabs>
             </CardContent>
