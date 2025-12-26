@@ -21,8 +21,25 @@ const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
   const [stats, setStats] = useState(platformStats);
   
   useEffect(() => {
-    setStats(platformStats);
-  }, [platformStats]);
+    const syncStats = async () => {
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        const data = await response.json();
+        
+        if (data.total !== undefined) {
+          setStats(prev => ({
+            ...prev,
+            totalUsers: data.total,
+            activeUsers: data.total
+          }));
+        }
+      } catch (error) {
+        console.error('Ошибка синхронизации статистики:', error);
+      }
+    };
+    
+    syncStats();
+  }, []);
   
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">

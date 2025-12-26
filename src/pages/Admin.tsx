@@ -148,15 +148,6 @@ const Admin = () => {
     customTemplates: mockBots.filter(b => b.price === 0).length
   };
 
-  console.log('🔍 Admin platformStats:', {
-    activeBots: activeBots,
-    activeBots_length: activeBots.length,
-    paymentHistory_length: paymentHistory.length,
-    monthlyRevenue: monthlyRevenue,
-    mockBots_length: mockBots.length,
-    platformStats: platformStats
-  });
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <div className="container mx-auto px-4 py-8">
