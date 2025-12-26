@@ -8,12 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useBotStats } from '@/contexts/BotStatsContext';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { activateBot, activeBots } = useActiveBots();
+  const { getBotStats } = useBotStats();
   const [searchParams] = useSearchParams();
   
   const PLAN_LIMITS: Record<string, number> = {
@@ -26,18 +28,40 @@ const Dashboard = () => {
   const userPlan = user?.plan || 'free';
   const maxBots = PLAN_LIMITS[userPlan];
   
+  const totalMessages = activeBots.reduce((sum, bot) => {
+    const botStats = getBotStats(bot.botId);
+    return sum + botStats.messages;
+  }, 0);
+  
+  const totalUsers = new Set(
+    activeBots.flatMap(bot => {
+      const botStats = getBotStats(bot.botId);
+      return Array(botStats.users).fill(null).map((_, i) => `${bot.botId}_user_${i}`);
+    })
+  ).size;
+  
   const stats = {
     totalBots: activeBots.length,
-    activeUsers: activeBots.filter(bot => bot.status === 'active').length,
-    messagesThisMonth: 0,
+    activeUsers: totalUsers,
+    messagesThisMonth: totalMessages,
     earnings: 0
   };
+
+  const [, setRefresh] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefresh(prev => prev + 1);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');

@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBots } from '@/contexts/ActiveBotsContext';
+import { useBotStats } from '@/contexts/BotStatsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockBots } from './marketplace/mockBots';
 import BotSettingsModal from './modals/BotSettingsModal';
@@ -35,6 +36,7 @@ const MyBots = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeBots, deactivateBot } = useActiveBots();
+  const { getBotStats, addMessage } = useBotStats();
   const [bots, setBots] = useState<MyBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [settingsModal, setSettingsModal] = useState<{ isOpen: boolean; botId: number; botName: string }>({ 
@@ -49,12 +51,25 @@ const MyBots = () => {
     loadBots();
   }, [activeBots]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading && bots.length > 0) {
+        loadBots();
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [loading, bots.length]);
+
   const loadBots = async () => {
     setLoading(true);
     
     const activatedBots: MyBot[] = activeBots.map(activeBot => {
       const templateBot = mockBots.find(b => b.id === activeBot.botId);
       const daysLeft = Math.ceil((activeBot.expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      const stats = getBotStats(activeBot.botId);
+      
+      const performance = stats.messages > 0 ? Math.min(100, 50 + stats.messages) : 0;
       
       return {
         id: activeBot.botId,
@@ -62,10 +77,10 @@ const MyBots = () => {
         type: templateBot?.category || 'ИИ-агент',
         platform: 'Telegram',
         status: activeBot.status === 'active' ? 'active' : 'paused',
-        users: Math.floor(Math.random() * 100),
-        messages: Math.floor(Math.random() * 500),
-        lastActive: activeBot.status === 'active' ? 'Только что' : 'Тестовый период истек',
-        performance: activeBot.status === 'active' ? 85 : 0,
+        users: stats.users,
+        messages: stats.messages,
+        lastActive: activeBot.status === 'active' ? stats.lastActive : 'Тестовый период истек',
+        performance,
         testMode: true,
         daysLeft
       };
@@ -115,6 +130,20 @@ const MyBots = () => {
       }
       return bot;
     }));
+  };
+
+  const handleTestMessage = (botId: number, botName: string) => {
+    const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+    addMessage(botId, userId);
+    
+    toast({
+      title: "Тестовое сообщение отправлено",
+      description: `Статистика бота "${botName}" обновлена`,
+    });
+    
+    setTimeout(() => {
+      loadBots();
+    }, 500);
   };
 
   return (
@@ -202,6 +231,15 @@ const MyBots = () => {
             <CardContent className="space-y-4">
               {bot.status !== 'draft' && (
                 <>
+                  {bot.testMode && bot.users === 0 && bot.messages === 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs">
+                      <p className="text-blue-900 font-medium mb-1">💡 Протестируйте бота</p>
+                      <p className="text-blue-700">
+                        Нажмите кнопку "Тест" чтобы отправить пробное сообщение и увидеть статистику в действии
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Пользователи</p>
@@ -255,14 +293,18 @@ const MyBots = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => handleToggleStatus(bot.id)}
-                    className="flex-1"
                   >
                     <Icon name={bot.status === 'active' ? 'Pause' : 'Play'} size={16} className="mr-2" />
-                    {bot.status === 'active' ? 'Остановить' : 'Запустить'}
+                    {bot.status === 'active' ? 'Стоп' : 'Старт'}
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <Icon name="BarChart3" size={16} className="mr-2" />
-                    Статистика
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleTestMessage(bot.id, bot.name)}
+                    disabled={bot.status !== 'active'}
+                  >
+                    <Icon name="Send" size={16} className="mr-2" />
+                    Тест
                   </Button>
                   <Button 
                     variant="outline" 

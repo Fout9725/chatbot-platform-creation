@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ActiveBotsProvider } from "./contexts/ActiveBotsContext";
+import { BotStatsProvider } from "./contexts/BotStatsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import SessionExpiryNotification from "./components/SessionExpiryNotification";
 import Index from "./pages/Index";
@@ -35,11 +36,12 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ActiveBotsProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-        <SessionExpiryNotification />
+        <BotStatsProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+          <SessionExpiryNotification />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/bot/:id" element={<BotDetails />} />
@@ -66,6 +68,7 @@ const App = () => (
         <AIAssistant />
         </BrowserRouter>
       </TooltipProvider>
+        </BotStatsProvider>
       </ActiveBotsProvider>
     </AuthProvider>
   </QueryClientProvider>
