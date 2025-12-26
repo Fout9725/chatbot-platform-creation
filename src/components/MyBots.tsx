@@ -48,12 +48,14 @@ const MyBots = () => {
   const maxBots = PLAN_LIMITS[user?.plan || 'free'];
 
   useEffect(() => {
+    console.log('🔄 MyBots: Перезагрузка, активных ботов:', activeBots.length);
     loadBots();
   }, [activeBots]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (!loading && bots.length > 0) {
+        console.log('🔄 MyBots: Автообновление статистики');
         loadBots();
       }
     }, 10000);
@@ -202,7 +204,7 @@ const MyBots = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {bots.map((bot, index) => (
           <Card 
-            key={bot.id}
+            key={`bot-${bot.id}`}
             className="hover:shadow-lg transition-all duration-300 animate-scale-in"
             style={{ animationDelay: `${index * 100}ms` }}
           >

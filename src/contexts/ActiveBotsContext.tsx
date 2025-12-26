@@ -20,29 +20,28 @@ const ActiveBotsContext = createContext<ActiveBotsContextType | undefined>(undef
 
 export function ActiveBotsProvider({ children }: { children: ReactNode }) {
   const [activeBots, setActiveBots] = useState<ActiveBot[]>(() => {
-    const DATA_VERSION = '2.0';
-    const currentVersion = localStorage.getItem('activeBots_version');
-    
-    if (currentVersion !== DATA_VERSION) {
-      localStorage.removeItem('activeBots');
-      localStorage.setItem('activeBots_version', DATA_VERSION);
-      return [];
-    }
+    localStorage.removeItem('activeBots_version');
     
     const saved = localStorage.getItem('activeBots');
+    console.log('🔄 Загрузка из localStorage:', saved);
+    
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed.map((bot: any) => ({
+        const bots = parsed.map((bot: any) => ({
           ...bot,
           activatedAt: new Date(bot.activatedAt),
           expiresAt: new Date(bot.expiresAt)
         }));
+        console.log('✅ Загружено ботов:', bots.length);
+        return bots;
       } catch (error) {
-        console.error('Error parsing activeBots:', error);
+        console.error('❌ Ошибка парсинга activeBots:', error);
+        localStorage.removeItem('activeBots');
         return [];
       }
     }
+    console.log('⚠️ Нет сохранённых ботов');
     return [];
   });
 
@@ -64,7 +63,9 @@ export function ActiveBotsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('activeBots', JSON.stringify(activeBots));
+    const dataToSave = JSON.stringify(activeBots);
+    localStorage.setItem('activeBots', dataToSave);
+    console.log('💾 Сохранено в localStorage:', activeBots.length, 'ботов');
   }, [activeBots]);
 
   const activateBot = (botId: number, botName: string) => {

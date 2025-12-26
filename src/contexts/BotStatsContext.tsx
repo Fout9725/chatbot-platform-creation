@@ -17,14 +17,7 @@ const BotStatsContext = createContext<BotStatsContextType | undefined>(undefined
 
 export function BotStatsProvider({ children }: { children: ReactNode }) {
   const [botsStats, setBotsStats] = useState<Map<number, BotStats>>(() => {
-    const DATA_VERSION = '1.0';
-    const currentVersion = localStorage.getItem('botStats_version');
-    
-    if (currentVersion !== DATA_VERSION) {
-      localStorage.removeItem('botStats');
-      localStorage.setItem('botStats_version', DATA_VERSION);
-      return new Map();
-    }
+    localStorage.removeItem('botStats_version');
     
     const saved = localStorage.getItem('botStats');
     if (saved) {
@@ -44,6 +37,7 @@ export function BotStatsProvider({ children }: { children: ReactNode }) {
         return map;
       } catch (error) {
         console.error('Error parsing botStats:', error);
+        localStorage.removeItem('botStats');
         return new Map();
       }
     }
@@ -62,6 +56,7 @@ export function BotStatsProvider({ children }: { children: ReactNode }) {
     });
     
     localStorage.setItem('botStats', JSON.stringify(statsObject));
+    console.log('📊 Сохранена статистика для', botsStats.size, 'ботов');
   }, [botsStats]);
 
   const getBotStats = (botId: number) => {
