@@ -165,7 +165,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'Authorization': f'Bearer {api_key}',
                     'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://intellektpro.ru',
-                    'X-Title': 'ИнтеллектПро AI Assistant'
+                    'X-Title': 'IntellektPro AI Assistant'
                 },
                 method='POST'
             )
