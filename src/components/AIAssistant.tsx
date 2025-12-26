@@ -76,6 +76,7 @@ const AIAssistant = () => {
     await trackAction('chat_message', { message: currentMessage });
 
     try {
+      console.log('Sending message to assistant:', currentMessage);
       const response = await fetch('https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f', {
         method: 'POST',
         headers: {
@@ -84,7 +85,9 @@ const AIAssistant = () => {
         body: JSON.stringify({ message: currentMessage })
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
       
       const assistantMessage: Message = {
         sender: 'assistant',
@@ -93,6 +96,7 @@ const AIAssistant = () => {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
+      console.error('Error in AI assistant:', error);
       const errorMessage: Message = {
         sender: 'assistant',
         message: 'Произошла ошибка. Вы можете связаться с главным администратором:\n\n👤 Сляднев Владимир Сергеевич\n📧 s89624027661@yandex.ru\n✈️ Telegram: @Fou9725\n\nИли обратитесь в поддержку: https://t.me/+QgiLIa1gFRY4Y2Iy'
