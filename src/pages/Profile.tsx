@@ -31,8 +31,9 @@ const Profile = () => {
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   
   const avatarSeeds = [
-    'Happy', 'Sunny', 'Joy', 'Cheerful', 'Smile', 'Bright',
-    'Lovely', 'Sweet', 'Lucky', 'Angel', 'Sparkle', 'Rainbow'
+    'happy1', 'happy2', 'happy3', 'happy4', 'happy5', 'happy6',
+    'smile1', 'smile2', 'smile3', 'joy1', 'joy2', 'joy3',
+    'sunny1', 'sunny2', 'sunny3', 'fun1', 'fun2', 'fun3'
   ];
   
   const totalUsers = activeBots.reduce((sum, bot) => {
