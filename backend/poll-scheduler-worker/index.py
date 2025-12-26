@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import time
 import threading
 
+
 def get_db_connection():
     dsn = os.environ.get('DATABASE_URL')
     return psycopg2.connect(dsn, cursor_factory=RealDictCursor)

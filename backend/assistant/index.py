@@ -4,9 +4,7 @@ import urllib.request
 from typing import Dict, Any
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''
-    AI assistant для консультирования пользователей по платформе ИнтеллектПро
-    '''
+    '''AI assistant для консультирования пользователей по платформе ИнтеллектПро'''
     method: str = event.get('httpMethod', 'GET')
     
     if method == 'OPTIONS':
