@@ -122,7 +122,7 @@ const AIAssistant = () => {
 
   if (!isOpen && showGreeting) {
     return (
-      <div className="fixed bottom-24 right-6 z-40 animate-in slide-in-from-bottom-5">
+      <div className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-5">
         <Card className="w-80 shadow-2xl border-2 border-primary/20">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
@@ -170,7 +170,7 @@ const AIAssistant = () => {
     return (
       <Button
         onClick={handleOpen}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-2xl"
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl"
         size="icon"
       >
         <Icon name="Bot" size={24} />
@@ -182,7 +182,7 @@ const AIAssistant = () => {
     return (
       <Button
         onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 z-40 h-14 rounded-full shadow-2xl px-4"
+        className="fixed bottom-6 right-6 z-50 h-14 rounded-full shadow-2xl px-4"
       >
         <Icon name="Bot" size={20} className="mr-2" />
         <span className="text-sm font-medium">Помощник</span>
@@ -194,7 +194,7 @@ const AIAssistant = () => {
   }
 
   return (
-    <Card className="fixed bottom-6 right-6 z-40 w-96 h-[600px] shadow-2xl flex flex-col">
+    <Card className="fixed bottom-6 right-6 z-50 w-96 h-[600px] shadow-2xl flex flex-col">
       <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
