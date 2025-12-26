@@ -49,11 +49,11 @@ def get_pending_polls() -> List[Dict]:
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # Используем UTC время для корректного сравнения (scheduled_time хранится в UTC)
+    # Используем NOW() для сравнения (scheduled_time хранится как timestamp UTC)
     cur.execute("""
         SELECT id, chat_id, poll_question, poll_options, scheduled_time
         FROM scheduled_polls
-        WHERE status = 'pending' AND scheduled_time <= (NOW() AT TIME ZONE 'UTC')
+        WHERE status = 'pending' AND scheduled_time <= NOW()
         ORDER BY scheduled_time ASC
         LIMIT 10
     """)
@@ -90,10 +90,10 @@ def mark_poll_sent(poll_id: int, success: bool, error_message: str = None) -> No
     conn.close()
 
 def schedule_next_check():
-    '''Запланировать следующую проверку через 60 секунд'''
+    '''Запланировать следующую проверку через 10 секунд для точности отправки'''
     def call_after_delay():
-        print('Waiting 60 seconds before next check...')
-        time.sleep(60)
+        print('Waiting 10 seconds before next check...')
+        time.sleep(10)
         try:
             worker_url = 'https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442'
             req = urllib.request.Request(
