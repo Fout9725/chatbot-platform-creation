@@ -54,7 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: user.email,
           name: user.name,
           role: user.role || 'user',
-          plan: user.plan
+          plan: user.plan,
+          avatar: user.avatar
         })
       }).catch(error => {
         console.error('Ошибка синхронизации пользователя при загрузке:', error);
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
       try {
-        await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -108,9 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: adminUser.email,
             name: adminUser.name,
             role: adminUser.role,
-            plan: adminUser.plan
+            plan: adminUser.plan,
+            avatar: adminUser.avatar
           })
         });
+        const data = await response.json();
+        if (data.user && data.user.avatar) {
+          adminUser.avatar = data.user.avatar;
+        }
       } catch (error) {
         console.error('Ошибка синхронизации админа с БД:', error);
       }
@@ -130,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     try {
-      await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,9 +144,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: mockUser.email,
           name: mockUser.name,
           role: 'user',
-          plan: mockUser.plan
+          plan: mockUser.plan,
+          avatar: mockUser.avatar
         })
       });
+      const data = await response.json();
+      if (data.user && data.user.avatar) {
+        mockUser.avatar = data.user.avatar;
+      }
     } catch (error) {
       console.error('Ошибка синхронизации пользователя с БД:', error);
     }
@@ -161,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     try {
-      await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,9 +180,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: newUser.email,
           name: newUser.name,
           role: 'user',
-          plan: newUser.plan
+          plan: newUser.plan,
+          avatar: newUser.avatar
         })
       });
+      const data = await response.json();
+      if (data.user && data.user.avatar) {
+        newUser.avatar = data.user.avatar;
+      }
     } catch (error) {
       console.error('Ошибка синхронизации с БД:', error);
     }
@@ -201,9 +217,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return now <= user.sessionExpiry;
   };
 
-  const updateUserAvatar = (avatarUrl: string) => {
+  const updateUserAvatar = async (avatarUrl: string) => {
     if (user) {
-      setUser({ ...user, avatar: avatarUrl });
+      const updatedUser = { ...user, avatar: avatarUrl };
+      setUser(updatedUser);
+      
+      try {
+        await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role || 'user',
+            plan: user.plan,
+            avatar: avatarUrl
+          })
+        });
+      } catch (error) {
+        console.error('Ошибка сохранения аватара в БД:', error);
+      }
     }
   };
 
