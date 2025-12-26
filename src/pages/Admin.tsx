@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,8 @@ const Admin = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('stats');
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const [planPrices, setPlanPrices] = useState({
     optimal: 990,
@@ -25,6 +27,30 @@ const Admin = () => {
 
   const [templatePrice, setTemplatePrice] = useState(0);
   const [constructorPrice, setConstructorPrice] = useState(0);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        const data = await response.json();
+        if (data.users) {
+          setUsers(data.users);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleUpdatePrices = () => {
+    toast({
+      title: 'Цены обновлены',
+      description: 'Новые тарифы вступят в силу для новых подписок'
+    });
+  };
 
   if (!user || user.role !== 'admin') {
     return (
@@ -50,16 +76,9 @@ const Admin = () => {
     );
   }
 
-  const handleUpdatePrices = () => {
-    toast({
-      title: 'Цены обновлены',
-      description: 'Новые тарифы вступят в силу для новых подписок'
-    });
-  };
-
   const platformStats = {
-    totalUsers: 45892,
-    activeUsers: 32451,
+    totalUsers: users.length,
+    activeUsers: users.filter(u => u.plan !== 'free').length,
     totalBots: 12458,
     activeBots: 8932,
     totalRevenue: 2847350,
@@ -287,12 +306,48 @@ const Admin = () => {
 
                 <Separator />
 
-                <div className="bg-muted p-6 rounded-lg text-center">
-                  <Icon name="Users" size={48} className="mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Выберите фильтр или воспользуйтесь поиском
-                  </p>
-                </div>
+                {usersLoading ? (
+                  <div className="bg-muted p-6 rounded-lg text-center">
+                    <Icon name="Loader2" size={48} className="mx-auto mb-4 text-muted-foreground animate-spin" />
+                    <p className="text-sm text-muted-foreground">
+                      Загрузка пользователей...
+                    </p>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="bg-muted p-6 rounded-lg text-center">
+                    <Icon name="Users" size={48} className="mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Пользователи не найдены
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {users.map((userData) => (
+                      <div key={userData.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-primary/10 p-2 rounded-lg">
+                            <Icon name="User" size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">{userData.name}</p>
+                            <p className="text-sm text-muted-foreground">{userData.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={userData.plan === 'free' ? 'secondary' : 'default'}>
+                            {userData.plan === 'free' ? 'Бесплатный' : userData.plan === 'optimal' ? 'Оптимальный' : userData.plan === 'premium' ? 'Премиум' : 'Партнёр'}
+                          </Badge>
+                          {userData.role === 'admin' && (
+                            <Badge variant="destructive" className="ml-2">Админ</Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {userData.created_at ? new Date(userData.created_at).toLocaleDateString('ru-RU') : 'Дата неизвестна'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

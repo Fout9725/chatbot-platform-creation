@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,22 @@ const Index = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        const data = await response.json();
+        if (data.users) {
+          setTotalUsers(data.users.length);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -105,12 +121,12 @@ const Index = () => {
           <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs">Пользователей</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-blue-600">1</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-blue-600">{totalUsers}</CardTitle>
             </CardHeader>
             <CardContent className="pb-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Icon name="Sparkles" size={12} className="text-blue-500" />
-                Бета-версия
+                {totalUsers > 0 ? 'Растём каждый день' : 'Бета-версия'}
               </p>
             </CardContent>
           </Card>
