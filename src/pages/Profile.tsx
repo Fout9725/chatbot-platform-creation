@@ -30,29 +30,22 @@ const Profile = () => {
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-  const [autoRenewal, setAutoRenewal] = useState(() => {
-    const saved = localStorage.getItem('autoRenewal');
-    return saved ? JSON.parse(saved) : false;
-  });
   
-  const paymentHistory = [
-    {
-      id: 1,
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      type: 'subscription',
-      description: 'Подписка "Оптимальный"',
-      amount: 990,
-      status: 'success'
-    },
-    {
-      id: 2,
-      date: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-      type: 'subscription',
-      description: 'Подписка "Оптимальный"',
-      amount: 990,
-      status: 'success'
+  const paymentHistory = (() => {
+    const saved = localStorage.getItem('paymentHistory');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((p: any) => ({
+          ...p,
+          date: new Date(p.date)
+        }));
+      } catch {
+        return [];
+      }
     }
-  ];
+    return [];
+  })();
   
   const avatarSeeds = [
     'happy1', 'happy2', 'happy3', 'happy4', 'happy5', 'happy6',
@@ -78,20 +71,6 @@ const Profile = () => {
       setEmail(user.email);
     }
   }, [isAuthenticated, user, navigate]);
-  
-  useEffect(() => {
-    localStorage.setItem('autoRenewal', JSON.stringify(autoRenewal));
-  }, [autoRenewal]);
-  
-  const handleAutoRenewalToggle = () => {
-    setAutoRenewal(!autoRenewal);
-    toast({
-      title: autoRenewal ? 'Автопродление отключено' : 'Автопродление включено',
-      description: autoRenewal 
-        ? 'Подписка не будет продлеваться автоматически' 
-        : 'Подписка будет автоматически продлеваться каждый месяц',
-    });
-  };
 
   const handleSave = () => {
     toast({
@@ -366,47 +345,6 @@ const Profile = () => {
 
                 <TabsContent value="orders" className="space-y-4 mt-4">
                   <div className="space-y-4">
-                    {user?.plan !== 'free' && (
-                      <Card className="bg-gradient-to-r from-purple-50 to-blue-50">
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <CardTitle className="text-base">Автопродление подписки</CardTitle>
-                              <CardDescription>Автоматическое продление тарифа</CardDescription>
-                            </div>
-                            <Button
-                              variant={autoRenewal ? "default" : "outline"}
-                              size="sm"
-                              onClick={handleAutoRenewalToggle}
-                            >
-                              <Icon name={autoRenewal ? "Check" : "X"} size={16} className="mr-2" />
-                              {autoRenewal ? 'Включено' : 'Выключено'}
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex items-start gap-3 p-3 bg-white/70 rounded-lg">
-                            <Icon 
-                              name={autoRenewal ? "CalendarCheck" : "CalendarX"} 
-                              size={24} 
-                              className={autoRenewal ? "text-green-500" : "text-muted-foreground"} 
-                            />
-                            <div className="flex-1">
-                              <p className="font-semibold text-sm">
-                                {autoRenewal ? 'Подписка продлевается автоматически' : 'Автопродление отключено'}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {autoRenewal 
-                                  ? `Следующее списание: ${new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU')} • ${user?.plan === 'optimal' ? '990₽' : user?.plan === 'premium' ? '2990₽' : '0₽'}`
-                                  : 'Подписка истечёт в конце расчётного периода'
-                                }
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-base">Активные боты</CardTitle>
