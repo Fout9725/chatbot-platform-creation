@@ -147,6 +147,14 @@ const Admin = () => {
     customTemplates: 0
   };
 
+  console.log('📊 Admin platformStats:', {
+    activeBots: activeBots,
+    totalBots: platformStats.totalBots,
+    activeBotsCount: platformStats.activeBots,
+    paymentHistory: paymentHistory,
+    monthlyRevenue: platformStats.monthlyRevenue
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <div className="container mx-auto px-4 py-8">
