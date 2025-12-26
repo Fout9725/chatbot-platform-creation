@@ -12,6 +12,7 @@ import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
+import { mockBots } from '@/components/marketplace/mockBots';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -143,17 +144,9 @@ const Admin = () => {
     activeBots: activeBots.filter((b: any) => b.status === 'active').length,
     totalRevenue: totalRevenue,
     monthlyRevenue: monthlyRevenue,
-    marketplaceBots: 0,
-    customTemplates: 0
+    marketplaceBots: mockBots.length,
+    customTemplates: mockBots.filter(b => b.price === 0).length
   };
-
-  console.log('📊 Admin platformStats:', {
-    activeBots: activeBots,
-    totalBots: platformStats.totalBots,
-    activeBotsCount: platformStats.activeBots,
-    paymentHistory: paymentHistory,
-    monthlyRevenue: platformStats.monthlyRevenue
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">

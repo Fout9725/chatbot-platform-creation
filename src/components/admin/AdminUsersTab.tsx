@@ -29,15 +29,10 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const syncUsers = async (isManual = false) => {
-    if (isManual) {
-      setIsSyncing(true);
-    } else {
-      setIsLoading(true);
-    }
+    setIsSyncing(true);
     
     try {
       const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
@@ -56,12 +51,10 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
         }));
         setUsers(dbUsers);
         
-        if (isManual) {
-          toast({
-            title: 'Синхронизация завершена',
-            description: `Загружено ${dbUsers.length} пользователей из базы данных`,
-          });
-        }
+        toast({
+          title: 'Синхронизация завершена',
+          description: `Загружено ${dbUsers.length} пользователей из базы данных`,
+        });
       }
     } catch (error) {
       console.error('Ошибка синхронизации пользователей:', error);
@@ -71,18 +64,10 @@ const AdminUsersTab = ({ users, setUsers }: AdminUsersTabProps) => {
         variant: 'destructive'
       });
     } finally {
-      if (isManual) {
-        setIsSyncing(false);
-      } else {
-        setIsLoading(false);
-      }
+      setIsSyncing(false);
     }
   };
   
-  useEffect(() => {
-    syncUsers();
-  }, []);
-
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          user.email.toLowerCase().includes(searchQuery.toLowerCase());
