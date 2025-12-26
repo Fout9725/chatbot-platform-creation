@@ -1,4 +1,6 @@
 {
+  "robokassa-robokassa-webhook": "https://functions.poehali.dev/26465cd3-9f9e-4ba4-a4ab-67690fa4446d",
+  "robokassa-robokassa": "https://functions.poehali.dev/bed28ab3-2127-417a-91cb-6d97e70797de",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "offer-constructor": "https://functions.poehali.dev/d6cbd773-276e-4b10-983b-b0fd08681386",
   "poll-webhook-setup": "https://functions.poehali.dev/7783247a-ed0d-4433-9b62-24fb9d1e9a04",
