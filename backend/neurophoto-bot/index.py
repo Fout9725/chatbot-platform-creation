@@ -255,12 +255,19 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     try:
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
+            
+            # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики
+            full_response_json = json.dumps(result, indent=2, ensure_ascii=False)
             print(f"[OPENROUTER] ===== FULL RESPONSE DEBUG =====")
             print(f"[OPENROUTER] ===== DETAILED RESPONSE STRUCTURE =====")
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
-            print(f"[OPENROUTER] Full response JSON (first 2000 chars): {json.dumps(result, indent=2)[:2000]}")
-            if len(json.dumps(result)) > 2000:
-                print(f"[OPENROUTER] Full response JSON (continued): {json.dumps(result, indent=2)[2000:4000]}")
+            print(f"[OPENROUTER] Full response length: {len(full_response_json)} chars")
+            
+            # Выводим весь ответ по частям
+            chunk_size = 3000
+            for i in range(0, len(full_response_json), chunk_size):
+                chunk_num = i // chunk_size + 1
+                print(f"[OPENROUTER] RESPONSE CHUNK {chunk_num}: {full_response_json[i:i+chunk_size]}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
@@ -268,11 +275,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 return None
             
             message = result['choices'][0].get('message', {})
+            full_message_json = json.dumps(message, indent=2, ensure_ascii=False)
             print(f"[OPENROUTER] ===== MESSAGE OBJECT DETAILS =====")
             print(f"[OPENROUTER] Message keys: {list(message.keys())}")
-            print(f"[OPENROUTER] Full message JSON (first 2000 chars): {json.dumps(message, indent=2)[:2000]}")
-            if len(json.dumps(message)) > 2000:
-                print(f"[OPENROUTER] Full message JSON (continued): {json.dumps(message, indent=2)[2000:]}")
+            print(f"[OPENROUTER] Full message length: {len(full_message_json)} chars")
+            
+            # Выводим весь message по частям
+            chunk_size = 3000
+            for i in range(0, len(full_message_json), chunk_size):
+                chunk_num = i // chunk_size + 1
+                print(f"[OPENROUTER] MESSAGE CHUNK {chunk_num}: {full_message_json[i:i+chunk_size]}")
             
             # DEBUG: Detailed type analysis
             content = message.get('content', '')
@@ -282,11 +294,13 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             
             # CRITICAL: Выводим ВЕСЬ content полностью для диагностики
             if isinstance(content, str):
-                print(f"[OPENROUTER] ===== FULL STRING CONTENT (first 5000 chars) =====")
-                print(content[:5000])
-                if len(content) > 5000:
-                    print(f"[OPENROUTER] ===== CONTINUED (5000-10000) =====")
-                    print(content[5000:10000])
+                print(f"[OPENROUTER] ===== FULL STRING CONTENT =====")
+                print(f"[OPENROUTER] Content length: {len(content)} chars")
+                # Выводим весь content по частям
+                chunk_size = 3000
+                for i in range(0, len(content), chunk_size):
+                    chunk_num = i // chunk_size + 1
+                    print(f"[OPENROUTER] CONTENT CHUNK {chunk_num}: {content[i:i+chunk_size]}")
             
             if isinstance(content, dict):
                 print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
@@ -319,6 +333,31 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             
             if isinstance(content, str):
                 print(f"[OPENROUTER] Analyzing string content (length: {len(content)})")
+                
+                # CRITICAL: Попытка распарсить content как JSON (может быть вложенный JSON)
+                try:
+                    parsed_content = json.loads(content)
+                    print(f"[OPENROUTER] Content is valid JSON! Type: {type(parsed_content).__name__}")
+                    print(f"[OPENROUTER] Parsed content: {json.dumps(parsed_content, indent=2, ensure_ascii=False)[:1000]}")
+                    
+                    # Проверяем parsed content на наличие изображения
+                    if isinstance(parsed_content, dict):
+                        if 'url' in parsed_content:
+                            print(f"[OPENROUTER] Found url in parsed JSON: {parsed_content['url'][:100]}")
+                            return parsed_content['url']
+                        if 'image_url' in parsed_content:
+                            img = parsed_content['image_url']
+                            if isinstance(img, str):
+                                print(f"[OPENROUTER] Found image_url string in parsed JSON")
+                                return img
+                            elif isinstance(img, dict) and 'url' in img:
+                                print(f"[OPENROUTER] Found image_url.url in parsed JSON")
+                                return img['url']
+                        if 'data' in parsed_content:
+                            print(f"[OPENROUTER] Found data in parsed JSON")
+                            return parsed_content['data']
+                except (json.JSONDecodeError, TypeError):
+                    print(f"[OPENROUTER] Content is not JSON, treating as plain string")
                 
                 # CRITICAL: Ищем любые признаки base64 изображения
                 # 1. Ищем data:image URL
