@@ -2,16 +2,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Icon from '@/components/ui/icon';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 export default function Documentation() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 md:p-6 lg:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-3 mb-8">
-          <Icon name="BookOpen" size={32} className="text-primary" />
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            Документация
-          </h1>
+        <div className="flex items-center justify-between gap-3 mb-8">
+          <div className="flex items-center gap-3">
+            <Icon name="BookOpen" size={32} className="text-primary" />
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+              Документация
+            </h1>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2"
+          >
+            <Icon name="ArrowLeft" size={18} />
+            На главную
+          </Button>
         </div>
 
         <Tabs defaultValue="quickstart" className="w-full">
