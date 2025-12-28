@@ -219,14 +219,11 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         'max_tokens': 1000
     }
     
-    # CRITICAL: Для image generation моделей добавляем modalities ТОЛЬКО если нет фото
-    # С фото - это vision+generation режим, modalities не нужен
-    if is_image_gen and not image_urls:
-        print(f"[OPENROUTER] Adding modalities for pure generation")
-        request_body['modalities'] = ['image', 'text']
-    elif is_image_gen and image_urls:
-        print(f"[OPENROUTER] Image generation from examples - modalities included")
-        request_body['modalities'] = ['image', 'text']
+    # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
+    # Это указывает API что нужно вернуть изображение в поле message.images
+    if is_image_gen:
+        print(f"[OPENROUTER] Adding modalities=['image'] for image generation model")
+        request_body['modalities'] = ['image']  # Только 'image' для генерации изображений
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
@@ -316,17 +313,31 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                         print(f"[OPENROUTER]       keys: {list(item.keys())}")
                         print(f"[OPENROUTER]       preview: {json.dumps(item)[:300]}")
             
-            # ===== STRATEGY 1: Check 'images' field in message =====
-            print(f"[OPENROUTER] === Trying Strategy 1: message.images ===")
+            # ===== STRATEGY 1: Check 'images' field in message (PRIMARY FOR IMAGE GENERATION) =====
+            print(f"[OPENROUTER] === Trying Strategy 1: message.images (MAIN STRATEGY) ===")
             if 'images' in message:
                 images = message['images']
-                print(f"[OPENROUTER] Found 'images' field with {len(images) if isinstance(images, list) else 'N/A'} items")
-                if isinstance(images, list) and len(images) > 0:
-                    print(f"[OPENROUTER] First image preview: {str(images[0])[:100]}")
-                    return images[0]
+                print(f"[OPENROUTER] ✅ FOUND 'images' field!")
+                print(f"[OPENROUTER] Images type: {type(images).__name__}")
+                print(f"[OPENROUTER] Images length/count: {len(images) if isinstance(images, (list, str)) else 'N/A'}")
+                
+                if isinstance(images, list):
+                    print(f"[OPENROUTER] Images is list with {len(images)} items")
+                    for i, img in enumerate(images):
+                        print(f"[OPENROUTER]   Image [{i}] type: {type(img).__name__}, preview: {str(img)[:200]}")
+                    
+                    if len(images) > 0:
+                        first_image = images[0]
+                        print(f"[OPENROUTER] ✅ RETURNING first image from list")
+                        return first_image
                 elif isinstance(images, str):
-                    print(f"[OPENROUTER] Images is string: {images[:100]}")
+                    print(f"[OPENROUTER] Images is string, preview: {images[:200]}")
+                    print(f"[OPENROUTER] ✅ RETURNING images string")
                     return images
+                else:
+                    print(f"[OPENROUTER] ⚠️ Images field exists but unexpected type: {type(images).__name__}")
+            else:
+                print(f"[OPENROUTER] ❌ No 'images' field in message")
             
             # ===== STRATEGY 2: Check content as string (base64 or URL) =====
             print(f"[OPENROUTER] === Trying Strategy 2: content as string ===")
