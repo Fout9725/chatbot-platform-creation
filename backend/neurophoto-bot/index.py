@@ -72,6 +72,25 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
         print(f"[ERROR] Send photo: {e}")
         return False
 
+def answer_callback_query(bot_token: str, callback_query_id: str, text: str = '', show_alert: bool = False) -> bool:
+    '''Ответ на callback query для убирания "загрузки" на кнопке'''
+    telegram_url = f'https://api.telegram.org/bot{bot_token}/answerCallbackQuery'
+    payload = {
+        'callback_query_id': callback_query_id,
+        'text': text,
+        'show_alert': show_alert
+    }
+    
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(telegram_url, data=data, headers={'Content-Type': 'application/json'})
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            return response.status == 200
+    except Exception as e:
+        print(f"[ERROR] Answer callback: {e}")
+        return False
+
 def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
     '''Генерация изображения через OpenRouter API'''
     api_key = os.environ.get('OPENROUTER_API_KEY')
@@ -210,7 +229,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             callback = update['callback_query']
             chat_id = str(callback['message']['chat']['id'])
             telegram_id = callback['from']['id']
+            callback_query_id = callback['id']
             data = callback['data']
+            
+            # Ответить на callback query (убирает "загрузку" на кнопке)
+            answer_callback_query(bot_token, callback_query_id)
             
             if data == 'tier:free':
                 send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', get_model_keyboard('free'))
