@@ -1,5 +1,6 @@
 import json
 import os
+import base64
 from typing import Dict, Any, Optional, List
 import urllib.request
 import psycopg2
@@ -145,14 +146,32 @@ def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
     
     url = 'https://openrouter.ai/api/v1/chat/completions'
     
-    data = json.dumps({
+    # Определяем, является ли модель image generation моделью
+    image_gen_models = [
+        'google/gemini-3-pro-image-preview',
+        'google/gemini-2.5-flash-image',
+        'black-forest-labs/flux.2-flex',
+        'black-forest-labs/flux.2-pro',
+        'openai/gpt-5-image'
+    ]
+    
+    is_image_gen = model in image_gen_models
+    
+    # Формируем запрос в зависимости от типа модели
+    request_body = {
         'model': model,
         'messages': [{
             'role': 'user',
             'content': [{'type': 'text', 'text': prompt}]
         }],
         'max_tokens': 1000
-    }).encode('utf-8')
+    }
+    
+    # Для image generation моделей добавляем modalities
+    if is_image_gen:
+        request_body['modalities'] = ['image', 'text']
+    
+    data = json.dumps(request_body).encode('utf-8')
     
     headers = {
         'Authorization': f'Bearer {api_key}',
@@ -164,10 +183,22 @@ def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
     try:
-        with urllib.request.urlopen(req, timeout=90) as response:
+        with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
-            content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+            print(f"[OPENROUTER] Response keys: {list(result.keys())}")
             
+            message = result.get('choices', [{}])[0].get('message', {})
+            content = message.get('content', '')
+            
+            # Для image generation моделей проверяем поле images
+            if is_image_gen and 'images' in message:
+                images = message.get('images', [])
+                print(f"[OPENROUTER] Found {len(images)} images in response")
+                if images and len(images) > 0:
+                    # Возвращаем первое изображение (base64 data URL)
+                    return images[0]
+            
+            # Fallback: ищем URL в текстовом контенте
             if 'https://' in content:
                 start = content.find('https://')
                 end = content.find(')', start)
@@ -178,18 +209,29 @@ def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
                 image_url = content[start:end].strip()
                 return image_url
             
-            print(f"[ERROR] No image URL in response: {content[:200]}")
+            print(f"[ERROR] No image in response. Content: {content[:200]}")
+            print(f"[ERROR] Full response: {json.dumps(result)[:500]}")
             return None
     except Exception as e:
         print(f"[ERROR] Generate image: {e}")
+        import traceback
+        print(traceback.format_exc())
         return None
 
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
     '''Загрузка изображения в S3 для постоянного хранения'''
     try:
-        req = urllib.request.Request(image_url)
-        with urllib.request.urlopen(req, timeout=30) as response:
-            image_data = response.read()
+        # Проверяем, является ли изображение base64 data URL
+        if image_url.startswith('data:image'):
+            print("[S3] Processing base64 data URL")
+            # Формат: data:image/png;base64,iVBORw0KG...
+            header, encoded = image_url.split(',', 1)
+            image_data = base64.b64decode(encoded)
+        else:
+            print(f"[S3] Downloading from URL: {image_url[:100]}")
+            req = urllib.request.Request(image_url)
+            with urllib.request.urlopen(req, timeout=30) as response:
+                image_data = response.read()
         
         s3 = boto3.client('s3',
             endpoint_url='https://bucket.poehali.dev',
@@ -201,9 +243,12 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         s3.put_object(Bucket='files', Key=key, Body=image_data, ContentType='image/png')
         
         cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+        print(f"[S3] Uploaded successfully: {cdn_url}")
         return cdn_url
     except Exception as e:
         print(f"[ERROR] Upload to S3: {e}")
+        import traceback
+        print(traceback.format_exc())
         return None
 
 def get_model_keyboard(tier: str):
