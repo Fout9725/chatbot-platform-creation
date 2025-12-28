@@ -287,8 +287,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '/admin - эта панель\n'
                 '/users - список пользователей\n'
                 '/topusers - топ по генерациям\n'
-                '/addpro [id] - выдать Pro\n'
-                '/addgens [id] [кол-во] - добавить генерации\n'
+                '/addpro [@login] - выдать Pro по логину\n'
+                '/addgens [@login] [кол-во] - добавить генерации\n'
+                '/addpaidgens [@login] [кол-во] - добавить платные генерации\n'
+                '/userinfo [@login] - инфо о пользователе\n'
                 '/broadcast [текст] - рассылка всем'
             )
             send_telegram_message(bot_token, chat_id, admin_text)
@@ -326,30 +328,118 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addpro [id] - выдать Pro подписку
+        # Команда /addpro [@login] - выдать Pro подписку
         if message_text.startswith('/addpro ') and is_admin(telegram_id):
             try:
-                user_id = int(message_text.split()[1])
-                cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s", (user_id,))
-                conn.commit()
-                send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю {user_id}')
-            except:
-                send_telegram_message(bot_token, chat_id, '❌ Ошибка. Формат: /addpro [telegram_id]')
+                user_input = message_text.split()[1].lstrip('@')
+                
+                # Попытка найти по логину или ID
+                try:
+                    user_id = int(user_input)
+                    cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s RETURNING telegram_id, username", (user_id,))
+                except ValueError:
+                    cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE username = %s RETURNING telegram_id, username", (user_input,))
+                
+                result = cur.fetchone()
+                if result:
+                    conn.commit()
+                    send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
+                else:
+                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+            except Exception as e:
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addpro [@login или ID]')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addgens [id] [количество] - добавить бесплатные генерации
+        # Команда /addgens [@login] [количество] - добавить бесплатные генерации
         if message_text.startswith('/addgens ') and is_admin(telegram_id):
             try:
                 parts = message_text.split()
-                user_id = int(parts[1])
+                user_input = parts[1].lstrip('@')
                 amount = int(parts[2])
-                cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s", (amount, user_id))
-                conn.commit()
-                send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} генераций пользователю {user_id}')
-            except:
-                send_telegram_message(bot_token, chat_id, '❌ Ошибка. Формат: /addgens [telegram_id] [количество]')
+                
+                # Попытка найти по логину или ID
+                try:
+                    user_id = int(user_input)
+                    cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
+                except ValueError:
+                    cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
+                
+                result = cur.fetchone()
+                if result:
+                    conn.commit()
+                    send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} бесплатных генераций пользователю @{result["username"] or result["telegram_id"]}')
+                else:
+                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+            except Exception as e:
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addgens [@login или ID] [количество]')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Команда /addpaidgens [@login] [количество] - добавить платные генерации
+        if message_text.startswith('/addpaidgens ') and is_admin(telegram_id):
+            try:
+                parts = message_text.split()
+                user_input = parts[1].lstrip('@')
+                amount = int(parts[2])
+                
+                # Попытка найти по логину или ID
+                try:
+                    user_id = int(user_input)
+                    cur.execute("UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
+                except ValueError:
+                    cur.execute("UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
+                
+                result = cur.fetchone()
+                if result:
+                    conn.commit()
+                    send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} платных генераций пользователю @{result["username"] or result["telegram_id"]}')
+                else:
+                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+            except Exception as e:
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addpaidgens [@login или ID] [количество]')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Команда /userinfo [@login] - информация о пользователе
+        if message_text.startswith('/userinfo ') and is_admin(telegram_id):
+            try:
+                user_input = message_text.split()[1].lstrip('@')
+                
+                # Попытка найти по логину или ID
+                try:
+                    user_id = int(user_input)
+                    cur.execute("SELECT * FROM neurophoto_users WHERE telegram_id = %s", (user_id,))
+                except ValueError:
+                    cur.execute("SELECT * FROM neurophoto_users WHERE username = %s", (user_input,))
+                
+                user = cur.fetchone()
+                if user:
+                    cur.execute("SELECT COUNT(*) as gens_count FROM neurophoto_generations WHERE telegram_id = %s", (user['telegram_id'],))
+                    gens = cur.fetchone()['gens_count']
+                    
+                    status = '💎 PRO' if user['paid_generations'] > 0 else '🆓 Free'
+                    info_text = (
+                        f'👤 <b>Информация о пользователе</b>\n\n'
+                        f'ID: {user["telegram_id"]}\n'
+                        f'Логин: @{user["username"] or "нет"}\n'
+                        f'Имя: {user["first_name"] or "не указано"}\n'
+                        f'Статус: {status}\n\n'
+                        f'🆓 Бесплатных генераций: {user["free_generations"]}\n'
+                        f'💎 Платных генераций: {user["paid_generations"]}\n'
+                        f'📊 Всего использовано: {user["total_used"]}\n'
+                        f'🗄️ Записей в БД: {gens}\n\n'
+                        f'🎨 Модель: {user.get("preferred_model", "не выбрана")[:50]}...\n'
+                        f'📅 Регистрация: {user["created_at"]}'
+                    )
+                    send_telegram_message(bot_token, chat_id, info_text)
+                else:
+                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+            except Exception as e:
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /userinfo [@login или ID]')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
