@@ -218,7 +218,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         update = json.loads(body_str)
         print(f"[WEBHOOK] Update keys: {list(update.keys())}")
         
-        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN', '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4')
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN')
+        if not bot_token:
+            print("[ERROR] No NEUROPHOTO_BOT_TOKEN in environment")
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         db_url = os.environ.get('DATABASE_URL')
         
         if not db_url:
