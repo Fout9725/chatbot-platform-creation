@@ -157,9 +157,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     try:
-        update = json.loads(event.get('body', '{}'))
+        body_str = event.get('body', '{}')
+        print(f"Received webhook: {body_str[:200]}")
+        
+        update = json.loads(body_str)
         
         if 'message' not in update:
+            print("No message in update, skipping")
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
@@ -173,10 +177,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         username = message['from'].get('username', '')
         message_text = message.get('text', '')
         
+        print(f"Message from {username} ({telegram_id}): {message_text}")
+        
         bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN') or os.environ.get('TELEGRAM_BOT_TOKEN')
         db_url = os.environ.get('DATABASE_URL')
         
+        print(f"Bot token exists: {bool(bot_token)}, DB URL exists: {bool(db_url)}")
+        
         if not bot_token or not db_url:
+            print("ERROR: Missing bot_token or db_url")
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
