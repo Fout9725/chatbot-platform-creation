@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.7 - CRITICAL FIX: Removed duplicate processing logic, added generation_id check
+# v2.8 - FINAL FIX: Pre-mark generation before processing, improved base64 parsing
 
 IMAGE_MODELS = {
     'free': [
@@ -269,10 +269,37 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] === Trying Strategy 2: content as string ===")
             
             if isinstance(content, str):
-                # Проверяем base64 data URL
-                if content.startswith('data:image'):
-                    print(f"[OPENROUTER] Found base64 data URL in content")
-                    return content
+                print(f"[OPENROUTER] String content preview (first 200 chars): {content[:200]}")
+                
+                # Проверяем base64 data URL в любой позиции строки
+                if 'data:image' in content:
+                    print(f"[OPENROUTER] Found 'data:image' in content, extracting...")
+                    start = content.find('data:image')
+                    # Ищем конец base64 строки (обычно заканчивается на == или пробел/кавычка)
+                    end = start
+                    for end_char in ['"', "'", ' ', '\n', ')', '}']:
+                        pos = content.find(end_char, start + 20)  # +20 чтобы пропустить начало
+                        if pos != -1:
+                            end = pos
+                            break
+                    if end == start:
+                        end = len(content)  # До конца если не нашли ограничитель
+                    
+                    base64_data = content[start:end].strip()
+                    print(f"[OPENROUTER] Extracted base64 data URL (length: {len(base64_data)})")
+                    print(f"[OPENROUTER] Base64 preview: {base64_data[:100]}")
+                    return base64_data
+                
+                # Проверяем прямой base64 без префикса data:image
+                if content.startswith('iVBOR') or content.startswith('/9j/') or content.startswith('R0lGOD'):
+                    print(f"[OPENROUTER] Found raw base64 image data (PNG/JPEG/GIF header)")
+                    # Добавляем data URI схему
+                    if content.startswith('iVBOR'):
+                        return f"data:image/png;base64,{content}"
+                    elif content.startswith('/9j/'):
+                        return f"data:image/jpeg;base64,{content}"
+                    else:
+                        return f"data:image/gif;base64,{content}"
                 
                 # Проверяем https URL
                 if 'https://' in content:
@@ -281,6 +308,8 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                     end = content.find(')', start)
                     if end == -1:
                         end = content.find(' ', start)
+                    if end == -1:
+                        end = content.find('\n', start)
                     if end == -1:
                         end = len(content)
                     image_url = content[start:end].strip()
@@ -613,7 +642,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     # CRITICAL: Проверяем, не обработали ли мы уже этот media_group_id
                     cur.execute(
                         f"SELECT COUNT(*) as count FROM {DB_SCHEMA}.neurophoto_generations "
-                        f"WHERE telegram_id = %s AND prompt = %s AND created_at > NOW() - INTERVAL '1 minute'",
+                        f"WHERE telegram_id = %s AND prompt = %s AND created_at > NOW() - INTERVAL '2 minutes'",
                         (telegram_id, f"media_group:{media_group_id}")
                     )
                     already_processed = cur.fetchone()['count'] > 0
@@ -625,6 +654,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                     
                     print(f"[MESSAGE] Processing media group {media_group_id} for the first time")
+                    
+                    # CRITICAL: СРАЗУ записываем маркер обработки ПЕРЕД генерацией, чтобы блокировать дубликаты
+                    print(f"[MESSAGE] Creating processing marker to prevent duplicates")
+                    cur.execute(
+                        f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) "
+                        f"VALUES (%s, %s, %s, %s, %s)",
+                        (telegram_id, f"media_group:{media_group_id}", 'processing', 'pending', False)
+                    )
+                    conn.commit()
+                    print(f"[MESSAGE] Processing marker created, loading photos from session")
+                    
                     cur.execute(
                         f"SELECT session_photo_url FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s",
                         (telegram_id,)
@@ -1120,12 +1160,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"[ERROR] Failed to send photo to Telegram, sending URL as text")
                 send_telegram_message(bot_token, chat_id, f'{caption}\n\nИзображение: {final_url}')
             
-            # Сохраняем generation с маркером media_group если это media group
-            save_prompt = f"media_group:{generation_id}" if generation_id else message_text
-            cur.execute(
-                f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
-                (telegram_id, save_prompt, preferred_model, final_url, is_paid)
-            )
+            # Обновляем или создаем запись generation
+            if generation_id:
+                # Для media group обновляем существующую запись маркера
+                print(f"[SUCCESS] Updating media group marker with actual result")
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.neurophoto_generations SET "
+                    f"model = %s, image_url = %s, is_paid = %s "
+                    f"WHERE telegram_id = %s AND prompt = %s",
+                    (preferred_model, final_url, is_paid, telegram_id, f"media_group:{generation_id}")
+                )
+            else:
+                # Для обычного сообщения создаем новую запись
+                cur.execute(
+                    f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
+                    (telegram_id, message_text, preferred_model, final_url, is_paid)
+                )
             
             if not is_paid:
                 cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
