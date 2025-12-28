@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.1 - Fixed photo counting and image delivery
+# v2.2 - Enhanced image response parsing from OpenRouter
 
 IMAGE_MODELS = {
     'free': [
@@ -220,39 +220,74 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     try:
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
+            print(f"[OPENROUTER] ===== FULL RESPONSE DEBUG =====")
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
-            print(f"[OPENROUTER] Full response (first 1000 chars): {json.dumps(result)[:1000]}")
+            print(f"[OPENROUTER] Full response: {json.dumps(result, indent=2)}")
             
-            message = result.get('choices', [{}])[0].get('message', {})
-            content = message.get('content', '')
+            # Проверяем наличие choices
+            if 'choices' not in result or len(result['choices']) == 0:
+                print(f"[ERROR] No choices in response")
+                return None
+            
+            message = result['choices'][0].get('message', {})
+            print(f"[OPENROUTER] ===== MESSAGE OBJECT =====")
             print(f"[OPENROUTER] Message keys: {list(message.keys())}")
+            print(f"[OPENROUTER] Full message: {json.dumps(message, indent=2)}")
+            
+            # Стратегия 1: Проверяем поле images в message
+            if 'images' in message:
+                images = message['images']
+                print(f"[OPENROUTER] Found 'images' field with {len(images) if isinstance(images, list) else 'N/A'} items")
+                if isinstance(images, list) and len(images) > 0:
+                    print(f"[OPENROUTER] First image preview: {str(images[0])[:100]}")
+                    return images[0]
+                elif isinstance(images, str):
+                    print(f"[OPENROUTER] Images is string: {images[:100]}")
+                    return images
+            
+            # Стратегия 2: Проверяем content как строку с base64 или URL
+            content = message.get('content', '')
             print(f"[OPENROUTER] Content type: {type(content)}, length: {len(str(content))}")
             
-            # Для image generation моделей проверяем поле images
-            if is_image_gen and 'images' in message:
-                images = message.get('images', [])
-                print(f"[OPENROUTER] Found {len(images)} images in response")
-                if images and len(images) > 0:
-                    print(f"[OPENROUTER] First image type: {type(images[0])}, starts with: {str(images[0])[:50]}")
-                    # Возвращаем первое изображение (base64 data URL)
-                    return images[0]
+            if isinstance(content, str):
+                # Проверяем base64 data URL
+                if content.startswith('data:image'):
+                    print(f"[OPENROUTER] Found base64 data URL in content")
+                    return content
+                
+                # Проверяем https URL
+                if 'https://' in content:
+                    print(f"[OPENROUTER] Found HTTPS URL in content")
+                    start = content.find('https://')
+                    end = content.find(')', start)
+                    if end == -1:
+                        end = content.find(' ', start)
+                    if end == -1:
+                        end = len(content)
+                    image_url = content[start:end].strip()
+                    print(f"[OPENROUTER] Extracted URL: {image_url}")
+                    return image_url
             
-            # Fallback: ищем URL в текстовом контенте
-            if 'https://' in content:
-                print(f"[OPENROUTER] Found URL in text content")
-                start = content.find('https://')
-                end = content.find(')', start)
-                if end == -1:
-                    end = content.find(' ', start)
-                if end == -1:
-                    end = len(content)
-                image_url = content[start:end].strip()
-                print(f"[OPENROUTER] Extracted URL: {image_url}")
-                return image_url
+            # Стратегия 3: Проверяем content как список (structured content)
+            elif isinstance(content, list):
+                print(f"[OPENROUTER] Content is list with {len(content)} items")
+                for i, item in enumerate(content):
+                    print(f"[OPENROUTER] Content[{i}]: {json.dumps(item)[:200]}")
+                    if isinstance(item, dict):
+                        # Проверяем image_url в structured content
+                        if item.get('type') == 'image_url':
+                            img_url = item.get('image_url', {}).get('url', '')
+                            if img_url:
+                                print(f"[OPENROUTER] Found image_url in structured content: {img_url[:100]}")
+                                return img_url
+                        # Проверяем прямое поле url
+                        if 'url' in item:
+                            print(f"[OPENROUTER] Found url in item: {item['url'][:100]}")
+                            return item['url']
             
-            print(f"[ERROR] No image in response. Content: {content[:200]}")
-            print(f"[ERROR] Message object: {json.dumps(message)[:500]}")
-            print(f"[ERROR] Full response: {json.dumps(result)[:1000]}")
+            print(f"[ERROR] ===== NO IMAGE FOUND =====")
+            print(f"[ERROR] Could not extract image from response")
+            print(f"[ERROR] Content preview: {str(content)[:500]}")
             return None
     except Exception as e:
         print(f"[ERROR] Generate image: {e}")
