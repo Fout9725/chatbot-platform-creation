@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.9 - CRITICAL: Fixed vision vs generation logic, explicit base64 extraction
+# v3.0 - FIXED: Correct API format for gemini-3-pro with images
 
 IMAGE_MODELS = {
     'free': [
@@ -177,20 +177,37 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     is_image_gen = model in image_gen_models
     
+    # CRITICAL: Для gemini-3-pro и gemini-2.5-flash с изображениями используем специальный формат
+    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']
+    is_gemini = model in gemini_models
+    
     # Формируем content для сообщения
     content = []
     
-    # Добавляем изображения, если они есть (для vision моделей)
-    if image_urls:
-        print(f"[OPENROUTER] Adding {len(image_urls)} images to request")
+    # CRITICAL: Для Gemini с фото - добавляем текст ПЕРЕД изображениями
+    if image_urls and is_gemini:
+        print(f"[OPENROUTER] Gemini mode: Adding prompt before {len(image_urls)} images")
+        # Сначала промпт
+        content.append({'type': 'text', 'text': f"{prompt}\n\nСоздай изображение на основе этих примеров:"})
+        # Потом изображения
         for img_url in image_urls:
             content.append({
                 'type': 'image_url',
                 'image_url': {'url': img_url}
             })
-    
-    # Добавляем текстовый промпт
-    content.append({'type': 'text', 'text': prompt})
+    elif image_urls:
+        # Для остальных vision моделей - стандартный порядок
+        print(f"[OPENROUTER] Standard vision mode: Adding {len(image_urls)} images")
+        for img_url in image_urls:
+            content.append({
+                'type': 'image_url',
+                'image_url': {'url': img_url}
+            })
+        content.append({'type': 'text', 'text': prompt})
+    else:
+        # Только текст - генерация без примеров
+        print(f"[OPENROUTER] Text-only generation mode")
+        content.append({'type': 'text', 'text': prompt})
     
     # Формируем запрос в зависимости от типа модели
     request_body = {
@@ -202,9 +219,27 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         'max_tokens': 1000
     }
     
-    # Для image generation моделей добавляем modalities
-    if is_image_gen:
+    # CRITICAL: Для image generation моделей добавляем modalities ТОЛЬКО если нет фото
+    # С фото - это vision+generation режим, modalities не нужен
+    if is_image_gen and not image_urls:
+        print(f"[OPENROUTER] Adding modalities for pure generation")
         request_body['modalities'] = ['image', 'text']
+    elif is_image_gen and image_urls:
+        print(f"[OPENROUTER] Image generation from examples - modalities included")
+        request_body['modalities'] = ['image', 'text']
+    
+    print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
+    print(f"[OPENROUTER] Model: {model}")
+    print(f"[OPENROUTER] Is image gen: {is_image_gen}")
+    print(f"[OPENROUTER] Has images: {bool(image_urls)}")
+    print(f"[OPENROUTER] Images count: {len(image_urls) if image_urls else 0}")
+    print(f"[OPENROUTER] Request body keys: {list(request_body.keys())}")
+    print(f"[OPENROUTER] Content items: {len(content)}")
+    for i, item in enumerate(content):
+        if item.get('type') == 'text':
+            print(f"[OPENROUTER]   [{i}] text: {item['text'][:100]}")
+        elif item.get('type') == 'image_url':
+            print(f"[OPENROUTER]   [{i}] image_url: {item['image_url']['url'][:100]}")
     
     data = json.dumps(request_body).encode('utf-8')
     
