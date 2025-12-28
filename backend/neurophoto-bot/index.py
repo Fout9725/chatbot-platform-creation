@@ -4,7 +4,6 @@ from typing import Dict, Any, Optional
 import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import base64
 import boto3
 
 def send_telegram_message(bot_token: str, chat_id: str, text: str) -> bool:
@@ -25,7 +24,8 @@ def send_telegram_message(bot_token: str, chat_id: str, text: str) -> bool:
     try:
         with urllib.request.urlopen(req) as response:
             return response.status == 200
-    except Exception:
+    except Exception as e:
+        print(f"Error sending message: {e}")
         return False
 
 
@@ -48,7 +48,8 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
     try:
         with urllib.request.urlopen(req) as response:
             return response.status == 200
-    except Exception:
+    except Exception as e:
+        print(f"Error sending photo: {e}")
         return False
 
 
@@ -56,6 +57,7 @@ def generate_image_openrouter(prompt: str, model: str = 'openai/dall-e-3') -> Op
     '''Генерация изображения через OpenRouter API'''
     api_key = os.environ.get('OPENROUTER_API_KEY')
     if not api_key:
+        print("ERROR: No OPENROUTER_API_KEY")
         return None
     
     url = 'https://openrouter.ai/api/v1/chat/completions'
@@ -95,8 +97,10 @@ def generate_image_openrouter(prompt: str, model: str = 'openai/dall-e-3') -> Op
                 image_url = content[start:end].strip()
                 return image_url
             
+            print(f"No image URL in OpenRouter response: {content}")
             return None
-    except Exception:
+    except Exception as e:
+        print(f"Error generating image: {e}")
         return None
 
 
@@ -123,16 +127,14 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         
         cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
         return cdn_url
-    except Exception:
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
         return None
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
-    Business: Telegram бот для генерации AI-изображений (Нейрофотосессия)
-    Args: event - dict с httpMethod, body (Telegram update)
-          context - объект с request_id
-    Returns: HTTP response
+    Telegram бот для генерации AI-изображений (Нейрофотосессия)
     '''
     method: str = event.get('httpMethod', 'POST')
     
@@ -145,7 +147,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
-            'body': ''
+            'body': '',
+            'isBase64Encoded': False
         }
     
     if method != 'POST':
@@ -158,12 +161,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         body_str = event.get('body', '{}')
-        print(f"Received webhook: {body_str[:200]}")
+        print(f"[WEBHOOK] Received: {body_str[:200]}")
         
         update = json.loads(body_str)
         
         if 'message' not in update:
-            print("No message in update, skipping")
+            print("[WEBHOOK] No message in update, skipping")
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
@@ -177,20 +180,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         username = message['from'].get('username', '')
         message_text = message.get('text', '')
         
-        print(f"Message from {username} ({telegram_id}): {message_text}")
+        print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}")
         
-        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN') or os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN')
         db_url = os.environ.get('DATABASE_URL')
         
-        print(f"Bot token exists: {bool(bot_token)}, DB URL exists: {bool(db_url)}")
+        print(f"[CONFIG] Token exists: {bool(bot_token)}, DB exists: {bool(db_url)}")
         
-        if not bot_token or not db_url:
-            print("ERROR: Missing bot_token or db_url")
+        if not bot_token:
+            print("[ERROR] NEUROPHOTO_BOT_TOKEN not found")
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'ok': True})
+                'body': json.dumps({'ok': True, 'error': 'No token'})
+            }
+        
+        if not db_url:
+            print("[ERROR] DATABASE_URL not found")
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'isBase64Encoded': False,
+                'body': json.dumps({'ok': True, 'error': 'No db'})
             }
         
         conn = psycopg2.connect(db_url)
@@ -208,10 +220,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '• Закат над океаном\n'
                 '• Современный офис\n\n'
                 '<b>Лимиты:</b>\n'
-                '🆓 Бесплатно: 3 изображения\n'
+                '🆓 Бесплатно: 10 изображений\n'
                 '💎 Безлимит: 299₽/мес\n\n'
                 'Просто напишите описание изображения!'
             )
+            print(f"[HELP] Sending help to {chat_id}")
             send_telegram_message(bot_token, chat_id, help_text)
             cur.close()
             conn.close()
@@ -222,6 +235,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'ok': True})
             }
         
+        print(f"[DB] Upserting user {telegram_id}")
         cur.execute(
             "INSERT INTO neurophoto_users (telegram_id, username) VALUES (%s, %s) "
             "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username "
@@ -234,16 +248,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
         
+        print(f"[USER] Free: {free_left}, Paid: {is_paid}, Total used: {user_data['total_used']}")
+        
         if not is_paid and free_left <= 0:
             limit_text = (
                 '❌ <b>Бесплатный лимит исчерпан</b>\n\n'
-                'Вы использовали все 3 бесплатные генерации.\n\n'
+                'Вы использовали все бесплатные генерации.\n\n'
                 '💎 <b>Безлимитный доступ - 299₽/мес</b>\n'
                 '• Неограниченные генерации\n'
                 '• Приоритетная обработка\n'
                 '• Все модели доступны\n\n'
                 'Напишите /pay для оплаты'
             )
+            print(f"[LIMIT] User {telegram_id} reached limit")
             send_telegram_message(bot_token, chat_id, limit_text)
             cur.close()
             conn.close()
@@ -254,11 +271,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'ok': True})
             }
         
+        print(f"[GENERATE] Starting image generation for: {message_text[:50]}")
         send_telegram_message(bot_token, chat_id, '⏳ Генерирую изображение... Это займет 10-30 секунд.')
         
         image_url = generate_image_openrouter(message_text, 'openai/dall-e-3')
         
         if image_url:
+            print(f"[SUCCESS] Image generated: {image_url[:100]}")
             cdn_url = upload_to_s3(image_url, telegram_id)
             final_url = cdn_url if cdn_url else image_url
             
@@ -287,8 +306,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 )
             
             conn.commit()
+            print(f"[DB] Generation saved for user {telegram_id}")
         else:
             error_text = '❌ Ошибка генерации изображения. Попробуйте еще раз или измените описание.'
+            print(f"[ERROR] Image generation failed for user {telegram_id}")
             send_telegram_message(bot_token, chat_id, error_text)
         
         cur.close()
@@ -302,6 +323,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         
     except Exception as e:
+        print(f"[EXCEPTION] {type(e).__name__}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
