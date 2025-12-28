@@ -7,6 +7,7 @@ from psycopg2.extras import RealDictCursor
 import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
+DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
 
 IMAGE_MODELS = {
     'free': [
@@ -218,10 +219,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         update = json.loads(body_str)
         print(f"[WEBHOOK] Update keys: {list(update.keys())}")
         
-        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN')
-        if not bot_token:
-            print("[ERROR] No NEUROPHOTO_BOT_TOKEN in environment")
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
         db_url = os.environ.get('DATABASE_URL')
         
         if not db_url:
@@ -253,8 +251,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Создать пользователя если не существует
                 print(f"[CALLBACK] Creating/updating user {telegram_id}")
                 cur.execute(
-                    "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
-                    "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+                    f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
+                    f"ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
                     (telegram_id, username, first_name)
                 )
                 conn.commit()
@@ -269,7 +267,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 elif data == 'tier:paid':
                     print("[CALLBACK] Checking paid status")
-                    cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+                    cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
                     user = cur.fetchone()
                     is_paid = user and user['paid_generations'] > 0 if user else False
                     
@@ -294,7 +292,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 elif data.startswith('model:'):
                     model_id = data.split(':', 1)[1]
                     print(f"[CALLBACK] Setting model: {model_id}")
-                    cur.execute("UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
                     conn.commit()
                     
                     all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
@@ -342,16 +340,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            cur.execute("SELECT COUNT(*) as total_users FROM neurophoto_users")
+            cur.execute(f"SELECT COUNT(*) as total_users FROM {DB_SCHEMA}.neurophoto_users")
             total_users = cur.fetchone()['total_users']
             
-            cur.execute("SELECT COUNT(*) as paid_users FROM neurophoto_users WHERE paid_generations > 0")
+            cur.execute(f"SELECT COUNT(*) as paid_users FROM {DB_SCHEMA}.neurophoto_users WHERE paid_generations > 0")
             paid_users = cur.fetchone()['paid_users']
             
-            cur.execute("SELECT SUM(total_used) as total_gens FROM neurophoto_users")
+            cur.execute(f"SELECT SUM(total_used) as total_gens FROM {DB_SCHEMA}.neurophoto_users")
             total_gens = cur.fetchone()['total_gens'] or 0
             
-            cur.execute("SELECT COUNT(*) as today_gens FROM neurophoto_generations WHERE created_at > NOW() - INTERVAL '1 day'")
+            cur.execute(f"SELECT COUNT(*) as today_gens FROM {DB_SCHEMA}.neurophoto_generations WHERE created_at > NOW() - INTERVAL '1 day'")
             today_gens = cur.fetchone()['today_gens']
             
             admin_text = (
@@ -384,7 +382,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            cur.execute("SELECT telegram_id, username, first_name, total_used, free_generations, paid_generations FROM neurophoto_users ORDER BY created_at DESC LIMIT 20")
+            cur.execute(f"SELECT telegram_id, username, first_name, total_used, free_generations, paid_generations FROM {DB_SCHEMA}.neurophoto_users ORDER BY created_at DESC LIMIT 20")
             users = cur.fetchall()
             
             users_text = '👥 <b>Последние 20 пользователей:</b>\n\n'
@@ -405,7 +403,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            cur.execute("SELECT telegram_id, username, total_used, paid_generations FROM neurophoto_users ORDER BY total_used DESC LIMIT 15")
+            cur.execute(f"SELECT telegram_id, username, total_used, paid_generations FROM {DB_SCHEMA}.neurophoto_users ORDER BY total_used DESC LIMIT 15")
             users = cur.fetchall()
             
             top_text = '🏆 <b>Топ-15 пользователей:</b>\n\n'
@@ -432,9 +430,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
-                    cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s RETURNING telegram_id, username", (user_id,))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s RETURNING telegram_id, username", (user_id,))
                 except ValueError:
-                    cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE username = %s RETURNING telegram_id, username", (user_input,))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE username = %s RETURNING telegram_id, username", (user_input,))
                 
                 result = cur.fetchone()
                 if result:
@@ -464,9 +462,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
-                    cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
                 except ValueError:
-                    cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
                 
                 result = cur.fetchone()
                 if result:
@@ -496,9 +494,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
-                    cur.execute("UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
                 except ValueError:
-                    cur.execute("UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
+                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
                 
                 result = cur.fetchone()
                 if result:
@@ -526,13 +524,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
-                    cur.execute("SELECT * FROM neurophoto_users WHERE telegram_id = %s", (user_id,))
+                    cur.execute(f"SELECT * FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (user_id,))
                 except ValueError:
-                    cur.execute("SELECT * FROM neurophoto_users WHERE username = %s", (user_input,))
+                    cur.execute(f"SELECT * FROM {DB_SCHEMA}.neurophoto_users WHERE username = %s", (user_input,))
                 
                 user = cur.fetchone()
                 if user:
-                    cur.execute("SELECT COUNT(*) as gens_count FROM neurophoto_generations WHERE telegram_id = %s", (user['telegram_id'],))
+                    cur.execute(f"SELECT COUNT(*) as gens_count FROM {DB_SCHEMA}.neurophoto_generations WHERE telegram_id = %s", (user['telegram_id'],))
                     gens = cur.fetchone()['gens_count']
                     
                     status = '💎 PRO' if user['paid_generations'] > 0 else '🆓 Free'
@@ -604,7 +602,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '• Закат над океаном в стиле импрессионизм\n'
                 '• Современный офис с панорамными окнами\n\n'
                 '<b>Тарифы:</b>\n'
-                '🆓 Бесплатно: 10 изображений\n'
+                '🆓 Бесплатно: 3 изображения\n'
                 '💎 PRO: 299₽/мес - безлимит + все модели'
             )
             send_telegram_message(bot_token, chat_id, help_text)
@@ -619,7 +617,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if message_text == '/stats':
-            cur.execute("SELECT free_generations, paid_generations, total_used, preferred_model FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+            cur.execute(f"SELECT free_generations, paid_generations, total_used, preferred_model FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
             user = cur.fetchone()
             
             if user:
@@ -654,9 +652,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Генерация изображения
         cur.execute(
-            "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
-            "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name "
-            "RETURNING free_generations, paid_generations, total_used, preferred_model",
+            f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
+            f"ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name "
+            f"RETURNING free_generations, paid_generations, total_used, preferred_model",
             (telegram_id, username, first_name)
         )
         user_data = cur.fetchone()
@@ -664,7 +662,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
-        preferred_model = user_data.get('preferred_model') or 'google/gemini-2.5-flash-image-preview:free'
+        preferred_model = user_data.get('preferred_model') or 'gemini-2.5-flash-image'
+        
+        # Конвертация старых моделей в новые ID OpenRouter
+        if preferred_model == 'gemini-2.5-flash-image':
+            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
         
         print(f"[USER] Free: {free_left}, Paid: {is_paid}, Model: {preferred_model}")
         
@@ -672,7 +674,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not is_paid and free_left <= 0:
             limit_text = (
                 '❌ <b>Бесплатный лимит исчерпан</b>\n\n'
-                'Вы использовали все 10 бесплатных генераций.\n\n'
+                'Вы использовали все 3 бесплатные генерации.\n\n'
                 '💎 <b>Безлимитный доступ - 299₽/мес</b>\n'
                 '• Неограниченные генерации\n'
                 '• Все Pro модели (DALL-E 3, FLUX Pro, Gemini Pro)\n'
@@ -714,14 +716,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             send_telegram_photo(bot_token, chat_id, final_url, caption)
             
             cur.execute(
-                "INSERT INTO neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
+                f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
                 (telegram_id, message_text, preferred_model, final_url, is_paid)
             )
             
             if not is_paid:
-                cur.execute("UPDATE neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
+                cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
             else:
-                cur.execute("UPDATE neurophoto_users SET total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
+                cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
             
             conn.commit()
         else:
