@@ -86,6 +86,14 @@ const Index = () => {
                 <Icon name="BookOpen" size={18} className="mr-2" />
                 <span className="hidden lg:inline">Документация</span>
               </Button>
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/legal')}>
+                <Icon name="Scale" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Юридическая информация</span>
+              </Button>
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => window.location.href = 'mailto:support@intellectpro.ru'}>
+                <Icon name="Mail" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Контакты</span>
+              </Button>
               {user?.role === 'admin' && (
                 <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/admin')}>
                   <Icon name="Shield" size={18} className="mr-2" />
@@ -332,30 +340,10 @@ const Index = () => {
       </main>
     </div>
 
-    <footer className="border-t bg-white backdrop-blur-sm relative z-[999] pointer-events-auto">
+    <footer className="border-t bg-white backdrop-blur-sm">
       <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
-          <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
-          <div className="flex gap-3 md:gap-4">
-            <span 
-              onMouseDown={(e) => { e.preventDefault(); navigate('/docs'); }} 
-              className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
-            >
-              Помощь
-            </span>
-            <span 
-              onMouseDown={(e) => { e.preventDefault(); navigate('/docs'); }} 
-              className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
-            >
-              Документация
-            </span>
-            <span 
-              onMouseDown={(e) => { e.preventDefault(); navigate('/legal'); }} 
-              className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
-            >
-              Юридическая информация
-            </span>
-          </div>
+        <div className="flex flex-col md:flex-row items-center justify-center gap-3 text-xs md:text-sm text-muted-foreground">
+          <p className="text-center">© 2024 ИнтеллектПро. Все права защищены.</p>
         </div>
       </div>
     </footer>
