@@ -11,18 +11,62 @@ DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
 
 IMAGE_MODELS = {
     'free': [
-        {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': 'Gemini 2.5 Flash (Free)', 'emoji': '⚡'},
+        {
+            'id': 'nvidia/nemotron-nano-12b-v2-vl:free',
+            'name': 'Nemotron Nano',
+            'emoji': '🟢',
+            'info': 'Компактная vision-модель от NVIDIA. Отлично понимает изображения и текст.'
+        },
+        {
+            'id': 'google/gemma-3-27b-it:free',
+            'name': 'Gemma 3',
+            'emoji': '💚',
+            'info': 'Мощная модель Google для сложных задач. Высокая точность генерации.'
+        },
+        {
+            'id': 'google/gemini-2.0-flash-exp:free',
+            'name': 'Gemini Flash',
+            'emoji': '⚡',
+            'info': 'Быстрая генерация от Google. Скорость + качество.'
+        },
+        {
+            'id': 'mistralai/mistral-small-3.1-24b-instruct:free',
+            'name': 'Mistral Small',
+            'emoji': '🔵',
+            'info': 'Эффективная модель от Mistral AI. Точно следует инструкциям.'
+        }
     ],
     'paid': [
-        {'id': 'openai/dall-e-3', 'name': 'DALL-E 3', 'emoji': '🎨'},
-        {'id': 'black-forest-labs/flux-pro', 'name': 'FLUX Pro', 'emoji': '🌟'},
-        {'id': 'black-forest-labs/flux-1.1-pro', 'name': 'FLUX 1.1 Pro', 'emoji': '✨'},
-        {'id': 'black-forest-labs/flux-2-pro', 'name': 'FLUX 2 Pro', 'emoji': '💫'},
-        {'id': 'google/gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash', 'emoji': '⚡'},
-        {'id': 'google/gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro', 'emoji': '💎'},
-        {'id': 'google/gemini-2.5-preview', 'name': 'Gemini 2.5 Preview', 'emoji': '🔮'},
-        {'id': 'stability-ai/stable-diffusion-xl', 'name': 'Stable Diffusion XL', 'emoji': '🎭'},
-        {'id': 'midjourney/imagine', 'name': 'Midjourney Imagine', 'emoji': '🖼️'},
+        {
+            'id': 'google/gemini-3-pro-image-preview',
+            'name': 'Gemini 3 Pro',
+            'emoji': '💎',
+            'info': 'Топовая модель Google для профессиональной генерации изображений.'
+        },
+        {
+            'id': 'google/gemini-2.5-flash-image',
+            'name': 'Gemini 2.5 Flash',
+            'emoji': '⚡',
+            'info': 'Быстрая Pro-версия с расширенными возможностями обработки.'
+        },
+        {
+            'id': 'black-forest-labs/flux.2-flex',
+            'name': 'FLUX 2 Flex',
+            'emoji': '🌟',
+            'info': 'Гибкая генерация любых стилей. От реализма до арта.'
+        },
+        {
+            'id': 'black-forest-labs/flux.2-pro',
+            'name': 'FLUX 2 Pro',
+            'emoji': '💫',
+            'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
+        },
+        {
+            'id': 'openai/gpt-5-image',
+            'name': 'GPT-5 Image',
+            'emoji': '🎨',
+            'info': 'Новейшая модель OpenAI. Революционное качество генерации.'
+        }
     ]
 }
 
@@ -282,7 +326,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         result = send_telegram_message(bot_token, chat_id, 
                             '💎 <b>Pro модели доступны только по подписке</b>\n\n'
                             '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
-                            '✅ Все Pro модели (DALL-E 3, FLUX, Gemini Pro)\n'
+                            '✅ Gemini 3 Pro - топовая модель Google\n'
+                            '✅ FLUX 2 Pro - максимальное качество\n'
+                            '✅ GPT-5 Image - новейшая от OpenAI\n'
                             '✅ Неограниченные генерации\n'
                             '✅ Приоритетная обработка\n\n'
                             'Для оплаты напишите: /pay'
@@ -301,8 +347,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     conn.commit()
                     
                     all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-                    model_name = next((m['name'] for m in all_models if m['id'] == model_id), 'Unknown')
-                    result = send_telegram_message(bot_token, chat_id, f"✅ Модель изменена на: {model_name}\n\nТеперь просто отправьте описание изображения!")
+                    selected_model = next((m for m in all_models if m['id'] == model_id), None)
+                    
+                    if selected_model:
+                        model_text = (
+                            f"✅ <b>Модель выбрана:</b> {selected_model['emoji']} {selected_model['name']}\n\n"
+                            f"ℹ️ {selected_model['info']}\n\n"
+                            f"Теперь просто отправьте описание изображения!"
+                        )
+                        result = send_telegram_message(bot_token, chat_id, model_text)
+                    else:
+                        result = send_telegram_message(bot_token, chat_id, f"✅ Модель изменена\n\nТеперь просто отправьте описание изображения!")
                     print(f"[CALLBACK] Model changed message sent: {result}")
                 
                 elif data == 'back':
@@ -605,13 +660,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '1. Выберите модель командой /models\n'
                 '2. Опишите изображение текстом\n'
                 '3. Получите фото за 10-60 секунд\n\n'
-                '<b>Примеры:</b>\n'
-                '• Портрет девушки с голубыми глазами\n'
-                '• Закат над океаном в стиле импрессионизм\n'
-                '• Современный офис с панорамными окнами\n\n'
+                '<b>Доступные модели:</b>\n'
+                '🟢 Nemotron Nano - компактная vision-модель\n'
+                '💚 Gemma 3 - высокая точность\n'
+                '⚡ Gemini Flash - скорость + качество\n'
+                '🔵 Mistral Small - точные инструкции\n\n'
+                '<b>Pro модели:</b>\n'
+                '💎 Gemini 3 Pro - топ от Google\n'
+                '🌟 FLUX 2 Flex - любые стили\n'
+                '💫 FLUX 2 Pro - максимум качества\n'
+                '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
                 '<b>Тарифы:</b>\n'
                 '🆓 Бесплатно: 3 изображения\n'
-                '💎 PRO: 299₽/мес - безлимит + все модели'
+                '💎 PRO: 299₽/мес - безлимит + Pro модели'
             )
             send_telegram_message(bot_token, chat_id, help_text)
             cur.close()
@@ -670,11 +731,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
-        preferred_model = user_data.get('preferred_model') or 'gemini-2.5-flash-image'
+        preferred_model = user_data.get('preferred_model') or 'google/gemini-2.0-flash-exp:free'
         
-        # Конвертация старых моделей в новые ID OpenRouter
-        if preferred_model == 'gemini-2.5-flash-image':
-            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
+        # Конвертация старых моделей в новые (если у пользователя осталась старая модель)
+        old_to_new_models = {
+            'gemini-2.5-flash-image': 'google/gemini-2.0-flash-exp:free',
+            'google/gemini-2.5-flash-image-preview:free': 'google/gemini-2.0-flash-exp:free',
+            'openai/dall-e-3': 'openai/gpt-5-image',
+            'black-forest-labs/flux-pro': 'black-forest-labs/flux.2-pro',
+            'black-forest-labs/flux-1.1-pro': 'black-forest-labs/flux.2-pro',
+            'black-forest-labs/flux-2-pro': 'black-forest-labs/flux.2-pro'
+        }
+        
+        if preferred_model in old_to_new_models:
+            preferred_model = old_to_new_models[preferred_model]
+            # Обновляем модель в БД
+            cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (preferred_model, telegram_id))
+            conn.commit()
         
         print(f"[USER] Free: {free_left}, Paid: {is_paid}, Model: {preferred_model}")
         
@@ -685,7 +758,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Вы использовали все 3 бесплатные генерации.\n\n'
                 '💎 <b>Безлимитный доступ - 299₽/мес</b>\n'
                 '• Неограниченные генерации\n'
-                '• Все Pro модели (DALL-E 3, FLUX Pro, Gemini Pro)\n'
+                '• Gemini 3 Pro - топ от Google\n'
+                '• FLUX 2 Pro - максимум качества\n'
+                '• GPT-5 Image - новейшая от OpenAI\n'
                 '• Приоритетная обработка\n\n'
                 'Напишите /pay для оплаты'
             )
@@ -699,10 +774,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if is_paid_model and not is_paid:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Вы выбрали Pro модель, но у вас нет подписки.\n\n'
-                'Используется бесплатная модель Gemini 2.5 Flash.\n\n'
+                'Используется бесплатная модель Gemini Flash.\n\n'
                 'Для доступа к Pro моделям напишите /pay'
             )
-            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
+            preferred_model = 'google/gemini-2.0-flash-exp:free'
         
         print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}")
         all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
