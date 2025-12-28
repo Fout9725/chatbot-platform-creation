@@ -2,7 +2,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ConstructorModeModalProps {
   isOpen: boolean;
@@ -11,12 +13,32 @@ interface ConstructorModeModalProps {
 
 const ConstructorModeModal = ({ isOpen, onClose }: ConstructorModeModalProps) => {
   const [selectedMode, setSelectedMode] = useState<'professional' | 'visual' | null>(null);
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isOpen && (!isAuthenticated || !user?.plan || user?.plan === 'free')) {
+      onClose();
+      navigate('/pricing');
+    }
+  }, [isOpen, isAuthenticated, user, navigate, onClose]);
 
   const handleModeSelect = (mode: 'professional' | 'visual') => {
+    if (!isAuthenticated || !user?.plan || user?.plan === 'free') {
+      onClose();
+      navigate('/pricing');
+      return;
+    }
     setSelectedMode(mode);
   };
 
   const handleStartWork = () => {
+    if (!isAuthenticated || !user?.plan || user?.plan === 'free') {
+      onClose();
+      navigate('/pricing');
+      return;
+    }
+    
     if (selectedMode === 'professional') {
       window.location.href = '/constructor?mode=professional';
     } else if (selectedMode === 'visual') {

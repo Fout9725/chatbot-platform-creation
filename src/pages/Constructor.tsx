@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import BotConstructor from '@/components/BotConstructor';
@@ -7,11 +7,20 @@ import AdvancedVisualConstructor from '@/components/AdvancedVisualConstructor';
 import InteractiveTutorial from '@/components/InteractiveTutorial';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Constructor = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode') || 'professional';
   const [showTutorial, setShowTutorial] = useState(true);
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.plan || user?.plan === 'free') {
+      navigate('/pricing');
+    }
+  }, [isAuthenticated, user, navigate]);
 
   return (
     <>

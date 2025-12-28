@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,7 +104,7 @@ const n8nTemplates = [
 const BotBuilder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('visual');
   const [textPrompt, setTextPrompt] = useState('');
   const [botName, setBotName] = useState('');
@@ -113,6 +113,12 @@ const BotBuilder = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   const userPlan = user?.plan || 'free';
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.plan || user?.plan === 'free') {
+      navigate('/pricing');
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const planLimits = {
     free: { templates: 3, textGeneration: 0, advancedBlocks: false },

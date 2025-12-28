@@ -310,7 +310,7 @@ const Index = () => {
                   onClick={() => {
                     if (!isAuthenticated) {
                       setIsAuthOpen(true);
-                    } else if (!user?.subscription || user?.subscription === 'free') {
+                    } else if (!user?.plan || user?.plan === 'free') {
                       navigate('/pricing');
                     } else {
                       setIsModeModalOpen(true);
