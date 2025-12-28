@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.6 - Fixed media group photo duplication and added extensive OpenRouter debug
+# v2.7 - CRITICAL FIX: Removed duplicate processing logic, added generation_id check
 
 IMAGE_MODELS = {
     'free': [
@@ -577,9 +577,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     photo_urls.append(file_url)
                 print(f"[MESSAGE] Photo URL: {file_url}, media_group: {media_group_id or 'None'}")
         
+        # CRITICAL: Обработка media group - используем generation_id для предотвращения дублей
+        generation_id = None
+        
         # Если это часть медиа-группы (несколько фото), сохраняем в БД
         if media_group_id and file_url:
             print(f"[MESSAGE] Media group detected: {media_group_id}, caption: '{message_text}'")
+            generation_id = media_group_id  # Используем media_group_id как уникальный ID генерации
+            
             try:
                 # Создаем пользователя если не существует
                 cur.execute(
@@ -603,7 +608,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 # Если есть caption (текст к фото), значит это последнее фото - обрабатываем
                 if message_text:
-                    print(f"[MESSAGE] Caption found, processing all photos from session")
+                    print(f"[MESSAGE] Caption found in media group, checking if already processed...")
+                    
+                    # CRITICAL: Проверяем, не обработали ли мы уже этот media_group_id
+                    cur.execute(
+                        f"SELECT COUNT(*) as count FROM {DB_SCHEMA}.neurophoto_generations "
+                        f"WHERE telegram_id = %s AND prompt = %s AND created_at > NOW() - INTERVAL '1 minute'",
+                        (telegram_id, f"media_group:{media_group_id}")
+                    )
+                    already_processed = cur.fetchone()['count'] > 0
+                    
+                    if already_processed:
+                        print(f"[MESSAGE] Media group {media_group_id} already processed, skipping duplicate")
+                        cur.close()
+                        conn.close()
+                        return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+                    
+                    print(f"[MESSAGE] Processing media group {media_group_id} for the first time")
                     cur.execute(
                         f"SELECT session_photo_url FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s",
                         (telegram_id,)
@@ -612,8 +633,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     if session and session['session_photo_url']:
                         # Filter out empty strings from split
                         photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
-                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session: {photo_urls}")
-                        print(f"[MESSAGE] Proceeding to generation with {len(photo_urls)} photos")
+                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session")
+                        print(f"[MESSAGE] Proceeding to SINGLE generation with {len(photo_urls)} photos")
                         # Очищаем сессию
                         cur.execute(
                             f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
@@ -630,51 +651,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                 else:
                     # Нет caption - ждем следующее фото
-                    print(f"[MESSAGE] No caption, waiting for more photos")
+                    print(f"[MESSAGE] No caption yet, waiting for more photos in media group")
                     cur.close()
                     conn.close()
                     return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                     
             except Exception as e:
-                print(f"[ERROR] Failed to save photo to session: {e}")
+                print(f"[ERROR] Failed to process media group: {e}")
                 import traceback
                 print(traceback.format_exc())
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
-        
-        # Если это текст после фото (завершение media group)
-        # IMPORTANT: Только если сессия еще активна (не была очищена выше)
-        if message_text and not media_group_id and not photo_urls:
-            try:
-                # Проверяем, есть ли сохраненные фото И активная сессия
-                cur.execute(
-                    f"SELECT session_photo_url, session_state FROM {DB_SCHEMA}.neurophoto_users "
-                    f"WHERE telegram_id = %s AND session_state = 'collecting_photos' "
-                    f"AND session_updated_at > NOW() - INTERVAL '5 minutes'",
-                    (telegram_id,)
-                )
-                session = cur.fetchone()
-                if session and session['session_photo_url']:
-                    print(f"[MESSAGE] Loading photos from session: {session['session_photo_url']}")
-                    # Filter out empty strings from split
-                    photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
-                    print(f"[MESSAGE] Filtered to {len(photo_urls)} valid photo URLs")
-                    # Очищаем сессию
-                    cur.execute(
-                        f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
-                        f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
-                        f"WHERE telegram_id = %s",
-                        (telegram_id,)
-                    )
-                    conn.commit()
-                else:
-                    # Нет активной сессии - это обычное текстовое сообщение, не связанное с фото
-                    print(f"[MESSAGE] No active photo session, this is regular text message")
-            except Exception as e:
-                print(f"[ERROR] Failed to load photos from session: {e}")
-                import traceback
-                print(traceback.format_exc())
         
         print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}, Photos: {len(photo_urls)}")
         
@@ -1132,9 +1120,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"[ERROR] Failed to send photo to Telegram, sending URL as text")
                 send_telegram_message(bot_token, chat_id, f'{caption}\n\nИзображение: {final_url}')
             
+            # Сохраняем generation с маркером media_group если это media group
+            save_prompt = f"media_group:{generation_id}" if generation_id else message_text
             cur.execute(
                 f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
-                (telegram_id, message_text, preferred_model, final_url, is_paid)
+                (telegram_id, save_prompt, preferred_model, final_url, is_paid)
             )
             
             if not is_paid:
