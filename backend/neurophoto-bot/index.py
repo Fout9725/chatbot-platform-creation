@@ -1,22 +1,33 @@
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import boto3
 
+ADMIN_IDS = [285675692]  # Список ID администраторов
+
 IMAGE_MODELS = {
     'free': [
-        {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': 'Gemini Flash (Free)', 'emoji': '⚡'},
+        {'id': 'google/gemini-2.5-flash-image-preview:free', 'name': 'Gemini 2.5 Flash (Free)', 'emoji': '⚡'},
     ],
     'paid': [
         {'id': 'openai/dall-e-3', 'name': 'DALL-E 3', 'emoji': '🎨'},
         {'id': 'black-forest-labs/flux-pro', 'name': 'FLUX Pro', 'emoji': '🌟'},
-        {'id': 'google/gemini-2.5-flash-image', 'name': 'Gemini Flash', 'emoji': '⚡'},
+        {'id': 'black-forest-labs/flux-1.1-pro', 'name': 'FLUX 1.1 Pro', 'emoji': '✨'},
+        {'id': 'black-forest-labs/flux-2-pro', 'name': 'FLUX 2 Pro', 'emoji': '💫'},
+        {'id': 'google/gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash', 'emoji': '⚡'},
         {'id': 'google/gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro', 'emoji': '💎'},
+        {'id': 'google/gemini-2.5-preview', 'name': 'Gemini 2.5 Preview', 'emoji': '🔮'},
+        {'id': 'stability-ai/stable-diffusion-xl', 'name': 'Stable Diffusion XL', 'emoji': '🎭'},
+        {'id': 'midjourney/imagine', 'name': 'Midjourney Imagine', 'emoji': '🖼️'},
     ]
 }
+
+def is_admin(telegram_id: int) -> bool:
+    '''Проверка является ли пользователь администратором'''
+    return telegram_id in ADMIN_IDS
 
 def send_telegram_message(bot_token: str, chat_id: str, text: str, reply_markup: Optional[dict] = None) -> bool:
     '''Отправка текстового сообщения в Telegram'''
@@ -39,7 +50,6 @@ def send_telegram_message(bot_token: str, chat_id: str, text: str, reply_markup:
         print(f"[ERROR] Send message: {e}")
         return False
 
-
 def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: str = '', reply_markup: Optional[dict] = None) -> bool:
     '''Отправка изображения в Telegram'''
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendPhoto'
@@ -61,7 +71,6 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
     except Exception as e:
         print(f"[ERROR] Send photo: {e}")
         return False
-
 
 def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
     '''Генерация изображения через OpenRouter API'''
@@ -111,7 +120,6 @@ def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
         print(f"[ERROR] Generate image: {e}")
         return None
 
-
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
     '''Загрузка изображения в S3 для постоянного хранения'''
     try:
@@ -134,15 +142,13 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         print(f"[ERROR] Upload to S3: {e}")
         return None
 
-
-def get_model_keyboard(is_paid: bool):
-    '''Генерация клавиатуры выбора модели'''
+def get_model_keyboard(tier: str):
+    '''Генерация клавиатуры выбора модели по тарифу'''
     buttons = []
     
-    if not is_paid:
+    if tier == 'free':
         for model in IMAGE_MODELS['free']:
             buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
-        buttons.append([{'text': '💎 Разблокировать Pro модели', 'callback_data': 'upgrade'}])
     else:
         for model in IMAGE_MODELS['paid']:
             buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
@@ -150,6 +156,15 @@ def get_model_keyboard(is_paid: bool):
     buttons.append([{'text': '↩️ Назад', 'callback_data': 'back'}])
     return {'inline_keyboard': buttons}
 
+def get_tier_keyboard():
+    '''Клавиатура выбора тарифа'''
+    return {
+        'inline_keyboard': [
+            [{'text': '🆓 Бесплатная модель', 'callback_data': 'tier:free'}],
+            [{'text': '💎 Pro модели', 'callback_data': 'tier:paid'}],
+            [{'text': '↩️ Назад', 'callback_data': 'back'}]
+        ]
+    }
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''Telegram бот для генерации AI-изображений (Нейрофотосессия)'''
@@ -181,47 +196,62 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"[WEBHOOK] Received: {body_str[:200]}")
         
         update = json.loads(body_str)
+        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
+        db_url = os.environ.get('DATABASE_URL')
         
+        if not db_url:
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Обработка callback кнопок
         if 'callback_query' in update:
             callback = update['callback_query']
             chat_id = str(callback['message']['chat']['id'])
             telegram_id = callback['from']['id']
             data = callback['data']
             
-            bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
-            db_url = os.environ.get('DATABASE_URL')
+            if data == 'tier:free':
+                send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', get_model_keyboard('free'))
             
-            if not db_url:
-                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            elif data == 'tier:paid':
+                cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+                user = cur.fetchone()
+                is_paid = user and user['paid_generations'] > 0 if user else False
+                
+                if not is_paid:
+                    send_telegram_message(bot_token, chat_id, 
+                        '💎 <b>Pro модели доступны только по подписке</b>\n\n'
+                        '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
+                        '✅ Все Pro модели (DALL-E 3, FLUX, Gemini Pro)\n'
+                        '✅ Неограниченные генерации\n'
+                        '✅ Приоритетная обработка\n\n'
+                        'Для оплаты напишите: /pay'
+                    )
+                else:
+                    send_telegram_message(bot_token, chat_id, '💎 <b>Pro модели:</b>\n\nВыберите модель:', get_model_keyboard('paid'))
             
-            conn = psycopg2.connect(db_url)
-            cur = conn.cursor(cursor_factory=RealDictCursor)
-            
-            if data.startswith('model:'):
+            elif data.startswith('model:'):
                 model_id = data.split(':', 1)[1]
                 cur.execute("UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
                 conn.commit()
                 
-                model_name = next((m['name'] for m in IMAGE_MODELS['free'] + IMAGE_MODELS['paid'] if m['id'] == model_id), 'Unknown')
+                all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
+                model_name = next((m['name'] for m in all_models if m['id'] == model_id), 'Unknown')
                 send_telegram_message(bot_token, chat_id, f"✅ Модель изменена на: {model_name}\n\nТеперь просто отправьте описание изображения!")
             
-            elif data == 'upgrade':
-                send_telegram_message(bot_token, chat_id, 
-                    '💎 <b>Нейрофотосессия PRO</b>\n\n'
-                    '<b>Безлимитная подписка - 299₽/мес</b>\n\n'
-                    '✅ Неограниченные генерации\n'
-                    '✅ Все Pro модели (DALL-E 3, FLUX Pro, Gemini Pro)\n'
-                    '✅ Приоритетная обработка\n'
-                    '✅ Без очередей\n\n'
-                    'Для оплаты напишите: /pay'
-                )
+            elif data == 'back':
+                send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
             
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if 'message' not in update:
-            print("[WEBHOOK] No message in update, skipping")
+            print("[WEBHOOK] No message in update")
+            cur.close()
+            conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         message = update['message']
@@ -233,17 +263,99 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}")
         
-        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
-        db_url = os.environ.get('DATABASE_URL')
+        # Команда /admin - статистика для админов
+        if message_text == '/admin' and is_admin(telegram_id):
+            cur.execute("SELECT COUNT(*) as total_users FROM neurophoto_users")
+            total_users = cur.fetchone()['total_users']
+            
+            cur.execute("SELECT COUNT(*) as paid_users FROM neurophoto_users WHERE paid_generations > 0")
+            paid_users = cur.fetchone()['paid_users']
+            
+            cur.execute("SELECT SUM(total_used) as total_gens FROM neurophoto_users")
+            total_gens = cur.fetchone()['total_gens'] or 0
+            
+            cur.execute("SELECT COUNT(*) as today_gens FROM neurophoto_generations WHERE created_at > NOW() - INTERVAL '1 day'")
+            today_gens = cur.fetchone()['today_gens']
+            
+            admin_text = (
+                '👑 <b>Админ-панель Нейрофотосессия</b>\n\n'
+                f'👥 Всего пользователей: {total_users}\n'
+                f'💎 Платных подписчиков: {paid_users}\n'
+                f'🎨 Всего генераций: {total_gens}\n'
+                f'📊 Генераций сегодня: {today_gens}\n\n'
+                '<b>Доступные команды:</b>\n'
+                '/admin - эта панель\n'
+                '/users - список пользователей\n'
+                '/topusers - топ по генерациям\n'
+                '/addpro [id] - выдать Pro\n'
+                '/addgens [id] [кол-во] - добавить генерации\n'
+                '/broadcast [текст] - рассылка всем'
+            )
+            send_telegram_message(bot_token, chat_id, admin_text)
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        if not db_url:
-            print("[ERROR] DATABASE_URL not found")
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'error': 'No db'})}
+        # Команда /users - список последних пользователей
+        if message_text == '/users' and is_admin(telegram_id):
+            cur.execute("SELECT telegram_id, username, first_name, total_used, free_generations, paid_generations FROM neurophoto_users ORDER BY created_at DESC LIMIT 20")
+            users = cur.fetchall()
+            
+            users_text = '👥 <b>Последние 20 пользователей:</b>\n\n'
+            for user in users:
+                status = '💎 Pro' if user['paid_generations'] > 0 else f"🆓 {user['free_generations']}"
+                users_text += f"{user['telegram_id']} (@{user['username'] or 'noname'}) - {user['total_used']} ген. - {status}\n"
+            
+            send_telegram_message(bot_token, chat_id, users_text)
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Команда /topusers - топ пользователей
+        if message_text == '/topusers' and is_admin(telegram_id):
+            cur.execute("SELECT telegram_id, username, total_used, paid_generations FROM neurophoto_users ORDER BY total_used DESC LIMIT 15")
+            users = cur.fetchall()
+            
+            top_text = '🏆 <b>Топ-15 пользователей:</b>\n\n'
+            for i, user in enumerate(users, 1):
+                status = '💎' if user['paid_generations'] > 0 else '🆓'
+                top_text += f"{i}. {status} @{user['username'] or user['telegram_id']} - {user['total_used']} генераций\n"
+            
+            send_telegram_message(bot_token, chat_id, top_text)
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        if message_text in ['/start', '/help', 'Помощь', 'помощь']:
+        # Команда /addpro [id] - выдать Pro подписку
+        if message_text.startswith('/addpro ') and is_admin(telegram_id):
+            try:
+                user_id = int(message_text.split()[1])
+                cur.execute("UPDATE neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s", (user_id,))
+                conn.commit()
+                send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю {user_id}')
+            except:
+                send_telegram_message(bot_token, chat_id, '❌ Ошибка. Формат: /addpro [telegram_id]')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Команда /addgens [id] [количество] - добавить бесплатные генерации
+        if message_text.startswith('/addgens ') and is_admin(telegram_id):
+            try:
+                parts = message_text.split()
+                user_id = int(parts[1])
+                amount = int(parts[2])
+                cur.execute("UPDATE neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s", (amount, user_id))
+                conn.commit()
+                send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} генераций пользователю {user_id}')
+            except:
+                send_telegram_message(bot_token, chat_id, '❌ Ошибка. Формат: /addgens [telegram_id] [количество]')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Обычные команды
+        if message_text in ['/start', '/help']:
             help_text = (
                 '🎨 <b>Нейрофотосессия PRO</b>\n\n'
                 'Создавайте профессиональные AI-фотографии!\n\n'
@@ -254,39 +366,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '<b>Как пользоваться:</b>\n'
                 '1. Выберите модель командой /models\n'
                 '2. Опишите изображение текстом\n'
-                '3. Получите сгенерированное фото за 10-30 сек\n\n'
-                '<b>Примеры запросов:</b>\n'
+                '3. Получите фото за 10-60 секунд\n\n'
+                '<b>Примеры:</b>\n'
                 '• Портрет девушки с голубыми глазами\n'
                 '• Закат над океаном в стиле импрессионизм\n'
                 '• Современный офис с панорамными окнами\n\n'
-                '<b>Лимиты:</b>\n'
+                '<b>Тарифы:</b>\n'
                 '🆓 Бесплатно: 10 изображений\n'
-                '💎 PRO: 299₽/мес - безлимит + все модели\n\n'
-                'Просто напишите описание изображения!'
+                '💎 PRO: 299₽/мес - безлимит + все модели'
             )
-            print(f"[HELP] Sending help to {chat_id}")
             send_telegram_message(bot_token, chat_id, help_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if message_text == '/models':
-            cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
-            user = cur.fetchone()
-            is_paid = user and user['paid_generations'] > 0 if user else False
-            
-            models_text = '📱 <b>Выберите модель генерации:</b>\n\n'
-            if not is_paid:
-                models_text += '🆓 <b>Бесплатные модели:</b>\n'
-                for model in IMAGE_MODELS['free']:
-                    models_text += f"{model['emoji']} {model['name']}\n"
-                models_text += '\n💎 Разблокируйте Pro модели за 299₽/мес'
-            else:
-                models_text += '💎 <b>Pro модели:</b>\n'
-                for model in IMAGE_MODELS['paid']:
-                    models_text += f"{model['emoji']} {model['name']}\n"
-            
-            send_telegram_message(bot_token, chat_id, models_text, get_model_keyboard(is_paid))
+            send_telegram_message(bot_token, chat_id, '📱 <b>Выберите тариф:</b>', get_tier_keyboard())
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -297,7 +392,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if user:
                 is_paid = user['paid_generations'] > 0
-                model_name = next((m['name'] for m in IMAGE_MODELS['free'] + IMAGE_MODELS['paid'] if m['id'] == user.get('preferred_model', '')), 'Gemini Flash (Free)')
+                all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
+                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'Gemini 2.5 Flash (Free)')
                 
                 stats_text = (
                     f'📊 <b>Ваша статистика</b>\n\n'
@@ -306,18 +402,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     f'🆓 Бесплатных осталось: {user["free_generations"]}\n'
                 )
                 if is_paid:
-                    stats_text += f'💎 Pro доступ: активен\n'
+                    stats_text += f'💎 Pro доступ: активен (безлимит)\n'
                 else:
-                    stats_text += '\n💎 Хотите безлимит? Напишите /pay'
+                    stats_text += '\n💡 Хотите безлимит? Напишите /pay'
             else:
-                stats_text = '❌ Пользователь не найден. Напишите /start для регистрации.'
+                stats_text = '❌ Пользователь не найден. Напишите /start'
             
             send_telegram_message(bot_token, chat_id, stats_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        print(f"[DB] Upserting user {telegram_id}")
+        # Генерация изображения
         cur.execute(
             "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
             "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name "
@@ -333,36 +429,48 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         print(f"[USER] Free: {free_left}, Paid: {is_paid}, Model: {preferred_model}")
         
+        # Проверка лимитов
         if not is_paid and free_left <= 0:
             limit_text = (
                 '❌ <b>Бесплатный лимит исчерпан</b>\n\n'
                 'Вы использовали все 10 бесплатных генераций.\n\n'
                 '💎 <b>Безлимитный доступ - 299₽/мес</b>\n'
                 '• Неограниченные генерации\n'
-                '• Все Pro модели (DALL-E 3, FLUX Pro)\n'
+                '• Все Pro модели (DALL-E 3, FLUX Pro, Gemini Pro)\n'
                 '• Приоритетная обработка\n\n'
                 'Напишите /pay для оплаты'
             )
-            print(f"[LIMIT] User {telegram_id} reached limit")
             send_telegram_message(bot_token, chat_id, limit_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        print(f"[GENERATE] Starting image generation: {message_text[:50]}")
-        send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение с помощью {preferred_model}...\n\nЭто займет 10-60 секунд.')
+        # Проверка доступа к платной модели
+        is_paid_model = preferred_model not in [m['id'] for m in IMAGE_MODELS['free']]
+        if is_paid_model and not is_paid:
+            send_telegram_message(bot_token, chat_id, 
+                '⚠️ Вы выбрали Pro модель, но у вас нет подписки.\n\n'
+                'Используется бесплатная модель Gemini 2.5 Flash.\n\n'
+                'Для доступа к Pro моделям напишите /pay'
+            )
+            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
+        
+        print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}")
+        all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
+        model_name = next((m['name'] for m in all_models if m['id'] == preferred_model), preferred_model)
+        
+        send_telegram_message(bot_token, chat_id, f'⏳ Генерирую с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
         
         image_url = generate_image_openrouter(message_text, preferred_model)
         
         if image_url:
-            print(f"[SUCCESS] Image generated: {image_url[:100]}")
+            print(f"[SUCCESS] Image: {image_url[:100]}")
             cdn_url = upload_to_s3(image_url, telegram_id)
             final_url = cdn_url if cdn_url else image_url
             
-            model_name = next((m['name'] for m in IMAGE_MODELS['free'] + IMAGE_MODELS['paid'] if m['id'] == preferred_model), preferred_model)
-            caption = f'✅ Готово!\n\n💬 Запрос: {message_text[:100]}\n🎨 Модель: {model_name}'
+            caption = f'✅ Готово!\n\n💬 {message_text[:100]}\n🎨 {model_name}'
             if not is_paid:
-                caption += f'\n\n🆓 Осталось бесплатных: {free_left - 1}'
+                caption += f'\n\n🆓 Осталось: {free_left - 1}'
             
             send_telegram_photo(bot_token, chat_id, final_url, caption)
             
@@ -377,11 +485,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 cur.execute("UPDATE neurophoto_users SET total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
             
             conn.commit()
-            print(f"[DB] Generation saved for user {telegram_id}")
         else:
-            error_text = '❌ Ошибка генерации изображения.\n\nПопробуйте:\n• Изменить описание\n• Выбрать другую модель (/models)\n• Повторить попытку через минуту'
-            print(f"[ERROR] Image generation failed for user {telegram_id}")
-            send_telegram_message(bot_token, chat_id, error_text)
+            send_telegram_message(bot_token, chat_id, '❌ Ошибка генерации.\n\nПопробуйте:\n• Изменить описание\n• /models - выбрать другую модель\n• Повторить через минуту')
         
         cur.close()
         conn.close()
