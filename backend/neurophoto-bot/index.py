@@ -229,19 +229,35 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             callback = update['callback_query']
             chat_id = str(callback['message']['chat']['id'])
             telegram_id = callback['from']['id']
+            username = callback['from'].get('username', '')
+            first_name = callback['from'].get('first_name', '')
             callback_query_id = callback['id']
             data = callback['data']
+            
+            print(f"[CALLBACK] User {telegram_id} pressed: {data}")
             
             # Ответить на callback query (убирает "загрузку" на кнопке)
             answer_callback_query(bot_token, callback_query_id)
             
+            # Создать пользователя если не существует
+            cur.execute(
+                "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
+                "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+                (telegram_id, username, first_name)
+            )
+            conn.commit()
+            
             if data == 'tier:free':
+                print("[CALLBACK] Showing free models")
                 send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', get_model_keyboard('free'))
             
             elif data == 'tier:paid':
+                print("[CALLBACK] Checking paid status")
                 cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
                 user = cur.fetchone()
                 is_paid = user and user['paid_generations'] > 0 if user else False
+                
+                print(f"[CALLBACK] User paid status: {is_paid}")
                 
                 if not is_paid:
                     send_telegram_message(bot_token, chat_id, 
@@ -257,6 +273,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             elif data.startswith('model:'):
                 model_id = data.split(':', 1)[1]
+                print(f"[CALLBACK] Setting model: {model_id}")
                 cur.execute("UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
                 conn.commit()
                 
@@ -265,6 +282,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 send_telegram_message(bot_token, chat_id, f"✅ Модель изменена на: {model_name}\n\nТеперь просто отправьте описание изображения!")
             
             elif data == 'back':
+                print("[CALLBACK] Back to main menu")
                 send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
             
             cur.close()
