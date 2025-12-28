@@ -335,9 +335,9 @@ const Index = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
             <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
             <div className="flex gap-3 md:gap-4">
-              <Button variant="link" onClick={() => navigate('/docs')} className="h-auto p-0 text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">Помощь</Button>
-              <Button variant="link" onClick={() => navigate('/docs')} className="h-auto p-0 text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">Документация</Button>
-              <Button variant="link" onClick={() => navigate('/legal')} className="h-auto p-0 text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">Юридическая информация</Button>
+              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer">Помощь</button>
+              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer">Документация</button>
+              <button onClick={() => { console.log('Переход на /legal'); navigate('/legal'); }} className="hover:text-primary transition-colors cursor-pointer">Юридическая информация</button>
             </div>
           </div>
         </div>
