@@ -1,4 +1,5 @@
 {
+  "test-openrouter": "https://functions.poehali.dev/5d80debd-b0c5-4121-af45-05b8af708122",
   "neurophoto-bot": "https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "offer-constructor": "https://functions.poehali.dev/d6cbd773-276e-4b10-983b-b0fd08681386",

@@ -221,9 +221,11 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
     # Это указывает API что нужно вернуть изображение в поле message.images
+    # CRITICAL: Добавляем response_format для URL вместо base64 (избегаем превышения лимита 3.5MB)
     if is_image_gen:
-        print(f"[OPENROUTER] Adding modalities=['image'] for image generation model")
+        print(f"[OPENROUTER] Adding modalities=['image'] and response_format for image generation model")
         request_body['modalities'] = ['image']  # Только 'image' для генерации изображений
+        request_body['response_format'] = {'type': 'url'}  # Просим URL вместо base64
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
