@@ -332,35 +332,29 @@ const Index = () => {
       </main>
     </div>
 
-    <footer 
-      className="border-t bg-white backdrop-blur-sm relative z-[999] pointer-events-auto"
-      onClick={(e) => console.log('КЛИК ПО ФУТЕРУ:', e.target)}
-    >
+    <footer className="border-t bg-white backdrop-blur-sm relative z-[999] pointer-events-auto">
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
           <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
           <div className="flex gap-3 md:gap-4">
-            <a 
-              href="/docs" 
-              onClick={(e) => { e.preventDefault(); console.log('Клик: Помощь'); navigate('/docs'); }} 
+            <span 
+              onMouseDown={(e) => { e.preventDefault(); navigate('/docs'); }} 
               className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
             >
               Помощь
-            </a>
-            <a 
-              href="/docs" 
-              onClick={(e) => { e.preventDefault(); console.log('Клик: Документация'); navigate('/docs'); }} 
+            </span>
+            <span 
+              onMouseDown={(e) => { e.preventDefault(); navigate('/docs'); }} 
               className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
             >
               Документация
-            </a>
-            <a 
-              href="/legal" 
-              onClick={(e) => { e.preventDefault(); console.log('Клик: Юридическая информация'); navigate('/legal'); }} 
+            </span>
+            <span 
+              onMouseDown={(e) => { e.preventDefault(); navigate('/legal'); }} 
               className="hover:text-primary transition-colors cursor-pointer underline pointer-events-auto"
             >
               Юридическая информация
-            </a>
+            </span>
           </div>
         </div>
       </div>
