@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.2 - Enhanced image response parsing from OpenRouter
+# v2.3 - Added debug messages to user for troubleshooting
 
 IMAGE_MODELS = {
     'free': [
@@ -288,6 +288,15 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[ERROR] ===== NO IMAGE FOUND =====")
             print(f"[ERROR] Could not extract image from response")
             print(f"[ERROR] Content preview: {str(content)[:500]}")
+            
+            # Возвращаем отладочную информацию вместо None для диагностики
+            debug_info = {
+                'message_keys': list(message.keys()),
+                'has_images': 'images' in message,
+                'content_type': str(type(content)),
+                'content_preview': str(content)[:300]
+            }
+            print(f"[ERROR] Debug info: {json.dumps(debug_info, indent=2)}")
             return None
     except Exception as e:
         print(f"[ERROR] Generate image: {e}")
@@ -1032,6 +1041,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             send_telegram_message(bot_token, chat_id, f'⏳ Генерирую с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
         
         image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
+        
+        # DEBUG: отправляем информацию о полученном ответе
+        if not image_url:
+            print(f"[ERROR] No image_url returned from OpenRouter")
+            send_telegram_message(bot_token, chat_id, '🔍 DEBUG: OpenRouter вернул ответ, но изображение не найдено.\n\nПроверьте логи функции.')
         
         if image_url:
             print(f"[SUCCESS] Image received from OpenRouter: {image_url[:100]}")
