@@ -9,6 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
+# v2.1 - Fixed photo counting and image delivery
 
 IMAGE_MODELS = {
     'free': [
@@ -220,20 +221,25 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
+            print(f"[OPENROUTER] Full response (first 1000 chars): {json.dumps(result)[:1000]}")
             
             message = result.get('choices', [{}])[0].get('message', {})
             content = message.get('content', '')
+            print(f"[OPENROUTER] Message keys: {list(message.keys())}")
+            print(f"[OPENROUTER] Content type: {type(content)}, length: {len(str(content))}")
             
             # Для image generation моделей проверяем поле images
             if is_image_gen and 'images' in message:
                 images = message.get('images', [])
                 print(f"[OPENROUTER] Found {len(images)} images in response")
                 if images and len(images) > 0:
+                    print(f"[OPENROUTER] First image type: {type(images[0])}, starts with: {str(images[0])[:50]}")
                     # Возвращаем первое изображение (base64 data URL)
                     return images[0]
             
             # Fallback: ищем URL в текстовом контенте
             if 'https://' in content:
+                print(f"[OPENROUTER] Found URL in text content")
                 start = content.find('https://')
                 end = content.find(')', start)
                 if end == -1:
@@ -241,10 +247,12 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 if end == -1:
                     end = len(content)
                 image_url = content[start:end].strip()
+                print(f"[OPENROUTER] Extracted URL: {image_url}")
                 return image_url
             
             print(f"[ERROR] No image in response. Content: {content[:200]}")
-            print(f"[ERROR] Full response: {json.dumps(result)[:500]}")
+            print(f"[ERROR] Message object: {json.dumps(message)[:500]}")
+            print(f"[ERROR] Full response: {json.dumps(result)[:1000]}")
             return None
     except Exception as e:
         print(f"[ERROR] Generate image: {e}")
@@ -497,11 +505,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 cur.execute(
                     f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
                     f"session_state = 'collecting_photos', "
-                    f"session_photo_url = COALESCE(session_photo_url || '|', '') || %s, "
+                    f"session_photo_url = CASE WHEN session_photo_url IS NULL OR session_photo_url = '' THEN %s ELSE session_photo_url || '|' || %s END, "
                     f"session_photo_prompt = %s, "
                     f"session_updated_at = NOW() "
                     f"WHERE telegram_id = %s",
-                    (file_url, message_text, telegram_id)
+                    (file_url, file_url, message_text, telegram_id)
                 )
                 conn.commit()
                 print(f"[MESSAGE] Photo saved to session")
@@ -515,8 +523,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     )
                     session = cur.fetchone()
                     if session and session['session_photo_url']:
-                        photo_urls = session['session_photo_url'].split('|')
-                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session, proceeding to generation")
+                        # Filter out empty strings from split
+                        photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
+                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session: {photo_urls}")
+                        print(f"[MESSAGE] Proceeding to generation with {len(photo_urls)} photos")
                         # Очищаем сессию
                         cur.execute(
                             f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
@@ -559,7 +569,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 session = cur.fetchone()
                 if session and session['session_photo_url']:
                     print(f"[MESSAGE] Loading photos from session: {session['session_photo_url']}")
-                    photo_urls = session['session_photo_url'].split('|')
+                    # Filter out empty strings from split
+                    photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
+                    print(f"[MESSAGE] Filtered to {len(photo_urls)} valid photo URLs")
                     # Очищаем сессию
                     cur.execute(
                         f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
@@ -987,15 +999,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
         
         if image_url:
-            print(f"[SUCCESS] Image: {image_url[:100]}")
+            print(f"[SUCCESS] Image received from OpenRouter: {image_url[:100]}")
+            print(f"[SUCCESS] Is base64 data URL: {image_url.startswith('data:image')}")
+            
+            # CRITICAL: Always upload to S3, especially for base64 images
             cdn_url = upload_to_s3(image_url, telegram_id)
-            final_url = cdn_url if cdn_url else image_url
+            
+            if not cdn_url:
+                print(f"[ERROR] S3 upload failed, cannot send image to user")
+                send_telegram_message(bot_token, chat_id, '❌ Изображение сгенерировано, но произошла ошибка при сохранении.\n\nПопробуйте еще раз.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
+            print(f"[SUCCESS] CDN URL: {cdn_url}")
+            final_url = cdn_url
             
             caption = f'✅ Готово!\n\n💬 {message_text[:100]}\n🎨 {model_name}'
             if not is_paid:
                 caption += f'\n\n🆓 Осталось: {free_left - 1}'
             
-            send_telegram_photo(bot_token, chat_id, final_url, caption)
+            photo_sent = send_telegram_photo(bot_token, chat_id, final_url, caption)
+            print(f"[SUCCESS] Photo sent to Telegram: {photo_sent}")
+            
+            if not photo_sent:
+                print(f"[ERROR] Failed to send photo to Telegram, sending URL as text")
+                send_telegram_message(bot_token, chat_id, f'{caption}\n\nИзображение: {final_url}')
             
             cur.execute(
                 f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
