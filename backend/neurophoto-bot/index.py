@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.8 - FINAL FIX: Pre-mark generation before processing, improved base64 parsing
+# v2.9 - CRITICAL: Fixed vision vs generation logic, explicit base64 extraction
 
 IMAGE_MODELS = {
     'free': [
@@ -244,14 +244,28 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] ===== CONTENT ANALYSIS =====")
             print(f"[OPENROUTER] Content type: {type(content).__name__}")
             print(f"[OPENROUTER] Content length/size: {len(str(content))}")
+            
+            # CRITICAL: Выводим ВЕСЬ content полностью для диагностики
+            if isinstance(content, str):
+                print(f"[OPENROUTER] ===== FULL STRING CONTENT (first 5000 chars) =====")
+                print(content[:5000])
+                if len(content) > 5000:
+                    print(f"[OPENROUTER] ===== CONTINUED (5000-10000) =====")
+                    print(content[5000:10000])
+            
             if isinstance(content, dict):
                 print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
                 for key, val in content.items():
                     print(f"[OPENROUTER]   - {key}: {type(val).__name__} (len={len(str(val)) if val else 0})")
+                    if key in ['url', 'data', 'image_url'] and val:
+                        print(f"[OPENROUTER]   - {key} PREVIEW: {str(val)[:200]}")
             elif isinstance(content, list):
                 print(f"[OPENROUTER] Content list length: {len(content)}")
-                for i, item in enumerate(content[:3]):  # First 3 items
-                    print(f"[OPENROUTER]   [{i}] type={type(item).__name__}, preview={str(item)[:100]}")
+                for i, item in enumerate(content[:5]):  # First 5 items
+                    print(f"[OPENROUTER]   [{i}] type={type(item).__name__}")
+                    if isinstance(item, dict):
+                        print(f"[OPENROUTER]       keys: {list(item.keys())}")
+                        print(f"[OPENROUTER]       preview: {json.dumps(item)[:300]}")
             
             # ===== STRATEGY 1: Check 'images' field in message =====
             print(f"[OPENROUTER] === Trying Strategy 1: message.images ===")
@@ -269,9 +283,10 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] === Trying Strategy 2: content as string ===")
             
             if isinstance(content, str):
-                print(f"[OPENROUTER] String content preview (first 200 chars): {content[:200]}")
+                print(f"[OPENROUTER] Analyzing string content (length: {len(content)})")
                 
-                # Проверяем base64 data URL в любой позиции строки
+                # CRITICAL: Ищем любые признаки base64 изображения
+                # 1. Ищем data:image URL
                 if 'data:image' in content:
                     print(f"[OPENROUTER] Found 'data:image' in content, extracting...")
                     start = content.find('data:image')
@@ -1120,10 +1135,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        if photo_urls:
-            send_telegram_message(bot_token, chat_id, f'⏳ Обрабатываю {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        # CRITICAL: Определяем режим работы
+        is_generation_mode = preferred_model in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
+        
+        if photo_urls and is_generation_mode:
+            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение на основе {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        elif photo_urls:
+            send_telegram_message(bot_token, chat_id, f'⏳ Анализирую {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
         else:
-            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
         
         image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
         
