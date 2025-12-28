@@ -221,11 +221,9 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
     # Это указывает API что нужно вернуть изображение в поле message.images
-    # CRITICAL: Добавляем response_format для URL вместо base64 (избегаем превышения лимита 3.5MB)
     if is_image_gen:
-        print(f"[OPENROUTER] Adding modalities=['image'] and response_format for image generation model")
+        print(f"[OPENROUTER] Adding modalities=['image'] for image generation model")
         request_body['modalities'] = ['image']  # Только 'image' для генерации изображений
-        request_body['response_format'] = {'type': 'url'}  # Просим URL вместо base64
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
@@ -255,18 +253,9 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
             
-            # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики
-            full_response_json = json.dumps(result, indent=2, ensure_ascii=False)
-            print(f"[OPENROUTER] ===== FULL RESPONSE DEBUG =====")
-            print(f"[OPENROUTER] ===== DETAILED RESPONSE STRUCTURE =====")
+            # Краткая диагностика без вывода огромных данных
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
-            print(f"[OPENROUTER] Full response length: {len(full_response_json)} chars")
-            
-            # Выводим весь ответ по частям
-            chunk_size = 3000
-            for i in range(0, len(full_response_json), chunk_size):
-                chunk_num = i // chunk_size + 1
-                print(f"[OPENROUTER] RESPONSE CHUNK {chunk_num}: {full_response_json[i:i+chunk_size]}")
+            print(f"[OPENROUTER] Choices count: {len(result.get('choices', []))}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
@@ -274,84 +263,42 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 return None
             
             message = result['choices'][0].get('message', {})
-            full_message_json = json.dumps(message, indent=2, ensure_ascii=False)
-            print(f"[OPENROUTER] ===== MESSAGE OBJECT DETAILS =====")
             print(f"[OPENROUTER] Message keys: {list(message.keys())}")
-            print(f"[OPENROUTER] Full message length: {len(full_message_json)} chars")
             
-            # Выводим весь message по частям
-            chunk_size = 3000
-            for i in range(0, len(full_message_json), chunk_size):
-                chunk_num = i // chunk_size + 1
-                print(f"[OPENROUTER] MESSAGE CHUNK {chunk_num}: {full_message_json[i:i+chunk_size]}")
-            
-            # DEBUG: Detailed type analysis
             content = message.get('content', '')
-            print(f"[OPENROUTER] ===== CONTENT ANALYSIS =====")
             print(f"[OPENROUTER] Content type: {type(content).__name__}")
-            print(f"[OPENROUTER] Content length/size: {len(str(content))}")
-            
-            # CRITICAL: Выводим ВЕСЬ content полностью для диагностики
             if isinstance(content, str):
-                print(f"[OPENROUTER] ===== FULL STRING CONTENT =====")
                 print(f"[OPENROUTER] Content length: {len(content)} chars")
-                # Выводим весь content по частям
-                chunk_size = 3000
-                for i in range(0, len(content), chunk_size):
-                    chunk_num = i // chunk_size + 1
-                    print(f"[OPENROUTER] CONTENT CHUNK {chunk_num}: {content[i:i+chunk_size]}")
-            
-            if isinstance(content, dict):
+                print(f"[OPENROUTER] Content preview: {content[:100]}...")
+            elif isinstance(content, dict):
                 print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
-                for key, val in content.items():
-                    print(f"[OPENROUTER]   - {key}: {type(val).__name__} (len={len(str(val)) if val else 0})")
-                    if key in ['url', 'data', 'image_url'] and val:
-                        print(f"[OPENROUTER]   - {key} PREVIEW: {str(val)[:200]}")
             elif isinstance(content, list):
                 print(f"[OPENROUTER] Content list length: {len(content)}")
-                for i, item in enumerate(content[:5]):  # First 5 items
-                    print(f"[OPENROUTER]   [{i}] type={type(item).__name__}")
-                    if isinstance(item, dict):
-                        print(f"[OPENROUTER]       keys: {list(item.keys())}")
-                        print(f"[OPENROUTER]       preview: {json.dumps(item)[:300]}")
             
             # ===== STRATEGY 1: Check 'images' field in message (PRIMARY FOR IMAGE GENERATION) =====
-            print(f"[OPENROUTER] === Trying Strategy 1: message.images (MAIN STRATEGY) ===")
             if 'images' in message:
                 images = message['images']
-                print(f"[OPENROUTER] ✅ FOUND 'images' field!")
-                print(f"[OPENROUTER] Images type: {type(images).__name__}")
-                print(f"[OPENROUTER] Images length/count: {len(images) if isinstance(images, (list, str)) else 'N/A'}")
+                print(f"[OPENROUTER] ✅ Found 'images' field: {type(images).__name__}")
                 
-                if isinstance(images, list):
-                    print(f"[OPENROUTER] Images is list with {len(images)} items")
-                    for i, img in enumerate(images):
-                        print(f"[OPENROUTER]   Image [{i}] type: {type(img).__name__}, preview: {str(img)[:200]}")
-                    
-                    if len(images) > 0:
-                        first_image = images[0]
-                        print(f"[OPENROUTER] ✅ RETURNING first image from list")
-                        return first_image
+                if isinstance(images, list) and len(images) > 0:
+                    first_image = images[0]
+                    print(f"[OPENROUTER] ✅ Returning first image from list (type: {type(first_image).__name__}, size: {len(str(first_image))} chars)")
+                    return first_image
                 elif isinstance(images, str):
-                    print(f"[OPENROUTER] Images is string, preview: {images[:200]}")
-                    print(f"[OPENROUTER] ✅ RETURNING images string")
+                    print(f"[OPENROUTER] ✅ Returning images string (size: {len(images)} chars)")
                     return images
                 else:
-                    print(f"[OPENROUTER] ⚠️ Images field exists but unexpected type: {type(images).__name__}")
+                    print(f"[OPENROUTER] ⚠️ Unexpected images type: {type(images).__name__}")
             else:
-                print(f"[OPENROUTER] ❌ No 'images' field in message")
+                print(f"[OPENROUTER] No 'images' field in message")
             
             # ===== STRATEGY 2: Check content as string (base64 or URL) =====
-            print(f"[OPENROUTER] === Trying Strategy 2: content as string ===")
-            
             if isinstance(content, str):
-                print(f"[OPENROUTER] Analyzing string content (length: {len(content)})")
                 
                 # CRITICAL: Попытка распарсить content как JSON (может быть вложенный JSON)
                 try:
                     parsed_content = json.loads(content)
-                    print(f"[OPENROUTER] Content is valid JSON! Type: {type(parsed_content).__name__}")
-                    print(f"[OPENROUTER] Parsed content: {json.dumps(parsed_content, indent=2, ensure_ascii=False)[:1000]}")
+                    print(f"[OPENROUTER] Content is valid JSON: {type(parsed_content).__name__}")
                     
                     # Проверяем parsed content на наличие изображения
                     if isinstance(parsed_content, dict):
@@ -370,31 +317,25 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                             print(f"[OPENROUTER] Found data in parsed JSON")
                             return parsed_content['data']
                 except (json.JSONDecodeError, TypeError):
-                    print(f"[OPENROUTER] Content is not JSON, treating as plain string")
+                    pass  # Content is not JSON, continue
                 
-                # CRITICAL: Ищем любые признаки base64 изображения
-                # 1. Ищем data:image URL
                 if 'data:image' in content:
-                    print(f"[OPENROUTER] Found 'data:image' in content, extracting...")
+                    print(f"[OPENROUTER] Found 'data:image' in content")
                     start = content.find('data:image')
-                    # Ищем конец base64 строки (обычно заканчивается на == или пробел/кавычка)
                     end = start
                     for end_char in ['"', "'", ' ', '\n', ')', '}']:
-                        pos = content.find(end_char, start + 20)  # +20 чтобы пропустить начало
+                        pos = content.find(end_char, start + 20)
                         if pos != -1:
                             end = pos
                             break
                     if end == start:
-                        end = len(content)  # До конца если не нашли ограничитель
-                    
+                        end = len(content)
                     base64_data = content[start:end].strip()
-                    print(f"[OPENROUTER] Extracted base64 data URL (length: {len(base64_data)})")
-                    print(f"[OPENROUTER] Base64 preview: {base64_data[:100]}")
+                    print(f"[OPENROUTER] Extracted base64 data (length: {len(base64_data)})")
                     return base64_data
                 
-                # Проверяем прямой base64 без префикса data:image
                 if content.startswith('iVBOR') or content.startswith('/9j/') or content.startswith('R0lGOD'):
-                    print(f"[OPENROUTER] Found raw base64 image data (PNG/JPEG/GIF header)")
+                    print(f"[OPENROUTER] Found raw base64 image")
                     # Добавляем data URI схему
                     if content.startswith('iVBOR'):
                         return f"data:image/png;base64,{content}"
@@ -403,9 +344,8 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                     else:
                         return f"data:image/gif;base64,{content}"
                 
-                # Проверяем https URL
                 if 'https://' in content:
-                    print(f"[OPENROUTER] Found HTTPS URL in content")
+                    print(f"[OPENROUTER] Found HTTPS URL")
                     start = content.find('https://')
                     end = content.find(')', start)
                     if end == -1:
@@ -420,28 +360,23 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             
             # ===== STRATEGY 3: Check content as list (structured content) =====
             elif isinstance(content, list):
-                print(f"[OPENROUTER] === Trying Strategy 3: content as list ===")
                 print(f"[OPENROUTER] Content is list with {len(content)} items")
                 for i, item in enumerate(content):
-                    print(f"[OPENROUTER] Content[{i}]: {json.dumps(item)[:200]}")
                     if isinstance(item, dict):
-                        # Проверяем image_url в structured content
                         if item.get('type') == 'image_url':
                             img_url = item.get('image_url', {}).get('url', '')
                             if img_url:
-                                print(f"[OPENROUTER] Found image_url in structured content: {img_url[:100]}")
+                                print(f"[OPENROUTER] Found image_url in list item")
                                 return img_url
-                        # Проверяем прямое поле url
                         if 'url' in item:
-                            print(f"[OPENROUTER] Found url in item: {item['url'][:100]}")
+                            print(f"[OPENROUTER] Found url in list item")
                             return item['url']
             
             # ===== STRATEGY 4: Check content as dict (structured response) =====
             elif isinstance(content, dict):
-                print(f"[OPENROUTER] === Trying Strategy 4: content as dict ===")
-                print(f"[OPENROUTER] Content is dict: {json.dumps(content)[:500]}")
+                print(f"[OPENROUTER] Content is dict")
                 if 'url' in content:
-                    print(f"[OPENROUTER] Found url in dict: {content['url'][:100]}")
+                    print(f"[OPENROUTER] Found url in dict")
                     return content['url']
                 if 'data' in content:
                     print(f"[OPENROUTER] Found data in dict")
@@ -449,24 +384,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 if 'image_url' in content:
                     img_data = content['image_url']
                     if isinstance(img_data, dict) and 'url' in img_data:
-                        print(f"[OPENROUTER] Found nested image_url.url: {img_data['url'][:100]}")
+                        print(f"[OPENROUTER] Found nested image_url.url")
                         return img_data['url']
                     elif isinstance(img_data, str):
-                        print(f"[OPENROUTER] Found image_url as string: {img_data[:100]}")
+                        print(f"[OPENROUTER] Found image_url as string")
                         return img_data
             
-            print(f"[ERROR] ===== NO IMAGE FOUND =====")
-            print(f"[ERROR] Could not extract image from response")
-            print(f"[ERROR] Content preview: {str(content)[:500]}")
-            
-            # Возвращаем отладочную информацию вместо None для диагностики
-            debug_info = {
-                'message_keys': list(message.keys()),
-                'has_images': 'images' in message,
-                'content_type': str(type(content)),
-                'content_preview': str(content)[:300]
-            }
-            print(f"[ERROR] Debug info: {json.dumps(debug_info, indent=2)}")
+            print(f"[ERROR] No image found in response")
+            print(f"[ERROR] Message keys: {list(message.keys())}")
+            print(f"[ERROR] Has 'images': {'images' in message}")
+            print(f"[ERROR] Content type: {type(content).__name__}")
             return None
     except Exception as e:
         print(f"[ERROR] Generate image: {e}")
