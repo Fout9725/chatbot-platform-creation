@@ -330,14 +330,14 @@ const Index = () => {
         </div>
       </main>
 
-      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16 relative z-10">
+      <footer className="border-t bg-white backdrop-blur-sm mt-16 relative z-[100] pointer-events-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
             <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
-            <div className="flex gap-3 md:gap-4">
-              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer">Помощь</button>
-              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer">Документация</button>
-              <button onClick={() => { console.log('Переход на /legal'); navigate('/legal'); }} className="hover:text-primary transition-colors cursor-pointer">Юридическая информация</button>
+            <div className="flex gap-3 md:gap-4 relative z-[101]">
+              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Помощь</button>
+              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Документация</button>
+              <button onClick={() => { console.log('Переход на /legal'); navigate('/legal'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Юридическая информация</button>
             </div>
           </div>
         </div>
