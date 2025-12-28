@@ -32,7 +32,6 @@ import AIAssistant from "./components/AIAssistant";
 import OfferConstructor from "./pages/OfferConstructor";
 import PollWorkerTrigger from "./pages/PollWorkerTrigger";
 import PollCronSetup from "./pages/PollCronSetup";
-import NeurophotoSetup from "./pages/NeurophotoSetup";
 
 const queryClient = new QueryClient();
 
@@ -69,7 +68,6 @@ const App = () => (
           <Route path="/offer-constructor" element={<OfferConstructor />} />
           <Route path="/poll-worker" element={<PollWorkerTrigger />} />
           <Route path="/poll-cron-setup" element={<PollCronSetup />} />
-          <Route path="/neurophoto-setup" element={<NeurophotoSetup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
