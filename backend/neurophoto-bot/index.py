@@ -173,7 +173,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         username = message['from'].get('username', '')
         message_text = message.get('text', '')
         
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN') or os.environ.get('TELEGRAM_BOT_TOKEN')
         db_url = os.environ.get('DATABASE_URL')
         
         if not bot_token or not db_url:
