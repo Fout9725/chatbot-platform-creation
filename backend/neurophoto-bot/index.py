@@ -213,11 +213,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         body_str = event.get('body', '{}')
-        print(f"[WEBHOOK] Received body length: {len(body_str)}")
+        print(f"[WEBHOOK] ========== NEW REQUEST ==========")
+        print(f"[WEBHOOK] Method: {method}")
+        print(f"[WEBHOOK] Event keys: {list(event.keys())}")
+        print(f"[WEBHOOK] Body length: {len(body_str)}")
         print(f"[WEBHOOK] Full body: {body_str}")
         
         update = json.loads(body_str)
         print(f"[WEBHOOK] Update keys: {list(update.keys())}")
+        print(f"[WEBHOOK] Has callback_query: {'callback_query' in update}")
+        print(f"[WEBHOOK] Has message: {'message' in update}")
         
         bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
         db_url = os.environ.get('DATABASE_URL')
@@ -567,7 +572,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             webhook_url = 'https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f'
             set_webhook_url = f'https://api.telegram.org/bot{bot_token}/setWebhook'
             
-            payload = json.dumps({'url': webhook_url}).encode('utf-8')
+            payload = json.dumps({
+                'url': webhook_url,
+                'allowed_updates': ['message', 'callback_query']
+            }).encode('utf-8')
             req = urllib.request.Request(set_webhook_url, data=payload, headers={'Content-Type': 'application/json'})
             
             try:

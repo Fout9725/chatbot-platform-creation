@@ -1,0 +1,4 @@
+{
+  "httpMethod": "POST",
+  "body": "{\"callback_query\":{\"id\":\"test_123\",\"from\":{\"id\":285675692,\"username\":\"Fou9725\",\"first_name\":\"Владимир\"},\"message\":{\"chat\":{\"id\":285675692}},\"data\":\"tier:free\"}}"
+}
