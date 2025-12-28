@@ -39,9 +39,9 @@ const Profile = () => {
   })();
   
   const avatarSeeds = [
-    'happy1', 'happy2', 'happy3', 'happy4', 'happy5', 'happy6',
-    'smile1', 'smile2', 'smile3', 'joy1', 'joy2', 'joy3',
-    'sunny1', 'sunny2', 'sunny3', 'fun1', 'fun2', 'fun3'
+    'Felix', 'Aneka', 'Jasmine', 'Chloe', 'Max', 'Lucy',
+    'Charlie', 'Mia', 'Oliver', 'Lily', 'Jack', 'Emma',
+    'Sophie', 'Leo', 'Zoe', 'Noah', 'Bella', 'Sam'
   ];
   
   const totalUsers = activeBots.reduce((sum, bot) => {

@@ -26,7 +26,7 @@ export function AvatarDialog({ open, onOpenChange, avatarSeeds, onSelectAvatar }
         </DialogHeader>
         <div className="grid grid-cols-3 gap-4 py-4">
           {avatarSeeds.map((seed) => {
-            const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+            const avatarUrl = `https://api.dicebear.com/7.x/big-smile/svg?seed=${seed}`;
             return (
               <button
                 key={seed}
