@@ -264,7 +264,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}")
         
         # Команда /admin - статистика для админов
-        if message_text == '/admin' and is_admin(telegram_id):
+        if message_text == '/admin':
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             cur.execute("SELECT COUNT(*) as total_users FROM neurophoto_users")
             total_users = cur.fetchone()['total_users']
             
@@ -299,7 +305,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /users - список последних пользователей
-        if message_text == '/users' and is_admin(telegram_id):
+        if message_text == '/users':
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             cur.execute("SELECT telegram_id, username, first_name, total_used, free_generations, paid_generations FROM neurophoto_users ORDER BY created_at DESC LIMIT 20")
             users = cur.fetchall()
             
@@ -314,7 +326,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /topusers - топ пользователей
-        if message_text == '/topusers' and is_admin(telegram_id):
+        if message_text == '/topusers':
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             cur.execute("SELECT telegram_id, username, total_used, paid_generations FROM neurophoto_users ORDER BY total_used DESC LIMIT 15")
             users = cur.fetchall()
             
@@ -329,7 +347,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /addpro [@login] - выдать Pro подписку
-        if message_text.startswith('/addpro ') and is_admin(telegram_id):
+        if message_text.startswith('/addpro'):
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             try:
                 user_input = message_text.split()[1].lstrip('@')
                 
@@ -353,7 +377,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /addgens [@login] [количество] - добавить бесплатные генерации
-        if message_text.startswith('/addgens ') and is_admin(telegram_id):
+        if message_text.startswith('/addgens'):
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             try:
                 parts = message_text.split()
                 user_input = parts[1].lstrip('@')
@@ -379,7 +409,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /addpaidgens [@login] [количество] - добавить платные генерации
-        if message_text.startswith('/addpaidgens ') and is_admin(telegram_id):
+        if message_text.startswith('/addpaidgens'):
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             try:
                 parts = message_text.split()
                 user_input = parts[1].lstrip('@')
@@ -405,7 +441,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Команда /userinfo [@login] - информация о пользователе
-        if message_text.startswith('/userinfo ') and is_admin(telegram_id):
+        if message_text.startswith('/userinfo'):
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
             try:
                 user_input = message_text.split()[1].lstrip('@')
                 
@@ -503,18 +545,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Проверка на неизвестные команды и админские команды без прав
+        # Проверка на неизвестные команды
         if message_text.startswith('/'):
-            admin_commands = ['/admin', '/users', '/topusers', '/addpro', '/addgens', '/addpaidgens', '/userinfo', '/broadcast']
-            
-            # Если это админская команда, но пользователь не админ
-            if any(message_text.startswith(cmd) for cmd in admin_commands) and not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.\n\nИспользуйте /help для списка доступных команд.')
-                cur.close()
-                conn.close()
-                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
-            
-            # Неизвестная команда
             send_telegram_message(bot_token, chat_id, '❓ Неизвестная команда.\n\nИспользуйте /help для списка доступных команд.')
             cur.close()
             conn.close()
