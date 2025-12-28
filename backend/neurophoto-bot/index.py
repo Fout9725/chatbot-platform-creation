@@ -182,7 +182,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}")
         
-        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN')
+        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
         db_url = os.environ.get('DATABASE_URL')
         
         print(f"[CONFIG] Token exists: {bool(bot_token)}, DB exists: {bool(db_url)}")
