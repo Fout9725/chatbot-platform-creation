@@ -212,10 +212,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         body_str = event.get('body', '{}')
-        print(f"[WEBHOOK] Received: {body_str[:200]}")
+        print(f"[WEBHOOK] Received body length: {len(body_str)}")
+        print(f"[WEBHOOK] Full body: {body_str}")
         
         update = json.loads(body_str)
-        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
+        print(f"[WEBHOOK] Update keys: {list(update.keys())}")
+        
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN', '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4')
         db_url = os.environ.get('DATABASE_URL')
         
         if not db_url:
@@ -226,8 +229,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Обработка callback кнопок
         if 'callback_query' in update:
+            print("[CALLBACK] ========== CALLBACK QUERY DETECTED ==========")
             try:
                 callback = update['callback_query']
+                print(f"[CALLBACK] Full callback object: {callback}")
+                
                 chat_id = str(callback['message']['chat']['id'])
                 telegram_id = callback['from']['id']
                 username = callback['from'].get('username', '')
