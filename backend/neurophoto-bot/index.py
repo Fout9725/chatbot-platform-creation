@@ -118,6 +118,25 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
         print(f"[ERROR] Send photo: {e}")
         return False
 
+def get_telegram_file_url(bot_token: str, file_id: str) -> Optional[str]:
+    '''Получение URL файла из Telegram'''
+    try:
+        # Получаем информацию о файле
+        get_file_url = f'https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}'
+        req = urllib.request.Request(get_file_url)
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            if result.get('ok'):
+                file_path = result['result']['file_path']
+                # Формируем URL для скачивания файла
+                download_url = f'https://api.telegram.org/file/bot{bot_token}/{file_path}'
+                return download_url
+            return None
+    except Exception as e:
+        print(f"[ERROR] Get file URL: {e}")
+        return None
+
 def answer_callback_query(bot_token: str, callback_query_id: str, text: str = '', show_alert: bool = False) -> bool:
     '''Ответ на callback query для убирания "загрузки" на кнопке'''
     telegram_url = f'https://api.telegram.org/bot{bot_token}/answerCallbackQuery'
@@ -137,7 +156,7 @@ def answer_callback_query(bot_token: str, callback_query_id: str, text: str = ''
         print(f"[ERROR] Answer callback: {e}")
         return False
 
-def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
+def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = None) -> Optional[str]:
     '''Генерация изображения через OpenRouter API'''
     api_key = os.environ.get('OPENROUTER_API_KEY')
     if not api_key:
@@ -157,12 +176,27 @@ def generate_image_openrouter(prompt: str, model: str) -> Optional[str]:
     
     is_image_gen = model in image_gen_models
     
+    # Формируем content для сообщения
+    content = []
+    
+    # Добавляем изображения, если они есть (для vision моделей)
+    if image_urls:
+        print(f"[OPENROUTER] Adding {len(image_urls)} images to request")
+        for img_url in image_urls:
+            content.append({
+                'type': 'image_url',
+                'image_url': {'url': img_url}
+            })
+    
+    # Добавляем текстовый промпт
+    content.append({'type': 'text', 'text': prompt})
+    
     # Формируем запрос в зависимости от типа модели
     request_body = {
         'model': model,
         'messages': [{
             'role': 'user',
-            'content': [{'type': 'text', 'text': prompt}]
+            'content': content
         }],
         'max_tokens': 1000
     }
@@ -433,9 +467,63 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         telegram_id = message['from']['id']
         username = message['from'].get('username', '')
         first_name = message['from'].get('first_name', '')
-        message_text = message.get('text', '')
+        message_text = message.get('text', '') or message.get('caption', '')
         
-        print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}")
+        # Извлекаем фотографии из сообщения
+        photo_urls = []
+        media_group_id = message.get('media_group_id')
+        
+        if 'photo' in message:
+            print(f"[MESSAGE] Found {len(message['photo'])} photo sizes")
+            # Берем самое большое фото (последнее в массиве)
+            largest_photo = message['photo'][-1]
+            file_url = get_telegram_file_url(bot_token, largest_photo['file_id'])
+            if file_url:
+                photo_urls.append(file_url)
+                print(f"[MESSAGE] Photo URL: {file_url}")
+        
+        # Если это часть медиа-группы (несколько фото), сохраняем в БД и ждем последнее фото
+        if media_group_id and 'photo' in message:
+            print(f"[MESSAGE] Media group detected: {media_group_id}")
+            # Сохраняем фото в сессию пользователя
+            cur.execute(
+                f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                f"session_state = 'collecting_photos', "
+                f"session_photo_url = COALESCE(session_photo_url || '|', '') || %s, "
+                f"session_photo_prompt = %s, "
+                f"session_updated_at = NOW() "
+                f"WHERE telegram_id = %s",
+                (file_url, message_text, telegram_id)
+            )
+            conn.commit()
+            print(f"[MESSAGE] Photo saved to session, waiting for more...")
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Если это текст после фото (завершение media group)
+        if message_text and not media_group_id:
+            # Проверяем, есть ли сохраненные фото
+            cur.execute(
+                f"SELECT session_photo_url, session_state FROM {DB_SCHEMA}.neurophoto_users "
+                f"WHERE telegram_id = %s AND session_state = 'collecting_photos' "
+                f"AND session_updated_at > NOW() - INTERVAL '5 minutes'",
+                (telegram_id,)
+            )
+            session = cur.fetchone()
+            if session and session['session_photo_url']:
+                print(f"[MESSAGE] Loading photos from session: {session['session_photo_url']}")
+                photo_urls = session['session_photo_url'].split('|')
+                # Очищаем сессию
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                    f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
+                    f"WHERE telegram_id = %s",
+                    (telegram_id,)
+                )
+                conn.commit()
+        
+        print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}, Photos: {len(photo_urls)}")
         
         # Команда /admin - статистика для админов
         if message_text == '/admin':
@@ -824,13 +912,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
             preferred_model = 'google/gemini-2.0-flash-exp:free'
         
-        print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}")
+        print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}, Photos: {len(photo_urls)}")
         all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
         model_name = next((m['name'] for m in all_models if m['id'] == preferred_model), preferred_model)
         
-        send_telegram_message(bot_token, chat_id, f'⏳ Генерирую с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        # Проверяем, поддерживает ли модель vision (работу с фото)
+        if photo_urls and preferred_model not in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']:
+            send_telegram_message(bot_token, chat_id, 
+                '⚠️ Выбранная модель не поддерживает работу с изображениями.\n\n'
+                'Для работы с фото выберите:\n'
+                '• Gemini 3 Pro\n'
+                '• Gemini 2.5 Flash Image\n\n'
+                'Используйте /models для выбора модели.'
+            )
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        image_url = generate_image_openrouter(message_text, preferred_model)
+        if photo_urls:
+            send_telegram_message(bot_token, chat_id, f'⏳ Обрабатываю {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        else:
+            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        
+        image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
         
         if image_url:
             print(f"[SUCCESS] Image: {image_url[:100]}")
