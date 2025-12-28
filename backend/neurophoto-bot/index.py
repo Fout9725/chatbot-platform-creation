@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.3 - Added debug messages to user for troubleshooting
+# v2.4 - Fixed vision models list (added Nemotron and Gemini Flash)
 
 IMAGE_MODELS = {
     'free': [
@@ -1022,13 +1022,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
         model_name = next((m['name'] for m in all_models if m['id'] == preferred_model), preferred_model)
         
+        # Список моделей с поддержкой vision (работа с фото)
+        vision_models = [
+            'nvidia/nemotron-nano-12b-v2-vl:free',
+            'google/gemini-2.0-flash-exp:free',
+            'google/gemini-3-pro-image-preview',
+            'google/gemini-2.5-flash-image'
+        ]
+        
         # Проверяем, поддерживает ли модель vision (работу с фото)
-        if photo_urls and preferred_model not in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']:
+        if photo_urls and preferred_model not in vision_models:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Выбранная модель не поддерживает работу с изображениями.\n\n'
                 'Для работы с фото выберите:\n'
-                '• Gemini 3 Pro\n'
-                '• Gemini 2.5 Flash Image\n\n'
+                '• Nemotron Nano (бесплатно)\n'
+                '• Gemini Flash (бесплатно)\n'
+                '• Gemini 3 Pro (Pro)\n'
+                '• Gemini 2.5 Flash (Pro)\n\n'
                 'Используйте /models для выбора модели.'
             )
             cur.close()
