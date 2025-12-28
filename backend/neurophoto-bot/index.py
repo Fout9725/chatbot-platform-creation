@@ -482,9 +482,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 photo_urls.append(file_url)
                 print(f"[MESSAGE] Photo URL: {file_url}")
         
-        # Если это часть медиа-группы (несколько фото), сохраняем в БД и ждем последнее фото
+        # Если это часть медиа-группы (несколько фото), сохраняем в БД
         if media_group_id and 'photo' in message:
-            print(f"[MESSAGE] Media group detected: {media_group_id}")
+            print(f"[MESSAGE] Media group detected: {media_group_id}, caption: '{message_text}'")
             try:
                 # Создаем пользователя если не существует
                 cur.execute(
@@ -504,15 +504,47 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     (file_url, message_text, telegram_id)
                 )
                 conn.commit()
-                print(f"[MESSAGE] Photo saved to session, waiting for more...")
+                print(f"[MESSAGE] Photo saved to session")
+                
+                # Если есть caption (текст к фото), значит это последнее фото - обрабатываем
+                if message_text:
+                    print(f"[MESSAGE] Caption found, processing all photos from session")
+                    cur.execute(
+                        f"SELECT session_photo_url FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+                        (telegram_id,)
+                    )
+                    session = cur.fetchone()
+                    if session and session['session_photo_url']:
+                        photo_urls = session['session_photo_url'].split('|')
+                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session, proceeding to generation")
+                        # Очищаем сессию
+                        cur.execute(
+                            f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                            f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
+                            f"WHERE telegram_id = %s",
+                            (telegram_id,)
+                        )
+                        conn.commit()
+                        # Не возвращаем - продолжаем к генерации
+                    else:
+                        print(f"[WARNING] Caption found but no photos in session")
+                        cur.close()
+                        conn.close()
+                        return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+                else:
+                    # Нет caption - ждем следующее фото
+                    print(f"[MESSAGE] No caption, waiting for more photos")
+                    cur.close()
+                    conn.close()
+                    return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+                    
             except Exception as e:
                 print(f"[ERROR] Failed to save photo to session: {e}")
                 import traceback
                 print(traceback.format_exc())
-            
-            cur.close()
-            conn.close()
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Если это текст после фото (завершение media group)
         if message_text and not media_group_id and not photo_urls:
