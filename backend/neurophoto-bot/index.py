@@ -359,6 +359,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '/addgens [@login] [кол-во] - добавить генерации\n'
                 '/addpaidgens [@login] [кол-во] - добавить платные генерации\n'
                 '/userinfo [@login] - инфо о пользователе\n'
+                '/setwebhook - установить webhook\n'
                 '/broadcast [текст] - рассылка всем'
             )
             send_telegram_message(bot_token, chat_id, admin_text)
@@ -544,6 +545,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
             except Exception as e:
                 send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /userinfo [@login или ID]')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Команда /setwebhook - установить webhook (только для админа)
+        if message_text == '/setwebhook':
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
+            webhook_url = 'https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f'
+            set_webhook_url = f'https://api.telegram.org/bot{bot_token}/setWebhook'
+            
+            payload = json.dumps({'url': webhook_url}).encode('utf-8')
+            req = urllib.request.Request(set_webhook_url, data=payload, headers={'Content-Type': 'application/json'})
+            
+            try:
+                with urllib.request.urlopen(req) as response:
+                    result = json.loads(response.read().decode('utf-8'))
+                    if result.get('ok'):
+                        send_telegram_message(bot_token, chat_id, f'✅ Webhook установлен:\n{webhook_url}')
+                    else:
+                        send_telegram_message(bot_token, chat_id, f'❌ Ошибка установки webhook:\n{result.get("description", "Unknown")}')
+            except Exception as e:
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}')
+            
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
