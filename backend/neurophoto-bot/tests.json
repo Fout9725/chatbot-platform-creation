@@ -25,6 +25,46 @@
         "ok": true
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test callback - free tier",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "callback_query": {
+          "id": "test_callback_123",
+          "from": {"id": 123456789, "username": "testuser", "first_name": "Test"},
+          "message": {
+            "chat": {"id": 123456789}
+          },
+          "data": "tier:free"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "ok": true
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test callback - paid tier",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "callback_query": {
+          "id": "test_callback_456",
+          "from": {"id": 123456789, "username": "testuser", "first_name": "Test"},
+          "message": {
+            "chat": {"id": 123456789}
+          },
+          "data": "tier:paid"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "ok": true
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }

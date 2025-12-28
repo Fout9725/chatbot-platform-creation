@@ -226,67 +226,88 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Обработка callback кнопок
         if 'callback_query' in update:
-            callback = update['callback_query']
-            chat_id = str(callback['message']['chat']['id'])
-            telegram_id = callback['from']['id']
-            username = callback['from'].get('username', '')
-            first_name = callback['from'].get('first_name', '')
-            callback_query_id = callback['id']
-            data = callback['data']
-            
-            print(f"[CALLBACK] User {telegram_id} pressed: {data}")
-            
-            # Ответить на callback query (убирает "загрузку" на кнопке)
-            answer_callback_query(bot_token, callback_query_id)
-            
-            # Создать пользователя если не существует
-            cur.execute(
-                "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
-                "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
-                (telegram_id, username, first_name)
-            )
-            conn.commit()
-            
-            if data == 'tier:free':
-                print("[CALLBACK] Showing free models")
-                send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', get_model_keyboard('free'))
-            
-            elif data == 'tier:paid':
-                print("[CALLBACK] Checking paid status")
-                cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
-                user = cur.fetchone()
-                is_paid = user and user['paid_generations'] > 0 if user else False
+            try:
+                callback = update['callback_query']
+                chat_id = str(callback['message']['chat']['id'])
+                telegram_id = callback['from']['id']
+                username = callback['from'].get('username', '')
+                first_name = callback['from'].get('first_name', '')
+                callback_query_id = callback['id']
+                data = callback['data']
                 
-                print(f"[CALLBACK] User paid status: {is_paid}")
+                print(f"[CALLBACK] START: User {telegram_id} (@{username}) pressed: {data}")
                 
-                if not is_paid:
-                    send_telegram_message(bot_token, chat_id, 
-                        '💎 <b>Pro модели доступны только по подписке</b>\n\n'
-                        '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
-                        '✅ Все Pro модели (DALL-E 3, FLUX, Gemini Pro)\n'
-                        '✅ Неограниченные генерации\n'
-                        '✅ Приоритетная обработка\n\n'
-                        'Для оплаты напишите: /pay'
-                    )
-                else:
-                    send_telegram_message(bot_token, chat_id, '💎 <b>Pro модели:</b>\n\nВыберите модель:', get_model_keyboard('paid'))
-            
-            elif data.startswith('model:'):
-                model_id = data.split(':', 1)[1]
-                print(f"[CALLBACK] Setting model: {model_id}")
-                cur.execute("UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
+                # Ответить на callback query (убирает "загрузку" на кнопке)
+                answer_result = answer_callback_query(bot_token, callback_query_id)
+                print(f"[CALLBACK] Answer result: {answer_result}")
+                
+                # Создать пользователя если не существует
+                print(f"[CALLBACK] Creating/updating user {telegram_id}")
+                cur.execute(
+                    "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+                    (telegram_id, username, first_name)
+                )
                 conn.commit()
+                print("[CALLBACK] User created/updated")
                 
-                all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-                model_name = next((m['name'] for m in all_models if m['id'] == model_id), 'Unknown')
-                send_telegram_message(bot_token, chat_id, f"✅ Модель изменена на: {model_name}\n\nТеперь просто отправьте описание изображения!")
+                if data == 'tier:free':
+                    print("[CALLBACK] Showing free models keyboard")
+                    keyboard = get_model_keyboard('free')
+                    print(f"[CALLBACK] Keyboard generated: {keyboard}")
+                    result = send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', keyboard)
+                    print(f"[CALLBACK] Message sent: {result}")
+                
+                elif data == 'tier:paid':
+                    print("[CALLBACK] Checking paid status")
+                    cur.execute("SELECT paid_generations FROM neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+                    user = cur.fetchone()
+                    is_paid = user and user['paid_generations'] > 0 if user else False
+                    
+                    print(f"[CALLBACK] User paid status: {is_paid}, paid_generations: {user['paid_generations'] if user else 'None'}")
+                    
+                    if not is_paid:
+                        result = send_telegram_message(bot_token, chat_id, 
+                            '💎 <b>Pro модели доступны только по подписке</b>\n\n'
+                            '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
+                            '✅ Все Pro модели (DALL-E 3, FLUX, Gemini Pro)\n'
+                            '✅ Неограниченные генерации\n'
+                            '✅ Приоритетная обработка\n\n'
+                            'Для оплаты напишите: /pay'
+                        )
+                        print(f"[CALLBACK] Subscription message sent: {result}")
+                    else:
+                        keyboard = get_model_keyboard('paid')
+                        print(f"[CALLBACK] Paid keyboard generated: {keyboard}")
+                        result = send_telegram_message(bot_token, chat_id, '💎 <b>Pro модели:</b>\n\nВыберите модель:', keyboard)
+                        print(f"[CALLBACK] Paid models message sent: {result}")
+                
+                elif data.startswith('model:'):
+                    model_id = data.split(':', 1)[1]
+                    print(f"[CALLBACK] Setting model: {model_id}")
+                    cur.execute("UPDATE neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
+                    conn.commit()
+                    
+                    all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
+                    model_name = next((m['name'] for m in all_models if m['id'] == model_id), 'Unknown')
+                    result = send_telegram_message(bot_token, chat_id, f"✅ Модель изменена на: {model_name}\n\nТеперь просто отправьте описание изображения!")
+                    print(f"[CALLBACK] Model changed message sent: {result}")
+                
+                elif data == 'back':
+                    print("[CALLBACK] Back to main menu")
+                    result = send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
+                    print(f"[CALLBACK] Back message sent: {result}")
+                
+                print(f"[CALLBACK] END: Successfully processed {data}")
+                
+            except Exception as callback_error:
+                print(f"[CALLBACK ERROR] {type(callback_error).__name__}: {str(callback_error)}")
+                import traceback
+                print(traceback.format_exc())
+            finally:
+                cur.close()
+                conn.close()
             
-            elif data == 'back':
-                print("[CALLBACK] Back to main menu")
-                send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
-            
-            cur.close()
-            conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if 'message' not in update:
