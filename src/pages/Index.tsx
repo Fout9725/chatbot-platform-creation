@@ -307,7 +307,15 @@ const Index = () => {
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
-                  onClick={() => setIsModeModalOpen(true)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      setIsAuthOpen(true);
+                    } else if (!user?.subscription || user?.subscription === 'free') {
+                      navigate('/pricing');
+                    } else {
+                      setIsModeModalOpen(true);
+                    }
+                  }}
                 >
                   <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="hidden sm:inline">Конструктор</span>

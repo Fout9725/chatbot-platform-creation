@@ -23,6 +23,9 @@ import PartnerProgram from "./pages/PartnerProgram";
 import Partner from "./pages/Partner";
 import BotBuilder from "./pages/BotBuilder";
 import Legal from "./pages/Legal";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Oferta from "./pages/Oferta";
 import Admin from "./pages/Admin";
 import AdminNew from "./pages/AdminNew";
 import AIAssistant from "./components/AIAssistant";
@@ -57,6 +60,9 @@ const App = () => (
           <Route path="/partner" element={<Partner />} />
           <Route path="/bot-builder" element={<BotBuilder />} />
           <Route path="/legal" element={<Legal />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/oferta" element={<Oferta />} />
           <Route path="/admin" element={<AdminNew />} />
           <Route path="/admin-old" element={<Admin />} />
           <Route path="/offer-constructor" element={<OfferConstructor />} />

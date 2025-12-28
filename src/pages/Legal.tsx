@@ -142,38 +142,47 @@ const Legal = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <a href="/docs/terms" className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors">
+                <button 
+                  onClick={() => navigate('/terms')}
+                  className="w-full flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <Icon name="FileText" className="text-primary" />
-                    <div>
+                    <div className="text-left">
                       <p className="font-semibold">Пользовательское соглашение</p>
                       <p className="text-sm text-muted-foreground">Условия использования сервиса</p>
                     </div>
                   </div>
-                  <Icon name="ExternalLink" size={18} className="text-muted-foreground" />
-                </a>
+                  <Icon name="ChevronRight" size={18} className="text-muted-foreground" />
+                </button>
 
-                <a href="/docs/privacy" className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors">
+                <button 
+                  onClick={() => navigate('/privacy')}
+                  className="w-full flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <Icon name="Shield" className="text-primary" />
-                    <div>
+                    <div className="text-left">
                       <p className="font-semibold">Политика конфиденциальности</p>
                       <p className="text-sm text-muted-foreground">Обработка персональных данных</p>
                     </div>
                   </div>
-                  <Icon name="ExternalLink" size={18} className="text-muted-foreground" />
-                </a>
+                  <Icon name="ChevronRight" size={18} className="text-muted-foreground" />
+                </button>
 
-                <a href="/docs/oferta" className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors">
+                <button 
+                  onClick={() => navigate('/oferta')}
+                  className="w-full flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <Icon name="ScrollText" className="text-primary" />
-                    <div>
+                    <div className="text-left">
                       <p className="font-semibold">Публичная оферта</p>
                       <p className="text-sm text-muted-foreground">Договор оказания услуг</p>
                     </div>
                   </div>
-                  <Icon name="ExternalLink" size={18} className="text-muted-foreground" />
-                </a>
+                  <Icon name="ChevronRight" size={18} className="text-muted-foreground" />
+                </button>
               </div>
             </CardContent>
           </Card>
