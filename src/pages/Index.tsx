@@ -65,6 +65,7 @@ const Index = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
       <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -329,21 +330,22 @@ const Index = () => {
           </div>
         </div>
       </main>
+    </div>
 
-      <footer className="border-t bg-white backdrop-blur-sm mt-16 relative z-[100] pointer-events-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
-            <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
-            <div className="flex gap-3 md:gap-4 relative z-[101]">
-              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Помощь</button>
-              <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Документация</button>
-              <button onClick={() => { console.log('Переход на /legal'); navigate('/legal'); }} className="hover:text-primary transition-colors cursor-pointer pointer-events-auto underline">Юридическая информация</button>
-            </div>
+    <footer className="border-t bg-white backdrop-blur-sm">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
+          <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
+          <div className="flex gap-3 md:gap-4">
+            <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer underline">Помощь</button>
+            <button onClick={() => { console.log('Переход на /docs'); navigate('/docs'); }} className="hover:text-primary transition-colors cursor-pointer underline">Документация</button>
+            <button onClick={() => { console.log('Переход на /legal'); navigate('/legal'); }} className="hover:text-primary transition-colors cursor-pointer underline">Юридическая информация</button>
           </div>
         </div>
-      </footer>
+      </div>
+    </footer>
 
-      <BotConstructorModal 
+    <BotConstructorModal 
         isOpen={isConstructorOpen} 
         onClose={() => setIsConstructorOpen(false)} 
       />
@@ -362,7 +364,7 @@ const Index = () => {
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
       />
-    </div>
+    </>
   );
 };
 
