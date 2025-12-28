@@ -503,6 +503,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
+        # Проверка на неизвестные команды и админские команды без прав
+        if message_text.startswith('/'):
+            admin_commands = ['/admin', '/users', '/topusers', '/addpro', '/addgens', '/addpaidgens', '/userinfo', '/broadcast']
+            
+            # Если это админская команда, но пользователь не админ
+            if any(message_text.startswith(cmd) for cmd in admin_commands) and not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.\n\nИспользуйте /help для списка доступных команд.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
+            # Неизвестная команда
+            send_telegram_message(bot_token, chat_id, '❓ Неизвестная команда.\n\nИспользуйте /help для списка доступных команд.')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
         # Генерация изображения
         cur.execute(
             "INSERT INTO neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
