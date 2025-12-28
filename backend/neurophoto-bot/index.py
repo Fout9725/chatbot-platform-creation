@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.4 - Fixed vision models list (added Nemotron and Gemini Flash)
+# v2.5 - Fixed duplicate generation bug and improved OpenRouter response parsing
 
 IMAGE_MODELS = {
     'free': [
@@ -284,6 +284,24 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                         if 'url' in item:
                             print(f"[OPENROUTER] Found url in item: {item['url'][:100]}")
                             return item['url']
+            
+            # Стратегия 4: Проверяем content как dict (structured response)
+            elif isinstance(content, dict):
+                print(f"[OPENROUTER] Content is dict: {json.dumps(content)[:500]}")
+                if 'url' in content:
+                    print(f"[OPENROUTER] Found url in dict: {content['url'][:100]}")
+                    return content['url']
+                if 'data' in content:
+                    print(f"[OPENROUTER] Found data in dict")
+                    return content['data']
+                if 'image_url' in content:
+                    img_data = content['image_url']
+                    if isinstance(img_data, dict) and 'url' in img_data:
+                        print(f"[OPENROUTER] Found nested image_url.url: {img_data['url'][:100]}")
+                        return img_data['url']
+                    elif isinstance(img_data, str):
+                        print(f"[OPENROUTER] Found image_url as string: {img_data[:100]}")
+                        return img_data
             
             print(f"[ERROR] ===== NO IMAGE FOUND =====")
             print(f"[ERROR] Could not extract image from response")
@@ -601,9 +619,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Если это текст после фото (завершение media group)
+        # IMPORTANT: Только если сессия еще активна (не была очищена выше)
         if message_text and not media_group_id and not photo_urls:
             try:
-                # Проверяем, есть ли сохраненные фото
+                # Проверяем, есть ли сохраненные фото И активная сессия
                 cur.execute(
                     f"SELECT session_photo_url, session_state FROM {DB_SCHEMA}.neurophoto_users "
                     f"WHERE telegram_id = %s AND session_state = 'collecting_photos' "
@@ -624,6 +643,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         (telegram_id,)
                     )
                     conn.commit()
+                else:
+                    # Нет активной сессии - это обычное текстовое сообщение, не связанное с фото
+                    print(f"[MESSAGE] No active photo session, this is regular text message")
             except Exception as e:
                 print(f"[ERROR] Failed to load photos from session: {e}")
                 import traceback
