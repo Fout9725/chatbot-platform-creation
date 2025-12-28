@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v2.5 - Fixed duplicate generation bug and improved OpenRouter response parsing
+# v2.6 - Fixed media group photo duplication and added extensive OpenRouter debug
 
 IMAGE_MODELS = {
     'free': [
@@ -221,8 +221,11 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
             print(f"[OPENROUTER] ===== FULL RESPONSE DEBUG =====")
+            print(f"[OPENROUTER] ===== DETAILED RESPONSE STRUCTURE =====")
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
-            print(f"[OPENROUTER] Full response: {json.dumps(result, indent=2)}")
+            print(f"[OPENROUTER] Full response JSON (first 2000 chars): {json.dumps(result, indent=2)[:2000]}")
+            if len(json.dumps(result)) > 2000:
+                print(f"[OPENROUTER] Full response JSON (continued): {json.dumps(result, indent=2)[2000:4000]}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
@@ -230,11 +233,28 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 return None
             
             message = result['choices'][0].get('message', {})
-            print(f"[OPENROUTER] ===== MESSAGE OBJECT =====")
+            print(f"[OPENROUTER] ===== MESSAGE OBJECT DETAILS =====")
             print(f"[OPENROUTER] Message keys: {list(message.keys())}")
-            print(f"[OPENROUTER] Full message: {json.dumps(message, indent=2)}")
+            print(f"[OPENROUTER] Full message JSON (first 2000 chars): {json.dumps(message, indent=2)[:2000]}")
+            if len(json.dumps(message)) > 2000:
+                print(f"[OPENROUTER] Full message JSON (continued): {json.dumps(message, indent=2)[2000:]}")
             
-            # Стратегия 1: Проверяем поле images в message
+            # DEBUG: Detailed type analysis
+            content = message.get('content', '')
+            print(f"[OPENROUTER] ===== CONTENT ANALYSIS =====")
+            print(f"[OPENROUTER] Content type: {type(content).__name__}")
+            print(f"[OPENROUTER] Content length/size: {len(str(content))}")
+            if isinstance(content, dict):
+                print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
+                for key, val in content.items():
+                    print(f"[OPENROUTER]   - {key}: {type(val).__name__} (len={len(str(val)) if val else 0})")
+            elif isinstance(content, list):
+                print(f"[OPENROUTER] Content list length: {len(content)}")
+                for i, item in enumerate(content[:3]):  # First 3 items
+                    print(f"[OPENROUTER]   [{i}] type={type(item).__name__}, preview={str(item)[:100]}")
+            
+            # ===== STRATEGY 1: Check 'images' field in message =====
+            print(f"[OPENROUTER] === Trying Strategy 1: message.images ===")
             if 'images' in message:
                 images = message['images']
                 print(f"[OPENROUTER] Found 'images' field with {len(images) if isinstance(images, list) else 'N/A'} items")
@@ -245,9 +265,8 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                     print(f"[OPENROUTER] Images is string: {images[:100]}")
                     return images
             
-            # Стратегия 2: Проверяем content как строку с base64 или URL
-            content = message.get('content', '')
-            print(f"[OPENROUTER] Content type: {type(content)}, length: {len(str(content))}")
+            # ===== STRATEGY 2: Check content as string (base64 or URL) =====
+            print(f"[OPENROUTER] === Trying Strategy 2: content as string ===")
             
             if isinstance(content, str):
                 # Проверяем base64 data URL
@@ -268,8 +287,9 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                     print(f"[OPENROUTER] Extracted URL: {image_url}")
                     return image_url
             
-            # Стратегия 3: Проверяем content как список (structured content)
+            # ===== STRATEGY 3: Check content as list (structured content) =====
             elif isinstance(content, list):
+                print(f"[OPENROUTER] === Trying Strategy 3: content as list ===")
                 print(f"[OPENROUTER] Content is list with {len(content)} items")
                 for i, item in enumerate(content):
                     print(f"[OPENROUTER] Content[{i}]: {json.dumps(item)[:200]}")
@@ -285,8 +305,9 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                             print(f"[OPENROUTER] Found url in item: {item['url'][:100]}")
                             return item['url']
             
-            # Стратегия 4: Проверяем content как dict (structured response)
+            # ===== STRATEGY 4: Check content as dict (structured response) =====
             elif isinstance(content, dict):
+                print(f"[OPENROUTER] === Trying Strategy 4: content as dict ===")
                 print(f"[OPENROUTER] Content is dict: {json.dumps(content)[:500]}")
                 if 'url' in content:
                     print(f"[OPENROUTER] Found url in dict: {content['url'][:100]}")
@@ -542,18 +563,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Извлекаем фотографии из сообщения
         photo_urls = []
         media_group_id = message.get('media_group_id')
+        file_url = None
         
+        # CRITICAL: Для media group НЕ добавляем в photo_urls сразу, только получаем URL для сохранения
         if 'photo' in message:
             print(f"[MESSAGE] Found {len(message['photo'])} photo sizes")
             # Берем самое большое фото (последнее в массиве)
             largest_photo = message['photo'][-1]
             file_url = get_telegram_file_url(bot_token, largest_photo['file_id'])
             if file_url:
-                photo_urls.append(file_url)
-                print(f"[MESSAGE] Photo URL: {file_url}")
+                # Если это НЕ media group, тогда добавляем в photo_urls
+                if not media_group_id:
+                    photo_urls.append(file_url)
+                print(f"[MESSAGE] Photo URL: {file_url}, media_group: {media_group_id or 'None'}")
         
         # Если это часть медиа-группы (несколько фото), сохраняем в БД
-        if media_group_id and 'photo' in message:
+        if media_group_id and file_url:
             print(f"[MESSAGE] Media group detected: {media_group_id}, caption: '{message_text}'")
             try:
                 # Создаем пользователя если не существует
