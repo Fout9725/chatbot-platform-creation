@@ -485,43 +485,61 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Если это часть медиа-группы (несколько фото), сохраняем в БД и ждем последнее фото
         if media_group_id and 'photo' in message:
             print(f"[MESSAGE] Media group detected: {media_group_id}")
-            # Сохраняем фото в сессию пользователя
-            cur.execute(
-                f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
-                f"session_state = 'collecting_photos', "
-                f"session_photo_url = COALESCE(session_photo_url || '|', '') || %s, "
-                f"session_photo_prompt = %s, "
-                f"session_updated_at = NOW() "
-                f"WHERE telegram_id = %s",
-                (file_url, message_text, telegram_id)
-            )
-            conn.commit()
-            print(f"[MESSAGE] Photo saved to session, waiting for more...")
+            try:
+                # Создаем пользователя если не существует
+                cur.execute(
+                    f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
+                    f"ON CONFLICT (telegram_id) DO NOTHING",
+                    (telegram_id, username, first_name)
+                )
+                
+                # Сохраняем фото в сессию пользователя
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                    f"session_state = 'collecting_photos', "
+                    f"session_photo_url = COALESCE(session_photo_url || '|', '') || %s, "
+                    f"session_photo_prompt = %s, "
+                    f"session_updated_at = NOW() "
+                    f"WHERE telegram_id = %s",
+                    (file_url, message_text, telegram_id)
+                )
+                conn.commit()
+                print(f"[MESSAGE] Photo saved to session, waiting for more...")
+            except Exception as e:
+                print(f"[ERROR] Failed to save photo to session: {e}")
+                import traceback
+                print(traceback.format_exc())
+            
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # Если это текст после фото (завершение media group)
-        if message_text and not media_group_id:
-            # Проверяем, есть ли сохраненные фото
-            cur.execute(
-                f"SELECT session_photo_url, session_state FROM {DB_SCHEMA}.neurophoto_users "
-                f"WHERE telegram_id = %s AND session_state = 'collecting_photos' "
-                f"AND session_updated_at > NOW() - INTERVAL '5 minutes'",
-                (telegram_id,)
-            )
-            session = cur.fetchone()
-            if session and session['session_photo_url']:
-                print(f"[MESSAGE] Loading photos from session: {session['session_photo_url']}")
-                photo_urls = session['session_photo_url'].split('|')
-                # Очищаем сессию
+        if message_text and not media_group_id and not photo_urls:
+            try:
+                # Проверяем, есть ли сохраненные фото
                 cur.execute(
-                    f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
-                    f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
-                    f"WHERE telegram_id = %s",
+                    f"SELECT session_photo_url, session_state FROM {DB_SCHEMA}.neurophoto_users "
+                    f"WHERE telegram_id = %s AND session_state = 'collecting_photos' "
+                    f"AND session_updated_at > NOW() - INTERVAL '5 minutes'",
                     (telegram_id,)
                 )
-                conn.commit()
+                session = cur.fetchone()
+                if session and session['session_photo_url']:
+                    print(f"[MESSAGE] Loading photos from session: {session['session_photo_url']}")
+                    photo_urls = session['session_photo_url'].split('|')
+                    # Очищаем сессию
+                    cur.execute(
+                        f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                        f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
+                        f"WHERE telegram_id = %s",
+                        (telegram_id,)
+                    )
+                    conn.commit()
+            except Exception as e:
+                print(f"[ERROR] Failed to load photos from session: {e}")
+                import traceback
+                print(traceback.format_exc())
         
         print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}, Photos: {len(photo_urls)}")
         
