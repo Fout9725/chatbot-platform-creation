@@ -332,7 +332,7 @@ const Index = () => {
       </main>
     </div>
 
-    <footer className="border-t bg-white backdrop-blur-sm">
+    <footer className="border-t bg-white backdrop-blur-sm relative z-[60]">
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-muted-foreground">
           <p className="text-center md:text-left">© 2024 BotPlatform. Все права защищены.</p>
