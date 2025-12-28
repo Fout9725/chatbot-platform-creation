@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "Test webhook OPTIONS request",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedHeaders": {
+        "Access-Control-Allow-Origin": "*"
+      }
+    },
+    {
+      "name": "Test help command",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": {
+          "chat": {"id": 123456789},
+          "from": {"id": 123456789, "username": "testuser"},
+          "text": "/help"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "ok": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
