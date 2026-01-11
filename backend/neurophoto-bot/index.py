@@ -9,10 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.17 - Дедупликация update_id, /start сброс, streaming read для больших JSON
-
-# CRITICAL: Хранение обработанных update_id для предотвращения дублей (в памяти на время жизни функции)
-processed_updates = set()  # Хранит последние 100 update_id
+# v3.18 - Дедупликация через PostgreSQL (не через память!), /start сброс, streaming read
 # v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
 IMAGE_MODELS = {
@@ -565,19 +562,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"[WEBHOOK] Has callback_query: {'callback_query' in update}")
         print(f"[WEBHOOK] Has message: {'message' in update}")
         
-        # CRITICAL: Проверка на дубликат update_id
-        if update_id and update_id in processed_updates:
-            print(f"[WEBHOOK] ⚠️ DUPLICATE update_id {update_id} detected - ignoring to prevent reprocessing")
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'skipped': 'duplicate'})}
-        
-        # Добавляем update_id в set обработанных (храним последние 100)
-        if update_id:
-            processed_updates.add(update_id)
-            if len(processed_updates) > 100:
-                # Удаляем самый старый (первый добавленный)
-                processed_updates.pop()
-            print(f"[WEBHOOK] Update {update_id} marked as processed ({len(processed_updates)} in cache)")
-        
         bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
         db_url = os.environ.get('DATABASE_URL')
         
@@ -586,6 +570,39 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         conn = psycopg2.connect(db_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # CRITICAL: Дедупликация через PostgreSQL (память НЕ сохраняется между Cloud Function инстансами!)
+        if update_id:
+            print(f"[DEDUP] Checking if update_id {update_id} already processed...")
+            cur.execute(
+                f"SELECT COUNT(*) as count FROM {DB_SCHEMA}.neurophoto_processed_updates WHERE update_id = %s",
+                (update_id,)
+            )
+            already_processed = cur.fetchone()['count'] > 0
+            
+            if already_processed:
+                print(f"[DEDUP] ⚠️ DUPLICATE update_id {update_id} detected - ignoring!")
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'skipped': 'duplicate'})}
+            
+            # Записываем update_id как обработанный
+            print(f"[DEDUP] Marking update_id {update_id} as processed...")
+            cur.execute(
+                f"INSERT INTO {DB_SCHEMA}.neurophoto_processed_updates (update_id) VALUES (%s) ON CONFLICT DO NOTHING",
+                (update_id,)
+            )
+            conn.commit()
+            
+            # Очищаем старые записи (старше 1 часа) для экономии места
+            cur.execute(
+                f"DELETE FROM {DB_SCHEMA}.neurophoto_processed_updates WHERE processed_at < NOW() - INTERVAL '1 hour'"
+            )
+            deleted = cur.rowcount
+            if deleted > 0:
+                print(f"[DEDUP] Cleaned up {deleted} old processed updates")
+            conn.commit()
+            print(f"[DEDUP] ✅ Update {update_id} marked as NEW and being processed")
         
         # Обработка callback кнопок
         if 'callback_query' in update:
