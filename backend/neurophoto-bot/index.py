@@ -112,11 +112,23 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(telegram_url, data=data, headers={'Content-Type': 'application/json'})
     
+    print(f"[TELEGRAM] Sending photo to chat {chat_id}")
+    print(f"[TELEGRAM] Photo URL: {photo_url}")
+    print(f"[TELEGRAM] Caption length: {len(caption)}")
+    
     try:
-        with urllib.request.urlopen(req) as response:
-            return response.status == 200
+        with urllib.request.urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(f"[TELEGRAM] Response: {json.dumps(result, ensure_ascii=False)[:500]}")
+            return result.get('ok', False)
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8')
+        print(f"[ERROR] Telegram API error {e.code}: {error_body}")
+        return False
     except Exception as e:
-        print(f"[ERROR] Send photo: {e}")
+        print(f"[ERROR] Send photo exception: {type(e).__name__}: {e}")
+        import traceback
+        print(traceback.format_exc())
         return False
 
 def get_telegram_file_url(bot_token: str, file_id: str) -> Optional[str]:
