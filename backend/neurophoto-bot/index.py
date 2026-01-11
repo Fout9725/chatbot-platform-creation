@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
+# v3.14 - Detailed logging for GPT-5 Image S3 upload timeout
 
 IMAGE_MODELS = {
     'free': [
@@ -272,6 +272,11 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] Got response! Status: {response.status}")
             response_body = response.read().decode('utf-8')
             print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+            
+            # CRITICAL: Для GPT-5 логируем RAW ответ до парсинга
+            if 'gpt-5-image' in model:
+                print(f"[GPT5-DEBUG] Raw response (first 2000 chars): {response_body[:2000]}")
+            
             result = json.loads(response_body)
             
             # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики (без огромных base64)
@@ -434,18 +439,30 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
     '''Загрузка изображения в S3 для постоянного хранения'''
     try:
+        print(f"[S3] ===== UPLOAD START =====")
+        print(f"[S3] URL type: {'data:image' if image_url.startswith('data:image') else 'http(s) URL'}")
+        print(f"[S3] URL length: {len(image_url)} chars")
+        print(f"[S3] URL preview: {image_url[:150]}")
+        
         # Проверяем, является ли изображение base64 data URL
         if image_url.startswith('data:image'):
             print("[S3] Processing base64 data URL")
             # Формат: data:image/png;base64,iVBORw0KG...
             header, encoded = image_url.split(',', 1)
+            print(f"[S3] Base64 length: {len(encoded)} chars")
             image_data = base64.b64decode(encoded)
+            print(f"[S3] Decoded image size: {len(image_data)} bytes")
         else:
-            print(f"[S3] Downloading from URL: {image_url[:100]}")
+            print(f"[S3] Downloading from external URL...")
             req = urllib.request.Request(image_url)
-            with urllib.request.urlopen(req, timeout=30) as response:
+            print(f"[S3] Starting urllib.request.urlopen with timeout=60...")
+            with urllib.request.urlopen(req, timeout=60) as response:
+                print(f"[S3] Connected! Status: {response.status}")
+                print(f"[S3] Reading response body...")
                 image_data = response.read()
+                print(f"[S3] Downloaded {len(image_data)} bytes")
         
+        print(f"[S3] Creating boto3 client...")
         s3 = boto3.client('s3',
             endpoint_url='https://bucket.poehali.dev',
             aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
@@ -453,10 +470,12 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         )
         
         key = f'neurophoto/{telegram_id}/{os.urandom(8).hex()}.png'
+        print(f"[S3] Uploading to S3: {key}")
+        print(f"[S3] Data size: {len(image_data)} bytes")
         s3.put_object(Bucket='files', Key=key, Body=image_data, ContentType='image/png')
         
         cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
-        print(f"[S3] Uploaded successfully: {cdn_url}")
+        print(f"[S3] ===== UPLOAD SUCCESS ===== {cdn_url}")
         return cdn_url
     except Exception as e:
         print(f"[ERROR] Upload to S3: {e}")
@@ -489,7 +508,7 @@ def get_tier_keyboard():
     }
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''Telegram бот для генерации AI-изображений (Нейрофотосессия)'''
+    '''Telegram бот для генерации AI-изображений (Нейрофотосессия) v3.14'''
     method: str = event.get('httpMethod', 'POST')
     
     if method == 'OPTIONS':
