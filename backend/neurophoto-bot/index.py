@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.12 - Increase max_tokens to 16000 for image generation (was hitting MAX_TOKENS limit)
+# v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
 IMAGE_MODELS = {
     'free': [
@@ -1217,8 +1217,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     image_url = image_url['url']
                 elif 'data' in image_url:
                     image_url = image_url['data']
+                elif 'image_url' in image_url:
+                    # CRITICAL: Gemini 3 Pro возвращает {'type': '...', 'image_url': '...', 'index': ...}
+                    print(f"[SUCCESS] Found nested 'image_url' key")
+                    nested = image_url['image_url']
+                    if isinstance(nested, dict) and 'url' in nested:
+                        image_url = nested['url']
+                    elif isinstance(nested, str):
+                        image_url = nested
+                    else:
+                        print(f"[ERROR] Unexpected nested image_url type: {type(nested).__name__}")
+                        image_url = None
                 else:
-                    print(f"[ERROR] No 'url' or 'data' key in image dict!")
+                    print(f"[ERROR] No 'url', 'data', or 'image_url' key in image dict!")
                     image_url = None
             
             if image_url and isinstance(image_url, str):
