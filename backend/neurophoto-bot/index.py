@@ -271,15 +271,6 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
             result = json.loads(response_body)
             
-            # Print full response without huge base64 data
-            result_copy = json.loads(response_body)
-            if 'choices' in result_copy and len(result_copy['choices']) > 0:
-                msg = result_copy['choices'][0].get('message', {})
-                # Truncate content if too long
-                if 'content' in msg and isinstance(msg['content'], str) and len(msg['content']) > 200:
-                    msg['content'] = msg['content'][:200] + '...[truncated]'
-            print(f"[OPENROUTER] Full response: {json.dumps(result_copy, ensure_ascii=False, indent=2)}")
-            
             # Краткая диагностика без вывода огромных данных
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
             print(f"[OPENROUTER] Choices count: {len(result.get('choices', []))}")
@@ -307,6 +298,28 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
             elif isinstance(content, list):
                 print(f"[OPENROUTER] Content list length: {len(content)}")
+            
+            # ===== STRATEGY 0: Check 'annotations' field (Gemini 3.0 Pro format) =====
+            if 'annotations' in message and message['annotations']:
+                annotations = message['annotations']
+                print(f"[OPENROUTER] Found 'annotations' field: {type(annotations).__name__}")
+                if isinstance(annotations, list) and len(annotations) > 0:
+                    for i, ann in enumerate(annotations):
+                        if isinstance(ann, dict):
+                            print(f"[OPENROUTER] Annotation[{i}] keys: {list(ann.keys())}")
+                            # Check for image URL or data
+                            if 'url' in ann:
+                                print(f"[OPENROUTER] ✅ Found URL in annotation!")
+                                return ann['url']
+                            if 'data' in ann:
+                                print(f"[OPENROUTER] ✅ Found data in annotation!")
+                                return ann['data']
+                            if 'image_url' in ann:
+                                print(f"[OPENROUTER] ✅ Found image_url in annotation!")
+                                img_url = ann['image_url']
+                                if isinstance(img_url, dict) and 'url' in img_url:
+                                    return img_url['url']
+                                return img_url
             
             # ===== STRATEGY 1: Check 'images' field in message (PRIMARY FOR IMAGE GENERATION) =====
             if 'images' in message:
