@@ -9,34 +9,16 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.18 - Дедупликация через PostgreSQL (не через память!), /start сброс, streaming read
+# v3.20 - Заменили все бесплатные модели на Nano Banana (единственную рабочую бесплатную генерацию)
 # v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
 IMAGE_MODELS = {
     'free': [
         {
-            'id': 'nvidia/nemotron-nano-12b-v2-vl:free',
-            'name': 'Nemotron Nano',
-            'emoji': '🟢',
-            'info': 'Компактная vision-модель от NVIDIA. Отлично понимает изображения и текст.'
-        },
-        {
-            'id': 'google/gemma-3-27b-it:free',
-            'name': 'Gemma 3',
-            'emoji': '💚',
-            'info': 'Мощная модель Google для сложных задач. Высокая точность генерации.'
-        },
-        {
-            'id': 'google/gemini-2.0-flash-exp:free',
-            'name': 'Gemini Flash',
-            'emoji': '⚡',
-            'info': 'Быстрая генерация от Google. Скорость + качество.'
-        },
-        {
-            'id': 'mistralai/mistral-small-3.1-24b-instruct:free',
-            'name': 'Mistral Small',
-            'emoji': '🔵',
-            'info': 'Эффективная модель от Mistral AI. Точно следует инструкциям.'
+            'id': 'google/gemini-2.5-flash-image-preview:free',
+            'name': 'Nano Banana',
+            'emoji': '🍌',
+            'info': 'Бесплатная генерация от Google. Понимает контекст и создает качественные изображения.'
         }
     ],
     'paid': [
@@ -181,6 +163,7 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # Определяем, является ли модель image generation моделью
     image_gen_models = [
+        'google/gemini-2.5-flash-image-preview:free',
         'google/gemini-3-pro-image-preview',
         'google/gemini-2.5-flash-image',
         'black-forest-labs/flux.2-flex',
@@ -191,7 +174,7 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     is_image_gen = model in image_gen_models
     
     # CRITICAL: Для gemini-3-pro и gemini-2.5-flash с изображениями используем специальный формат
-    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']
+    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'google/gemini-2.5-flash-image-preview:free']
     is_gemini = model in gemini_models
     
     # Формируем content для сообщения
@@ -605,10 +588,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     '2. Опишите изображение текстом\n'
                     '3. Получите фото за 10-60 секунд\n\n'
                     '<b>Доступные модели:</b>\n'
-                    '🟢 Nemotron Nano - компактная vision-модель\n'
-                    '💚 Gemma 3 - высокая точность\n'
-                    '⚡ Gemini Flash - скорость + качество\n'
-                    '🔵 Mistral Small - точные инструкции\n\n'
+                    '🍌 Nano Banana - бесплатная генерация от Google\n\n'
                     '<b>Pro модели:</b>\n'
                     '💎 Gemini 3 Pro - топ от Google\n'
                     '🌟 FLUX 2 Flex - любые стили\n'
@@ -1156,10 +1136,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '2. Опишите изображение текстом\n'
                 '3. Получите фото за 10-60 секунд\n\n'
                 '<b>Доступные модели:</b>\n'
-                '🟢 Nemotron Nano - компактная vision-модель\n'
-                '💚 Gemma 3 - высокая точность\n'
-                '⚡ Gemini Flash - скорость + качество\n'
-                '🔵 Mistral Small - точные инструкции\n\n'
+                '🍌 Nano Banana - бесплатная генерация от Google\n\n'
                 '<b>Pro модели:</b>\n'
                 '💎 Gemini 3 Pro - топ от Google\n'
                 '🌟 FLUX 2 Flex - любые стили\n'
@@ -1187,7 +1164,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if user:
                 is_paid = user['paid_generations'] > 0
                 all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'Gemini 2.5 Flash (Free)')
+                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'Nano Banana')
                 
                 stats_text = (
                     f'📊 <b>Ваша статистика</b>\n\n'
@@ -1226,12 +1203,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
-        preferred_model = user_data.get('preferred_model') or 'google/gemini-2.0-flash-exp:free'
+        preferred_model = user_data.get('preferred_model') or 'google/gemini-2.5-flash-image-preview:free'
         
         # Конвертация старых моделей в новые (если у пользователя осталась старая модель)
         old_to_new_models = {
-            'gemini-2.5-flash-image': 'google/gemini-2.0-flash-exp:free',
-            'google/gemini-2.5-flash-image-preview:free': 'google/gemini-2.0-flash-exp:free',
+            'gemini-2.5-flash-image': 'google/gemini-2.5-flash-image-preview:free',
+            'google/gemini-2.0-flash-exp:free': 'google/gemini-2.5-flash-image-preview:free',
+            'nvidia/nemotron-nano-12b-v2-vl:free': 'google/gemini-2.5-flash-image-preview:free',
+            'google/gemma-3-27b-it:free': 'google/gemini-2.5-flash-image-preview:free',
+            'mistralai/mistral-small-3.1-24b-instruct:free': 'google/gemini-2.5-flash-image-preview:free',
             'openai/dall-e-3': 'openai/gpt-5-image',
             'black-forest-labs/flux-pro': 'black-forest-labs/flux.2-pro',
             'black-forest-labs/flux-1.1-pro': 'black-forest-labs/flux.2-pro',
@@ -1269,10 +1249,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if is_paid_model and not is_paid:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Вы выбрали Pro модель, но у вас нет подписки.\n\n'
-                'Используется бесплатная модель Gemini Flash.\n\n'
+                'Используется бесплатная модель Nano Banana.\n\n'
                 'Для доступа к Pro моделям напишите /pay'
             )
-            preferred_model = 'google/gemini-2.0-flash-exp:free'
+            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
         
         print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}, Photos: {len(photo_urls)}")
         all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
@@ -1280,8 +1260,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Список моделей с поддержкой vision (работа с фото)
         vision_models = [
-            'nvidia/nemotron-nano-12b-v2-vl:free',
-            'google/gemini-2.0-flash-exp:free',
+            'google/gemini-2.5-flash-image-preview:free',
             'google/gemini-3-pro-image-preview',
             'google/gemini-2.5-flash-image'
         ]
@@ -1291,8 +1270,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Выбранная модель не поддерживает работу с изображениями.\n\n'
                 'Для работы с фото выберите:\n'
-                '• Nemotron Nano (бесплатно)\n'
-                '• Gemini Flash (бесплатно)\n'
+                '• Nano Banana (бесплатно)\n'
                 '• Gemini 3 Pro (Pro)\n'
                 '• Gemini 2.5 Flash (Pro)\n\n'
                 'Используйте /models для выбора модели.'
@@ -1302,7 +1280,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # CRITICAL: Определяем режим работы
-        is_generation_mode = preferred_model in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
+        is_generation_mode = preferred_model in ['google/gemini-2.5-flash-image-preview:free', 'google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
         
         if photo_urls and is_generation_mode:
             send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение на основе {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
