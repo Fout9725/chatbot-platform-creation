@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.10 - Debug full OpenRouter response to find image location
+# v3.11 - Fix image_url type handling (list/dict/string)
 
 IMAGE_MODELS = {
     'free': [
@@ -1194,8 +1194,38 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             send_telegram_message(bot_token, chat_id, '🔍 DEBUG: OpenRouter вернул ответ, но изображение не найдено.\n\nПроверьте логи функции.')
         
         if image_url:
-            print(f"[SUCCESS] Image received from OpenRouter: {image_url[:100]}")
-            print(f"[SUCCESS] Is base64 data URL: {image_url.startswith('data:image')}")
+            # CRITICAL: image_url может быть строкой, списком или dict!
+            print(f"[SUCCESS] Image received from OpenRouter!")
+            print(f"[SUCCESS] Image type: {type(image_url).__name__}")
+            
+            # Если это список - берем первый элемент
+            if isinstance(image_url, list):
+                print(f"[SUCCESS] Image is a list with {len(image_url)} items, taking first")
+                if len(image_url) > 0:
+                    image_url = image_url[0]
+                else:
+                    print(f"[ERROR] Image list is empty!")
+                    image_url = None
+            
+            # Если это dict - ищем URL внутри
+            if isinstance(image_url, dict):
+                print(f"[SUCCESS] Image is dict with keys: {list(image_url.keys())}")
+                if 'url' in image_url:
+                    image_url = image_url['url']
+                elif 'data' in image_url:
+                    image_url = image_url['data']
+                else:
+                    print(f"[ERROR] No 'url' or 'data' key in image dict!")
+                    image_url = None
+            
+            if image_url and isinstance(image_url, str):
+                print(f"[SUCCESS] Final image_url (first 100 chars): {image_url[:100]}")
+                print(f"[SUCCESS] Is base64 data URL: {image_url.startswith('data:image')}")
+            else:
+                print(f"[ERROR] image_url is not a string after processing: {type(image_url).__name__}")
+                image_url = None
+        
+        if image_url:
             
             # CRITICAL: Always upload to S3, especially for base64 images
             cdn_url = upload_to_s3(image_url, telegram_id)
