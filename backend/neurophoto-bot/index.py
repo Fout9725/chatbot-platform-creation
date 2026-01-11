@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.11 - Fix image_url type handling (list/dict/string)
+# v3.12 - Increase max_tokens to 16000 for image generation (was hitting MAX_TOKENS limit)
 
 IMAGE_MODELS = {
     'free': [
@@ -222,13 +222,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         content.append({'type': 'text', 'text': prompt})
     
     # Формируем запрос в зависимости от типа модели
+    # CRITICAL: Для генерации изображений нужно МНОГО токенов (base64 изображения очень длинные)
+    max_tokens = 16000 if is_image_gen else 1000
+    
     request_body = {
         'model': model,
         'messages': [{
             'role': 'user',
             'content': content
         }],
-        'max_tokens': 1000
+        'max_tokens': max_tokens
     }
     
     # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
