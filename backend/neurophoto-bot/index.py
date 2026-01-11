@@ -9,18 +9,11 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.20 - Заменили все бесплатные модели на Nano Banana (единственную рабочую бесплатную генерацию)
+# v3.21 - Удалили бесплатные модели (в OpenRouter их нет), оставили только Pro
 # v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
 IMAGE_MODELS = {
-    'free': [
-        {
-            'id': 'google/gemini-2.5-flash-image-preview:free',
-            'name': 'Nano Banana',
-            'emoji': '🍌',
-            'info': 'Бесплатная генерация от Google. Понимает контекст и создает качественные изображения.'
-        }
-    ],
+    'free': [],
     'paid': [
         {
             'id': 'google/gemini-3-pro-image-preview',
@@ -163,7 +156,6 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # Определяем, является ли модель image generation моделью
     image_gen_models = [
-        'google/gemini-2.5-flash-image-preview:free',
         'google/gemini-3-pro-image-preview',
         'google/gemini-2.5-flash-image',
         'black-forest-labs/flux.2-flex',
@@ -174,7 +166,7 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     is_image_gen = model in image_gen_models
     
     # CRITICAL: Для gemini-3-pro и gemini-2.5-flash с изображениями используем специальный формат
-    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'google/gemini-2.5-flash-image-preview:free']
+    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']
     is_gemini = model in gemini_models
     
     # Формируем content для сообщения
@@ -587,8 +579,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     '1. Выберите модель командой /models\n'
                     '2. Опишите изображение текстом\n'
                     '3. Получите фото за 10-60 секунд\n\n'
-                    '<b>Доступные модели:</b>\n'
-                    '🍌 Nano Banana - бесплатная генерация от Google\n\n'
+                    '<b>Доступно только Pro:</b>\n'
                     '<b>Pro модели:</b>\n'
                     '💎 Gemini 3 Pro - топ от Google\n'
                     '🌟 FLUX 2 Flex - любые стили\n'
@@ -1135,16 +1126,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '1. Выберите модель командой /models\n'
                 '2. Опишите изображение текстом\n'
                 '3. Получите фото за 10-60 секунд\n\n'
-                '<b>Доступные модели:</b>\n'
-                '🍌 Nano Banana - бесплатная генерация от Google\n\n'
+                '<b>Доступно только Pro:</b>\n'
                 '<b>Pro модели:</b>\n'
                 '💎 Gemini 3 Pro - топ от Google\n'
                 '🌟 FLUX 2 Flex - любые стили\n'
                 '💫 FLUX 2 Pro - максимум качества\n'
                 '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
                 '<b>Тарифы:</b>\n'
-                '🆓 Бесплатно: 3 изображения\n'
-                '💎 PRO: 299₽/мес - безлимит + Pro модели'
+                '💎 PRO: 299₽/мес - безлимит генерации\n\n'
+                'Напишите /pay для подключения'
             )
             send_telegram_message(bot_token, chat_id, help_text)
             cur.close()
@@ -1163,8 +1153,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if user:
                 is_paid = user['paid_generations'] > 0
-                all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'Nano Banana')
+                all_models = IMAGE_MODELS['paid']
+                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'GPT-5 Image')
                 
                 stats_text = (
                     f'📊 <b>Ваша статистика</b>\n\n'
@@ -1203,15 +1193,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
-        preferred_model = user_data.get('preferred_model') or 'google/gemini-2.5-flash-image-preview:free'
+        preferred_model = user_data.get('preferred_model') or 'openai/gpt-5-image'
         
         # Конвертация старых моделей в новые (если у пользователя осталась старая модель)
         old_to_new_models = {
-            'gemini-2.5-flash-image': 'google/gemini-2.5-flash-image-preview:free',
-            'google/gemini-2.0-flash-exp:free': 'google/gemini-2.5-flash-image-preview:free',
-            'nvidia/nemotron-nano-12b-v2-vl:free': 'google/gemini-2.5-flash-image-preview:free',
-            'google/gemma-3-27b-it:free': 'google/gemini-2.5-flash-image-preview:free',
-            'mistralai/mistral-small-3.1-24b-instruct:free': 'google/gemini-2.5-flash-image-preview:free',
+            'gemini-2.5-flash-image': 'openai/gpt-5-image',
+            'google/gemini-2.0-flash-exp:free': 'openai/gpt-5-image',
+            'nvidia/nemotron-nano-12b-v2-vl:free': 'openai/gpt-5-image',
+            'google/gemma-3-27b-it:free': 'openai/gpt-5-image',
+            'mistralai/mistral-small-3.1-24b-instruct:free': 'openai/gpt-5-image',
+            'google/gemini-2.5-flash-image-preview:free': 'openai/gpt-5-image',
             'openai/dall-e-3': 'openai/gpt-5-image',
             'black-forest-labs/flux-pro': 'black-forest-labs/flux.2-pro',
             'black-forest-labs/flux-1.1-pro': 'black-forest-labs/flux.2-pro',
@@ -1226,18 +1217,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         print(f"[USER] Free: {free_left}, Paid: {is_paid}, Model: {preferred_model}")
         
-        # Проверка лимитов
-        if not is_paid and free_left <= 0:
+        # Проверка Pro подписки (бесплатных моделей нет!)
+        if not is_paid:
             limit_text = (
-                '❌ <b>Бесплатный лимит исчерпан</b>\n\n'
-                'Вы использовали все 3 бесплатные генерации.\n\n'
-                '💎 <b>Безлимитный доступ - 299₽/мес</b>\n'
-                '• Неограниченные генерации\n'
+                '⚠️ <b>Нужна Pro подписка</b>\n\n'
+                'В OpenRouter нет бесплатных моделей генерации изображений.\n\n'
+                '💎 <b>Нейрофотосессия PRO - 299₽/мес</b>\n'
                 '• Gemini 3 Pro - топ от Google\n'
                 '• FLUX 2 Pro - максимум качества\n'
                 '• GPT-5 Image - новейшая от OpenAI\n'
+                '• Неограниченные генерации\n'
                 '• Приоритетная обработка\n\n'
-                'Напишите /pay для оплаты'
+                'Напишите /pay для подключения'
             )
             send_telegram_message(bot_token, chat_id, limit_text)
             cur.close()
@@ -1249,10 +1240,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if is_paid_model and not is_paid:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Вы выбрали Pro модель, но у вас нет подписки.\n\n'
-                'Используется бесплатная модель Nano Banana.\n\n'
-                'Для доступа к Pro моделям напишите /pay'
+                'Используется GPT-5 Image.\n\n'
+                'Напишите /pay для подключения Pro'
             )
-            preferred_model = 'google/gemini-2.5-flash-image-preview:free'
+            preferred_model = 'openai/gpt-5-image'
         
         print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}, Photos: {len(photo_urls)}")
         all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
@@ -1260,7 +1251,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Список моделей с поддержкой vision (работа с фото)
         vision_models = [
-            'google/gemini-2.5-flash-image-preview:free',
             'google/gemini-3-pro-image-preview',
             'google/gemini-2.5-flash-image'
         ]
@@ -1270,9 +1260,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             send_telegram_message(bot_token, chat_id, 
                 '⚠️ Выбранная модель не поддерживает работу с изображениями.\n\n'
                 'Для работы с фото выберите:\n'
-                '• Nano Banana (бесплатно)\n'
-                '• Gemini 3 Pro (Pro)\n'
-                '• Gemini 2.5 Flash (Pro)\n\n'
+                '• Gemini 3 Pro\n'
+                '• Gemini 2.5 Flash\n\n'
                 'Используйте /models для выбора модели.'
             )
             cur.close()
@@ -1280,7 +1269,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         # CRITICAL: Определяем режим работы
-        is_generation_mode = preferred_model in ['google/gemini-2.5-flash-image-preview:free', 'google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
+        is_generation_mode = preferred_model in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
         
         if photo_urls and is_generation_mode:
             send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение на основе {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
