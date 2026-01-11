@@ -407,8 +407,17 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[ERROR] Has 'images': {'images' in message}")
             print(f"[ERROR] Content type: {type(content).__name__}")
             return None
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8')
+        print(f"[ERROR] OpenRouter API error {e.code}: {error_body}")
+        try:
+            error_json = json.loads(error_body)
+            print(f"[ERROR] Parsed error: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
+        except:
+            pass
+        return None
     except Exception as e:
-        print(f"[ERROR] Generate image: {e}")
+        print(f"[ERROR] Generate image exception: {type(e).__name__}: {e}")
         import traceback
         print(traceback.format_exc())
         return None
