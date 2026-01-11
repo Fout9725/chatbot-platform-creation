@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.5 - Added detailed OpenRouter response logging
+# v3.8 - Debug annotations field content
 
 IMAGE_MODELS = {
     'free': [
@@ -289,11 +289,22 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 print(f"[ERROR] Refusal reason: {message['refusal']}")
                 return None
             
+            # Debug: Check all fields that might contain image
+            print(f"[OPENROUTER] Has 'images': {'images' in message}")
+            print(f"[OPENROUTER] Has 'annotations': {'annotations' in message}")
+            if 'annotations' in message:
+                ann = message['annotations']
+                print(f"[OPENROUTER] Annotations type: {type(ann).__name__}")
+                print(f"[OPENROUTER] Annotations value: {ann}")
+                if isinstance(ann, list):
+                    print(f"[OPENROUTER] Annotations length: {len(ann)}")
+            
             content = message.get('content', '')
             print(f"[OPENROUTER] Content type: {type(content).__name__}")
             if isinstance(content, str):
                 print(f"[OPENROUTER] Content length: {len(content)} chars")
-                print(f"[OPENROUTER] Content preview: {content[:100]}...")
+                if len(content) > 0:
+                    print(f"[OPENROUTER] Content preview: {content[:100]}...")
             elif isinstance(content, dict):
                 print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
             elif isinstance(content, list):
