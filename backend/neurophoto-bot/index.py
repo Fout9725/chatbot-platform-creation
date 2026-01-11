@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.0 - FIXED: Correct API format for gemini-3-pro with images
+# v3.5 - Added detailed OpenRouter response logging
 
 IMAGE_MODELS = {
     'free': [
@@ -261,9 +261,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
+    print(f"[OPENROUTER] Sending request to OpenRouter...")
+    print(f"[OPENROUTER] Request size: {len(data)} bytes")
+    
     try:
         with urllib.request.urlopen(req, timeout=120) as response:
-            result = json.loads(response.read().decode('utf-8'))
+            print(f"[OPENROUTER] Got response! Status: {response.status}")
+            response_body = response.read().decode('utf-8')
+            print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+            print(f"[OPENROUTER] Response preview (first 500 chars): {response_body[:500]}")
+            result = json.loads(response_body)
             
             # Краткая диагностика без вывода огромных данных
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
