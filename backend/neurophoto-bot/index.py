@@ -269,8 +269,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] Got response! Status: {response.status}")
             response_body = response.read().decode('utf-8')
             print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
-            print(f"[OPENROUTER] Response preview (first 500 chars): {response_body[:500]}")
             result = json.loads(response_body)
+            
+            # Print full response without huge base64 data
+            result_copy = json.loads(response_body)
+            if 'choices' in result_copy and len(result_copy['choices']) > 0:
+                msg = result_copy['choices'][0].get('message', {})
+                # Truncate content if too long
+                if 'content' in msg and isinstance(msg['content'], str) and len(msg['content']) > 200:
+                    msg['content'] = msg['content'][:200] + '...[truncated]'
+            print(f"[OPENROUTER] Full response: {json.dumps(result_copy, ensure_ascii=False, indent=2)}")
             
             # Краткая диагностика без вывода огромных данных
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
@@ -283,6 +291,12 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             
             message = result['choices'][0].get('message', {})
             print(f"[OPENROUTER] Message keys: {list(message.keys())}")
+            
+            # CRITICAL: Check for refusal first (model rejected the request)
+            if 'refusal' in message and message['refusal']:
+                print(f"[ERROR] Model refused the request!")
+                print(f"[ERROR] Refusal reason: {message['refusal']}")
+                return None
             
             content = message.get('content', '')
             print(f"[OPENROUTER] Content type: {type(content).__name__}")
