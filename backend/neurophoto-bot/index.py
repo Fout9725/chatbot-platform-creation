@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.9 - Restored working image extraction from commit 8a75503
+# v3.10 - Debug full OpenRouter response to find image location
 
 IMAGE_MODELS = {
     'free': [
@@ -271,9 +271,18 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
             result = json.loads(response_body)
             
-            # Краткая диагностика без вывода огромных данных
+            # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики (без огромных base64)
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
             print(f"[OPENROUTER] Choices count: {len(result.get('choices', []))}")
+            
+            # Выводим весь ответ, но ограничиваем размер каждого поля
+            result_debug = {}
+            for key, val in result.items():
+                if isinstance(val, str) and len(val) > 500:
+                    result_debug[key] = f"{val[:500]}... (truncated, total {len(val)} chars)"
+                else:
+                    result_debug[key] = val
+            print(f"[OPENROUTER] Full response: {json.dumps(result_debug, ensure_ascii=False, indent=2)}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
