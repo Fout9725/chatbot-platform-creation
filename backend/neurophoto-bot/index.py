@@ -9,7 +9,7 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.14 - Detailed logging for GPT-5 Image S3 upload timeout
+# v3.15 - Remove modalities parameter for GPT-5 Image (OpenAI doesn't support it)
 
 IMAGE_MODELS = {
     'free': [
@@ -236,9 +236,12 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
     # Это указывает API что нужно вернуть изображение в поле message.images
-    if is_image_gen:
-        print(f"[OPENROUTER] Adding modalities=['image'] for image generation model")
-        request_body['modalities'] = ['image']  # Только 'image' для генерации изображений
+    # ⚠️ GPT-5 НЕ поддерживает modalities - только для Gemini!
+    if is_image_gen and model not in ['openai/gpt-5-image']:
+        print(f"[OPENROUTER] Adding modalities=['image'] for Gemini image generation model")
+        request_body['modalities'] = ['image']  # Только для Gemini моделей
+    elif model == 'openai/gpt-5-image':
+        print(f"[OPENROUTER] GPT-5 Image mode - NO modalities parameter")
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
@@ -270,14 +273,23 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     try:
         with urllib.request.urlopen(req, timeout=120) as response:
             print(f"[OPENROUTER] Got response! Status: {response.status}")
-            response_body = response.read().decode('utf-8')
-            print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+            print(f"[OPENROUTER] Reading response body...")
+            
+            # CRITICAL: Для GPT-5 читаем с таймаутом и логируем процесс
+            try:
+                response_body = response.read().decode('utf-8')
+                print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+            except Exception as read_error:
+                print(f"[ERROR] Failed to read response body: {type(read_error).__name__}: {read_error}")
+                return None
             
             # CRITICAL: Для GPT-5 логируем RAW ответ до парсинга
             if 'gpt-5-image' in model:
                 print(f"[GPT5-DEBUG] Raw response (first 2000 chars): {response_body[:2000]}")
             
+            print(f"[OPENROUTER] Parsing JSON...")
             result = json.loads(response_body)
+            print(f"[OPENROUTER] JSON parsed successfully")
             
             # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики (без огромных base64)
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
@@ -508,7 +520,7 @@ def get_tier_keyboard():
     }
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''Telegram бот для генерации AI-изображений (Нейрофотосессия) v3.14'''
+    '''Telegram бот для генерации AI-изображений (Нейрофотосессия) v3.15'''
     method: str = event.get('httpMethod', 'POST')
     
     if method == 'OPTIONS':
