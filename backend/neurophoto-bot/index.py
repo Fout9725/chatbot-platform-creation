@@ -9,6 +9,10 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
+# v3.17 - Дедупликация update_id, /start сброс, streaming read для больших JSON
+
+# CRITICAL: Хранение обработанных update_id для предотвращения дублей (в памяти на время жизни функции)
+processed_updates = set()  # Хранит последние 100 update_id
 # v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
 IMAGE_MODELS = {
@@ -236,9 +240,12 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
     # Это указывает API что нужно вернуть изображение в поле message.images
-    if is_image_gen:
-        print(f"[OPENROUTER] Adding modalities=['image'] for image generation model")
-        request_body['modalities'] = ['image']  # Только 'image' для генерации изображений
+    # ⚠️ GPT-5 НЕ поддерживает modalities - только для Gemini!
+    if is_image_gen and model not in ['openai/gpt-5-image']:
+        print(f"[OPENROUTER] Adding modalities=['image'] for Gemini image generation model")
+        request_body['modalities'] = ['image']  # Только для Gemini моделей
+    elif model == 'openai/gpt-5-image':
+        print(f"[OPENROUTER] GPT-5 Image mode - NO modalities parameter")
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
@@ -268,11 +275,41 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     print(f"[OPENROUTER] Request size: {len(data)} bytes")
     
     try:
+        print(f"[OPENROUTER] Opening connection with 120s timeout...")
         with urllib.request.urlopen(req, timeout=120) as response:
             print(f"[OPENROUTER] Got response! Status: {response.status}")
-            response_body = response.read().decode('utf-8')
-            print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+            print(f"[OPENROUTER] Reading response body in chunks (streaming mode)...")
+            
+            # CRITICAL: Читаем ОГРОМНЫЕ ответы по частям, чтобы не превысить таймаут
+            try:
+                chunks = []
+                total_size = 0
+                chunk_count = 0
+                
+                # Читаем по 512 KB за раз
+                while True:
+                    chunk = response.read(512 * 1024)  # 512 KB chunks
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    total_size += len(chunk)
+                    chunk_count += 1
+                    
+                    # Логируем каждые 2 MB для отладки
+                    if chunk_count % 4 == 0:
+                        print(f"[OPENROUTER] Read {total_size / (1024*1024):.1f} MB so far ({chunk_count} chunks)...")
+                
+                response_body = b''.join(chunks).decode('utf-8')
+                print(f"[OPENROUTER] ✅ Response fully read: {len(response_body)} bytes ({len(response_body)/(1024*1024):.2f} MB)")
+            except Exception as read_error:
+                print(f"[ERROR] Failed to read response body: {type(read_error).__name__}: {read_error}")
+                import traceback
+                print(traceback.format_exc())
+                return None
+            
+            print(f"[OPENROUTER] Parsing JSON...")
             result = json.loads(response_body)
+            print(f"[OPENROUTER] ✅ JSON parsed successfully")
             
             # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики (без огромных base64)
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
@@ -522,9 +559,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"[WEBHOOK] Full body: {body_str}")
         
         update = json.loads(body_str)
+        update_id = update.get('update_id')
         print(f"[WEBHOOK] Update keys: {list(update.keys())}")
+        print(f"[WEBHOOK] Update ID: {update_id}")
         print(f"[WEBHOOK] Has callback_query: {'callback_query' in update}")
         print(f"[WEBHOOK] Has message: {'message' in update}")
+        
+        # CRITICAL: Проверка на дубликат update_id
+        if update_id and update_id in processed_updates:
+            print(f"[WEBHOOK] ⚠️ DUPLICATE update_id {update_id} detected - ignoring to prevent reprocessing")
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'skipped': 'duplicate'})}
+        
+        # Добавляем update_id в set обработанных (храним последние 100)
+        if update_id:
+            processed_updates.add(update_id)
+            if len(processed_updates) > 100:
+                # Удаляем самый старый (первый добавленный)
+                processed_updates.pop()
+            print(f"[WEBHOOK] Update {update_id} marked as processed ({len(processed_updates)} in cache)")
         
         bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
         db_url = os.environ.get('DATABASE_URL')
@@ -1020,8 +1072,54 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Обычные команды
-        if message_text in ['/start', '/help']:
+        # CRITICAL: /start - приоритетная команда для сброса состояния
+        if message_text == '/start':
+            print(f"[COMMAND] /start command - resetting user state")
+            # Очищаем сессию пользователя (на случай если застрял на media_group)
+            try:
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                    f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
+                    f"WHERE telegram_id = %s",
+                    (telegram_id,)
+                )
+                conn.commit()
+                print(f"[COMMAND] User session cleared")
+            except Exception as e:
+                print(f"[COMMAND] Failed to clear session: {e}")
+            
+            help_text = (
+                '🎨 <b>Нейрофотосессия PRO</b>\n\n'
+                'Создавайте профессиональные AI-фотографии!\n\n'
+                '<b>Команды:</b>\n'
+                '/models - Выбрать модель генерации\n'
+                '/stats - Ваша статистика\n'
+                '/help - Эта справка\n\n'
+                '<b>Как пользоваться:</b>\n'
+                '1. Выберите модель командой /models\n'
+                '2. Опишите изображение текстом\n'
+                '3. Получите фото за 10-60 секунд\n\n'
+                '<b>Доступные модели:</b>\n'
+                '🟢 Nemotron Nano - компактная vision-модель\n'
+                '💚 Gemma 3 - высокая точность\n'
+                '⚡ Gemini Flash - скорость + качество\n'
+                '🔵 Mistral Small - точные инструкции\n\n'
+                '<b>Pro модели:</b>\n'
+                '💎 Gemini 3 Pro - топ от Google\n'
+                '🌟 FLUX 2 Flex - любые стили\n'
+                '💫 FLUX 2 Pro - максимум качества\n'
+                '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
+                '<b>Тарифы:</b>\n'
+                '🆓 Бесплатно: 3 изображения\n'
+                '💎 PRO: 299₽/мес - безлимит + Pro модели'
+            )
+            send_telegram_message(bot_token, chat_id, help_text)
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Команда /help
+        if message_text == '/help':
             help_text = (
                 '🎨 <b>Нейрофотосессия PRO</b>\n\n'
                 'Создавайте профессиональные AI-фотографии!\n\n'
