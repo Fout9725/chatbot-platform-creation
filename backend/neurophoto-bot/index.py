@@ -571,6 +571,58 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
+        # CRITICAL: Проверка на /start ДО дедупликации (приоритетная команда)
+        if 'message' in update:
+            quick_message = update['message']
+            quick_text = quick_message.get('text', '')
+            if quick_text == '/start':
+                print(f"[PRIORITY] /start detected - bypassing deduplication and processing immediately")
+                chat_id = str(quick_message['chat']['id'])
+                telegram_id = quick_message['from']['id']
+                
+                # Очищаем сессию пользователя
+                try:
+                    cur.execute(
+                        f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
+                        f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
+                        f"WHERE telegram_id = %s",
+                        (telegram_id,)
+                    )
+                    conn.commit()
+                    print(f"[PRIORITY] User {telegram_id} session cleared")
+                except Exception as e:
+                    print(f"[PRIORITY] Failed to clear session: {e}")
+                
+                help_text = (
+                    '🎨 <b>Нейрофотосессия PRO</b>\n\n'
+                    'Создавайте профессиональные AI-фотографии!\n\n'
+                    '<b>Команды:</b>\n'
+                    '/models - Выбрать модель генерации\n'
+                    '/stats - Ваша статистика\n'
+                    '/help - Эта справка\n\n'
+                    '<b>Как пользоваться:</b>\n'
+                    '1. Выберите модель командой /models\n'
+                    '2. Опишите изображение текстом\n'
+                    '3. Получите фото за 10-60 секунд\n\n'
+                    '<b>Доступные модели:</b>\n'
+                    '🟢 Nemotron Nano - компактная vision-модель\n'
+                    '💚 Gemma 3 - высокая точность\n'
+                    '⚡ Gemini Flash - скорость + качество\n'
+                    '🔵 Mistral Small - точные инструкции\n\n'
+                    '<b>Pro модели:</b>\n'
+                    '💎 Gemini 3 Pro - топ от Google\n'
+                    '🌟 FLUX 2 Flex - любые стили\n'
+                    '💫 FLUX 2 Pro - максимум качества\n'
+                    '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
+                    '<b>Тарифы:</b>\n'
+                    '🆓 Бесплатно: 3 изображения\n'
+                    '💎 PRO: 299₽/мес - безлимит + Pro модели'
+                )
+                send_telegram_message(bot_token, chat_id, help_text)
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
         # CRITICAL: Дедупликация через PostgreSQL (память НЕ сохраняется между Cloud Function инстансами!)
         if update_id:
             print(f"[DEDUP] Checking if update_id {update_id} already processed...")
@@ -586,13 +638,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'skipped': 'duplicate'})}
             
-            # Записываем update_id как обработанный
+            # CRITICAL: Записываем update_id как обработанный и делаем COMMIT СРАЗУ!
+            # Это гарантирует что даже если функция таймаутится, следующий запрос увидит дубликат
             print(f"[DEDUP] Marking update_id {update_id} as processed...")
             cur.execute(
                 f"INSERT INTO {DB_SCHEMA}.neurophoto_processed_updates (update_id) VALUES (%s) ON CONFLICT DO NOTHING",
                 (update_id,)
             )
-            conn.commit()
+            conn.commit()  # COMMIT СРАЗУ, ДО обработки запроса!
+            print(f"[DEDUP] ✅ Update {update_id} COMMITTED to DB - safe from duplicates now")
             
             # Очищаем старые записи (старше 1 часа) для экономии места
             cur.execute(
@@ -602,7 +656,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if deleted > 0:
                 print(f"[DEDUP] Cleaned up {deleted} old processed updates")
             conn.commit()
-            print(f"[DEDUP] ✅ Update {update_id} marked as NEW and being processed")
         
         # Обработка callback кнопок
         if 'callback_query' in update:
@@ -1089,53 +1142,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # CRITICAL: /start - приоритетная команда для сброса состояния
-        if message_text == '/start':
-            print(f"[COMMAND] /start command - resetting user state")
-            # Очищаем сессию пользователя (на случай если застрял на media_group)
-            try:
-                cur.execute(
-                    f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
-                    f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
-                    f"WHERE telegram_id = %s",
-                    (telegram_id,)
-                )
-                conn.commit()
-                print(f"[COMMAND] User session cleared")
-            except Exception as e:
-                print(f"[COMMAND] Failed to clear session: {e}")
-            
-            help_text = (
-                '🎨 <b>Нейрофотосессия PRO</b>\n\n'
-                'Создавайте профессиональные AI-фотографии!\n\n'
-                '<b>Команды:</b>\n'
-                '/models - Выбрать модель генерации\n'
-                '/stats - Ваша статистика\n'
-                '/help - Эта справка\n\n'
-                '<b>Как пользоваться:</b>\n'
-                '1. Выберите модель командой /models\n'
-                '2. Опишите изображение текстом\n'
-                '3. Получите фото за 10-60 секунд\n\n'
-                '<b>Доступные модели:</b>\n'
-                '🟢 Nemotron Nano - компактная vision-модель\n'
-                '💚 Gemma 3 - высокая точность\n'
-                '⚡ Gemini Flash - скорость + качество\n'
-                '🔵 Mistral Small - точные инструкции\n\n'
-                '<b>Pro модели:</b>\n'
-                '💎 Gemini 3 Pro - топ от Google\n'
-                '🌟 FLUX 2 Flex - любые стили\n'
-                '💫 FLUX 2 Pro - максимум качества\n'
-                '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
-                '<b>Тарифы:</b>\n'
-                '🆓 Бесплатно: 3 изображения\n'
-                '💎 PRO: 299₽/мес - безлимит + Pro модели'
-            )
-            send_telegram_message(bot_token, chat_id, help_text)
-            cur.close()
-            conn.close()
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
-        
-        # Команда /help
+        # Команда /help (NOTE: /start обрабатывается в самом начале, до дедупликации)
         if message_text == '/help':
             help_text = (
                 '🎨 <b>Нейрофотосессия PRO</b>\n\n'
