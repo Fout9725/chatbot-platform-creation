@@ -273,14 +273,34 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     try:
         with urllib.request.urlopen(req, timeout=120) as response:
             print(f"[OPENROUTER] Got response! Status: {response.status}")
-            print(f"[OPENROUTER] Reading response body...")
+            print(f"[OPENROUTER] Reading response body in chunks...")
             
-            # CRITICAL: Для GPT-5 читаем с таймаутом и логируем процесс
+            # CRITICAL: Для GPT-5 читаем ОГРОМНЫЙ JSON по частям (streaming)
+            # Это позволяет не превышать 30-секундный таймаут Cloud Function
             try:
-                response_body = response.read().decode('utf-8')
-                print(f"[OPENROUTER] Response size: {len(response_body)} bytes")
+                chunks = []
+                total_size = 0
+                chunk_count = 0
+                
+                # Читаем по 1 МБ за раз
+                while True:
+                    chunk = response.read(1024 * 1024)  # 1 MB chunks
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    total_size += len(chunk)
+                    chunk_count += 1
+                    
+                    # Логируем каждый МБ для отладки
+                    if chunk_count % 5 == 0:
+                        print(f"[OPENROUTER] Read {total_size / (1024*1024):.1f} MB so far ({chunk_count} chunks)...")
+                
+                response_body = b''.join(chunks).decode('utf-8')
+                print(f"[OPENROUTER] Response fully read: {len(response_body)} bytes ({len(response_body)/(1024*1024):.2f} MB)")
             except Exception as read_error:
                 print(f"[ERROR] Failed to read response body: {type(read_error).__name__}: {read_error}")
+                import traceback
+                print(traceback.format_exc())
                 return None
             
             # CRITICAL: Для GPT-5 логируем RAW ответ до парсинга
