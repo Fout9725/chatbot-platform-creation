@@ -25,6 +25,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             body_str = '{}'
         body_data = json.loads(body_str)
         user_message = body_data.get('message', '')
+        context = body_data.get('context', '')
         
         if not user_message:
             return {
@@ -142,12 +143,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
+        messages = [{'role': 'system', 'content': system_prompt}]
+        if context:
+            messages.append({'role': 'assistant', 'content': context})
+        messages.append({'role': 'user', 'content': user_message})
+        
         request_data = {
             'model': 'xiaomi/mimo-v2-flash:free',
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_message}
-            ],
+            'messages': messages,
             'temperature': 0.7,
             'max_tokens': 600,
             'stream': True
@@ -189,11 +192,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             print(f'Streaming completed. Response length: {len(full_response)}')
             
+            truncated = len(full_response) >= 550
+            
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'response': full_response.strip()})
+                'body': json.dumps({
+                    'response': full_response.strip(),
+                    'truncated': truncated
+                })
             }
         except Exception as e:
             print(f'ERROR in assistant: {str(e)}')

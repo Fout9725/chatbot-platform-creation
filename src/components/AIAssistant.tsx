@@ -10,6 +10,7 @@ interface Message {
   sender: 'user' | 'assistant';
   message: string;
   created_at?: string;
+  canContinue?: boolean;
 }
 
 const AIAssistant = () => {
@@ -77,6 +78,39 @@ const AIAssistant = () => {
     }
   };
 
+  const continueMessage = async () => {
+    setIsLoading(true);
+    await trackAction('chat_continue', {});
+
+    try {
+      const lastMessage = messages[messages.length - 1];
+      const response = await fetch('https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          message: 'Продолжи ответ',
+          context: lastMessage.message
+        })
+      });
+
+      const data = await response.json();
+      
+      const continuedMessage: Message = {
+        sender: 'assistant',
+        message: data.response || 'Извините, не могу продолжить.',
+        canContinue: data.truncated || false
+      };
+
+      setMessages(prev => [...prev, continuedMessage]);
+    } catch (error) {
+      console.error('Error continuing message:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const sendMessage = async () => {
     if (!inputMessage.trim()) return;
 
@@ -108,7 +142,8 @@ const AIAssistant = () => {
       
       const assistantMessage: Message = {
         sender: 'assistant',
-        message: data.response || 'Извините, не могу ответить прямо сейчас.'
+        message: data.response || 'Извините, не могу ответить прямо сейчас.',
+        canContinue: data.truncated || false
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -292,19 +327,33 @@ const AIAssistant = () => {
             )}
             
             {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={idx}>
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    msg.sender === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
+                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${
+                      msg.sender === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                  </div>
                 </div>
+                {msg.sender === 'assistant' && msg.canContinue && idx === messages.length - 1 && !isLoading && (
+                  <div className="flex justify-start mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={continueMessage}
+                      className="text-xs"
+                    >
+                      <Icon name="MoreHorizontal" size={14} className="mr-1" />
+                      Продолжить ответ
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
             
