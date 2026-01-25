@@ -34,9 +34,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'Message is required'})
             }
         
-        hf_key = os.environ.get('HUGGINGFACE_API_KEY', '')
+        openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
         
-        if not hf_key:
+        if not openrouter_key:
             return {
                 'statusCode': 500,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -143,43 +143,40 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        prompt_text = f"{system_prompt}\n\nПользователь: {user_message}\n\nОтвет:"
+        messages = [{'role': 'system', 'content': system_prompt}]
         if context:
-            prompt_text = f"{system_prompt}\n\nПредыдущий ответ: {context}\n\nПользователь: {user_message}\n\nОтвет:"
+            messages.append({'role': 'assistant', 'content': context})
+        messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'inputs': prompt_text,
-            'parameters': {
-                'max_new_tokens': 400,
-                'temperature': 0.7,
-                'return_full_text': False
-            }
+            'model': 'tngtech/deepseek-r1t-chimera:free',
+            'messages': messages,
+            'temperature': 0.7,
+            'max_tokens': 500
         }
-        api_url = 'https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct'
+        api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
         try:
-            print(f'Making request to Hugging Face API')
+            print(f'Making request to OpenRouter API with model: tngtech/deepseek-r1t-chimera:free')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
                 headers={
-                    'Authorization': f'Bearer {hf_key}',
-                    'Content-Type': 'application/json'
+                    'Authorization': f'Bearer {openrouter_key}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://intellektpro.ru',
+                    'X-Title': 'IntellektPro AI Assistant'
                 },
                 method='POST'
             )
             
-            response = urllib.request.urlopen(req, timeout=20)
+            response = urllib.request.urlopen(req, timeout=25)
             response_data = json.loads(response.read().decode('utf-8'))
             
-            print(f'HF response: {response_data}')
+            print(f'OpenRouter response received')
             
-            if isinstance(response_data, list) and len(response_data) > 0:
-                full_response = response_data[0].get('generated_text', '')
-            else:
-                full_response = response_data.get('generated_text', '')
-            
-            truncated = len(full_response) >= 350
+            full_response = response_data['choices'][0]['message']['content']
+            truncated = len(full_response) >= 450
             
             return {
                 'statusCode': 200,
