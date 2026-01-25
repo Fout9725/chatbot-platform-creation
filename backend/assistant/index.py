@@ -149,7 +149,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'xiaomi/mimo-v2-flash:free',
+            'model': 'deepseek/deepseek-r1-0528:free',
             'messages': messages,
             'temperature': 0.7,
             'max_tokens': 600,
