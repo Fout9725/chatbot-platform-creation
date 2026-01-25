@@ -189,65 +189,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             full_response = response_data['choices'][0]['message']['content']
             print(f'Raw response (first 200 chars): {full_response[:200]}')
             
-            # Убираем размышления модели (все варианты тегов)
+            # Убираем размышления модели
             import re
+            
+            # Удаляем теги размышлений
             full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
             full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
             
-            # Deepseek-модель пишет размышления без тегов в начале
-            # Удаляем всё размышление целиком - ищем фразы-маркеры начала реального ответа
+            # Deepseek-модель сначала пишет размышления, потом двойной перенос, потом сам ответ
+            # Ищем ПЕРВЫЙ абзац с размышлениями и удаляем только его
             
-            # Расширенные паттерны размышлений (для обычных ответов и продолжений)
-            thinking_patterns = [
-                'Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 
-                'Мне нужно', 'Хорошо, продолж', 'Нужно продолж', 'Продолжу',
-                'Сначала я', 'Давай продолж', 'Итак, продолж'
+            # Паттерны начала размышлений
+            thinking_start_patterns = [
+                'Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает',
+                'Пользователь запросил', 'Пользователь хочет', 'Мне нужно',
+                'Сначала я', 'Давайте'
             ]
             
-            # Удаляем все размышления - всё до третьего двойного переноса или до реального контента
-            if any(full_response.startswith(pattern) for pattern in thinking_patterns):
-                # Ищем первый двойной перенос строки - там начинается ответ
-                if '\n\n' in full_response:
-                    parts = full_response.split('\n\n', 1)
-                    if len(parts) > 1:
-                        full_response = parts[1].strip()
-                else:
-                    # Если двойного переноса нет - удаляем первые 2 предложения (обычно размышления)
-                    sentences = full_response.split('. ')
-                    if len(sentences) > 2:
-                        full_response = '. '.join(sentences[2:])
+            # Если ответ начинается с размышления - удаляем весь первый абзац до \n\n
+            starts_with_thinking = any(full_response.startswith(pattern) for pattern in thinking_start_patterns)
             
-            # Дополнительная агрессивная фильтрация - удаляем ВСЕ предложения с размышлениями
-            thinking_sentence_patterns = [
-                'Сначала', 'Важно', 'Нужно', 'Также стоит', 'Мне нужно',
-                'Потом', 'Затем', 'После этого', 'В конце', 'Посмотр',
-                'Надо', 'Возможно', 'Стоит', 'Можно'
-            ]
-            
-            sentences = full_response.split('. ')
-            filtered_sentences = []
-            for sentence in sentences:
-                sentence_clean = sentence.strip()
-                # Пропускаем короткие фразы (меньше 10 символов) и размышления
-                is_thinking = any(sentence_clean.startswith(pattern) for pattern in thinking_sentence_patterns)
-                # Также пропускаем если в предложении есть слова "опишу", "упомяну", "вспомню"
-                has_meta_words = any(word in sentence_clean.lower() for word in ['опишу', 'упомян', 'вспомн', 'объясн'])
-                
-                if not is_thinking and not has_meta_words and len(sentence_clean) > 10:
-                    filtered_sentences.append(sentence)
-            
-            if filtered_sentences:
-                full_response = '. '.join(filtered_sentences)
-            
-            # Дополнительная фильтрация для режима продолжения
-            if is_continue:
-                # Убираем фразы типа "Продолжу с того места..." в начале
-                continue_phrases = ['Продолжу', 'Продолжаю', 'Далее', 'Итак', 'Хорошо']
-                for phrase in continue_phrases:
-                    if full_response.startswith(phrase):
-                        if '. ' in full_response:
-                            full_response = full_response.split('. ', 1)[1]
-                        break
+            if starts_with_thinking and '\n\n' in full_response:
+                # Удаляем всё до первого двойного переноса (это размышление)
+                parts = full_response.split('\n\n', 1)
+                if len(parts) > 1:
+                    full_response = parts[1].strip()
+                    print(f'Removed thinking block, new response starts with: {full_response[:100]}')
             
             # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
