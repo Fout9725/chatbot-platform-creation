@@ -149,7 +149,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'google/gemini-flash-1.5-8b',
+            'model': 'meta-llama/llama-3.2-3b-instruct:free',
             'messages': messages,
             'temperature': 0.7,
             'max_tokens': 500,
