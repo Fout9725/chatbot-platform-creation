@@ -151,9 +151,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         request_data = {
             'model': 'deepseek/deepseek-r1-0528:free',
             'messages': messages,
-            'temperature': 0.7,
-            'max_tokens': 300,
-            'stream': True
+            'temperature': 0.3,
+            'max_tokens': 200,
+            'stream': True,
+            'top_p': 0.9
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
@@ -171,12 +172,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            response = urllib.request.urlopen(req, timeout=25)
+            import time
+            response = urllib.request.urlopen(req, timeout=20)
             full_response = ''
             reasoning = ''
             in_think = False
+            start_time = time.time()
             
             for line in response:
+                if time.time() - start_time > 18:
+                    print('Breaking stream - approaching timeout')
+                    break
+                    
                 line_str = line.decode('utf-8').strip()
                 if not line_str or line_str == 'data: [DONE]':
                     continue
@@ -202,7 +209,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             full_response = full_response.strip()
             print(f'Streaming completed. Response length: {len(full_response)}')
             
-            truncated = len(full_response) >= 250
+            if not full_response:
+                full_response = 'Извините, ИИ не смог сгенерировать ответ. Попробуйте упростить вопрос или спросите позже.'
+            
+            truncated = len(full_response) >= 180
             
             return {
                 'statusCode': 200,
