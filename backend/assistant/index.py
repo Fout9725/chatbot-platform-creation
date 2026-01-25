@@ -203,6 +203,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'truncated': truncated
                 })
             }
+        except urllib.error.HTTPError as e:
+            print(f'HTTP ERROR in assistant: {e.code} {str(e)}')
+            if e.code == 429:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'response': '⏳ Превышен лимит бесплатных запросов к ИИ. Попробуйте через минуту или обратитесь к администратору @Fou9725 для увеличения лимита.'})
+                }
+            else:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'response': f'Ошибка ИИ-сервиса. Обратитесь к администратору: @Fou9725'})
+                }
         except Exception as e:
             print(f'ERROR in assistant: {str(e)}')
             import traceback
@@ -211,7 +227,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Пожалуйста, обратитесь к администратору: @Fou9725. Ошибка: {str(e)}'})
+                'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Пожалуйста, обратитесь к администратору: @Fou9725'})
             }
     
     return {
