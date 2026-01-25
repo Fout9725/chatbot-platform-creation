@@ -177,14 +177,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             full_response = response_data['choices'][0]['message']['content']
             
-            # Убираем размышления модели (текст между <think> и </think>)
-            if '<think>' in full_response and '</think>' in full_response:
-                parts = full_response.split('</think>')
-                if len(parts) > 1:
-                    full_response = parts[1].strip()
+            # Убираем размышления модели (все что внутри <think>...</think>)
+            import re
+            full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
             
-            # Убираем форматирование с **
+            # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
+            full_response = full_response.replace('###', '')
+            full_response = full_response.replace('##', '')
+            
+            # Убираем лишние пробелы и переносы строк
+            full_response = '\n'.join(line.strip() for line in full_response.split('\n') if line.strip())
             
             truncated = len(full_response) >= 450
             
