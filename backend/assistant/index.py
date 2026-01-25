@@ -155,7 +155,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'return_full_text': False
             }
         }
-        api_url = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3'
+        api_url = 'https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct'
         
         try:
             print(f'Making request to Hugging Face API')
