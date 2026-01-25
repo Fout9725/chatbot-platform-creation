@@ -160,7 +160,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'tngtech/deepseek-r1t-chimera:free',
+            'model': 'qwen/qwen3-next-80b-a3b-instruct:free',
             'messages': messages,
             'temperature': 0.7,
             'max_tokens': 500
@@ -168,7 +168,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
         try:
-            print(f'Making request to OpenRouter API with model: tngtech/deepseek-r1t-chimera:free')
+            print(f'Making request to OpenRouter API with model: qwen/qwen3-next-80b-a3b-instruct:free')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
