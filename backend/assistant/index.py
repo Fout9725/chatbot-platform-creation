@@ -149,12 +149,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'deepseek/deepseek-r1-0528:free',
+            'model': 'xiaomi/mimo-v2-flash:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 1500,
-            'stream': True,
-            'top_p': 0.9
+            'max_tokens': 600,
+            'stream': True
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
@@ -172,21 +171,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            import time
             response = urllib.request.urlopen(req, timeout=25)
             full_response = ''
-            reasoning = ''
-            in_think = False
-            start_time = time.time()
-            was_interrupted = False
             
             for line in response:
-                elapsed = time.time() - start_time
-                if elapsed > 23:
-                    print(f'Breaking stream - approaching timeout after {elapsed:.1f}s')
-                    was_interrupted = True
-                    break
-                    
                 line_str = line.decode('utf-8').strip()
                 if not line_str or line_str == 'data: [DONE]':
                     continue
@@ -198,25 +186,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             delta = chunk_data['choices'][0].get('delta', {})
                             content = delta.get('content', '')
                             if content:
-                                if '<think>' in content:
-                                    in_think = True
-                                if '</think>' in content:
-                                    in_think = False
-                                    continue
-                                
-                                if not in_think and '<think>' not in content and '</think>' not in content:
-                                    full_response += content
+                                full_response += content
                     except json.JSONDecodeError:
                         continue
             
-            full_response = full_response.strip()
-            elapsed_total = time.time() - start_time
-            print(f'Streaming completed. Response length: {len(full_response)}, elapsed: {elapsed_total:.1f}s, interrupted: {was_interrupted}')
+            print(f'Streaming completed. Response length: {len(full_response)}')
             
-            if not full_response:
-                full_response = 'Извините, ИИ не смог сгенерировать ответ. Попробуйте упростить вопрос или спросите позже.'
-            
-            truncated = len(full_response) >= 1400
+            truncated = len(full_response) >= 550
             
             return {
                 'statusCode': 200,
@@ -224,8 +200,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'isBase64Encoded': False,
                 'body': json.dumps({
                     'response': full_response.strip(),
-                    'truncated': truncated,
-                    'incomplete': was_interrupted
+                    'truncated': truncated
                 })
             }
         except urllib.error.HTTPError as e:
