@@ -176,6 +176,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f'OpenRouter response received')
             
             full_response = response_data['choices'][0]['message']['content']
+            
+            # Убираем размышления модели (текст между <think> и </think>)
+            if '<think>' in full_response and '</think>' in full_response:
+                parts = full_response.split('</think>')
+                if len(parts) > 1:
+                    full_response = parts[1].strip()
+            
+            # Убираем форматирование с **
+            full_response = full_response.replace('**', '')
+            
             truncated = len(full_response) >= 450
             
             return {
