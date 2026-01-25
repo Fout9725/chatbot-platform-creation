@@ -176,18 +176,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f'OpenRouter response received')
             
             full_response = response_data['choices'][0]['message']['content']
+            print(f'Raw response (first 200 chars): {full_response[:200]}')
             
-            # Убираем размышления модели (все что внутри <think>...</think>)
+            # Убираем размышления модели (все варианты тегов)
             import re
-            full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
+            full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
+            full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
+            
+            # Если в начале есть "Размышление:" или подобное - удаляем весь блок до первого абзаца ответа
+            if full_response.strip().startswith(('Размышление', 'Reasoning', 'Think')):
+                parts = full_response.split('\n\n', 1)
+                if len(parts) > 1:
+                    full_response = parts[1]
             
             # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
             full_response = full_response.replace('###', '')
             full_response = full_response.replace('##', '')
+            full_response = full_response.replace('#', '')
             
             # Убираем лишние пробелы и переносы строк
             full_response = '\n'.join(line.strip() for line in full_response.split('\n') if line.strip())
+            
+            print(f'Cleaned response (first 200 chars): {full_response[:200]}')
             
             truncated = len(full_response) >= 450
             
