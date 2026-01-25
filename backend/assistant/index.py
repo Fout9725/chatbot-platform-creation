@@ -218,17 +218,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         full_response = '. '.join(sentences[2:])
             
             # Дополнительная агрессивная фильтрация - удаляем ВСЕ предложения с размышлениями
-            thinking_sentence_starts = [
-                'Сначала я', 'Сначала опишу', 'Сначала вспом', 'Сначала нужно',
-                'Важно упомянуть', 'Нужно указать', 'Также стоит', 'Мне нужно',
-                'Потом упом', 'Затем опишу', 'После этого', 'В конце'
+            thinking_sentence_patterns = [
+                'Сначала', 'Важно', 'Нужно', 'Также стоит', 'Мне нужно',
+                'Потом', 'Затем', 'После этого', 'В конце', 'Посмотр',
+                'Надо', 'Возможно', 'Стоит', 'Можно'
             ]
             
             sentences = full_response.split('. ')
             filtered_sentences = []
             for sentence in sentences:
-                # Пропускаем предложения, которые являются размышлениями
-                if not any(sentence.strip().startswith(pattern) for pattern in thinking_sentence_starts):
+                sentence_clean = sentence.strip()
+                # Пропускаем короткие фразы (меньше 10 символов) и размышления
+                is_thinking = any(sentence_clean.startswith(pattern) for pattern in thinking_sentence_patterns)
+                # Также пропускаем если в предложении есть слова "опишу", "упомяну", "вспомню"
+                has_meta_words = any(word in sentence_clean.lower() for word in ['опишу', 'упомян', 'вспомн', 'объясн'])
+                
+                if not is_thinking and not has_meta_words and len(sentence_clean) > 10:
                     filtered_sentences.append(sentence)
             
             if filtered_sentences:
