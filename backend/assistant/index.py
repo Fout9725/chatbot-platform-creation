@@ -163,107 +163,112 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'model': 'xiaomi/mimo-v2-flash:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 300
+            'max_tokens': 500
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
-        try:
-            print(f'Making request to OpenRouter API with model: xiaomi/mimo-v2-flash:free')
-            req = urllib.request.Request(
-                api_url,
-                data=json.dumps(request_data).encode('utf-8'),
-                headers={
-                    'Authorization': f'Bearer {openrouter_key}',
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://intellektpro.ru',
-                    'X-Title': 'IntellektPro AI Assistant'
-                },
-                method='POST'
-            )
-            
-            response = urllib.request.urlopen(req, timeout=28)
-            response_data = json.loads(response.read().decode('utf-8'))
-            
-            print(f'OpenRouter response received')
-            
-            full_response = response_data['choices'][0]['message']['content']
-            print(f'Raw response (first 200 chars): {full_response[:200]}')
-            
-            # Убираем размышления модели
-            import re
-            
-            # Удаляем теги размышлений
-            full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
-            full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
-            
-            # Deepseek-модель сначала пишет размышления, потом двойной перенос, потом сам ответ
-            # Ищем ПЕРВЫЙ абзац с размышлениями и удаляем только его
-            
-            # Паттерны начала размышлений
-            thinking_start_patterns = [
-                'Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает',
-                'Пользователь запросил', 'Пользователь хочет', 'Мне нужно',
-                'Сначала я', 'Давайте'
-            ]
-            
-            # Если ответ начинается с размышления - удаляем весь первый абзац до \n\n
-            starts_with_thinking = any(full_response.startswith(pattern) for pattern in thinking_start_patterns)
-            
-            if starts_with_thinking and '\n\n' in full_response:
-                # Удаляем всё до первого двойного переноса (это размышление)
-                parts = full_response.split('\n\n', 1)
-                if len(parts) > 1:
-                    full_response = parts[1].strip()
-                    print(f'Removed thinking block, new response starts with: {full_response[:100]}')
-            
-            # Убираем форматирование markdown
-            full_response = full_response.replace('**', '')
-            full_response = full_response.replace('###', '')
-            full_response = full_response.replace('##', '')
-            full_response = full_response.replace('#', '')
-            
-            # Убираем лишние пробелы и переносы строк
-            full_response = '\n'.join(line.strip() for line in full_response.split('\n') if line.strip())
-            
-            print(f'Cleaned response (first 200 chars): {full_response[:200]}')
-            
-            truncated = len(full_response) >= 450
-            
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'isBase64Encoded': False,
-                'body': json.dumps({
-                    'response': full_response.strip(),
-                    'truncated': truncated
-                })
-            }
-        except urllib.error.HTTPError as e:
-            print(f'HTTP ERROR in assistant: {e.code} {str(e)}')
-            if e.code == 429:
+        # Retry механизм - пытаемся 2 раза при timeout
+        max_retries = 2
+        
+        for attempt in range(max_retries):
+            try:
+                print(f'Making request to OpenRouter API (attempt {attempt + 1}/{max_retries}) with model: xiaomi/mimo-v2-flash:free')
+                req = urllib.request.Request(
+                    api_url,
+                    data=json.dumps(request_data).encode('utf-8'),
+                    headers={
+                        'Authorization': f'Bearer {openrouter_key}',
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://intellektpro.ru',
+                        'X-Title': 'IntellektPro AI Assistant'
+                    },
+                    method='POST'
+                )
+                
+                response = urllib.request.urlopen(req, timeout=29)
+                response_data = json.loads(response.read().decode('utf-8'))
+                
+                print(f'OpenRouter response received')
+                
+                full_response = response_data['choices'][0]['message']['content']
+                print(f'Raw response (first 200 chars): {full_response[:200]}')
+                
+                # Убираем размышления модели
+                import re
+                
+                # Удаляем теги размышлений
+                full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
+                full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
+                
+                # Паттерны начала размышлений
+                thinking_start_patterns = [
+                    'Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает',
+                    'Пользователь запросил', 'Пользователь хочет', 'Мне нужно',
+                    'Сначала я', 'Давайте'
+                ]
+                
+                # Если ответ начинается с размышления - удаляем весь первый абзац до \n\n
+                starts_with_thinking = any(full_response.startswith(pattern) for pattern in thinking_start_patterns)
+                
+                if starts_with_thinking and '\n\n' in full_response:
+                    # Удаляем всё до первого двойного переноса (это размышление)
+                    parts = full_response.split('\n\n', 1)
+                    if len(parts) > 1:
+                        full_response = parts[1].strip()
+                        print(f'Removed thinking block, new response starts with: {full_response[:100]}')
+                
+                # Убираем форматирование markdown
+                full_response = full_response.replace('**', '')
+                full_response = full_response.replace('###', '')
+                full_response = full_response.replace('##', '')
+                full_response = full_response.replace('#', '')
+                
+                # Убираем лишние пробелы и переносы строк
+                full_response = '\n'.join(line.strip() for line in full_response.split('\n') if line.strip())
+                
+                print(f'Cleaned response (first 200 chars): {full_response[:200]}')
+                
+                truncated = len(full_response) >= 450
+                
                 return {
                     'statusCode': 200,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                     'isBase64Encoded': False,
-                    'body': json.dumps({'response': '⏳ Превышен лимит бесплатных запросов к ИИ. Попробуйте через минуту или обратитесь к администратору @Fou9725 для увеличения лимита.'})
+                    'body': json.dumps({
+                        'response': full_response.strip(),
+                        'truncated': truncated
+                    })
                 }
-            else:
-                return {
-                    'statusCode': 200,
-                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'isBase64Encoded': False,
-                    'body': json.dumps({'response': f'Ошибка ИИ-сервиса. Обратитесь к администратору: @Fou9725'})
-                }
-        except Exception as e:
-            print(f'ERROR in assistant: {str(e)}')
-            import traceback
-            print(f'Traceback: {traceback.format_exc()}')
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'isBase64Encoded': False,
-                'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Пожалуйста, обратитесь к администратору: @Fou9725'})
-            }
+            except urllib.error.HTTPError as e:
+                print(f'HTTP ERROR in assistant (attempt {attempt + 1}): {e.code} {str(e)}')
+                if e.code == 429:
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'isBase64Encoded': False,
+                        'body': json.dumps({'response': '⏳ Превышен лимит бесплатных запросов к ИИ. Попробуйте через минуту или обратитесь к администратору @Fou9725 для увеличения лимита.'})
+                    }
+                # Для других HTTP ошибок - повторяем попытку
+                if attempt < max_retries - 1:
+                    print(f'Retrying request...')
+                    continue
+            except Exception as e:
+                print(f'ERROR in assistant (attempt {attempt + 1}): {str(e)}')
+                import traceback
+                print(f'Traceback: {traceback.format_exc()}')
+                
+                # Если это timeout - пробуем ещё раз
+                if 'timeout' in str(e).lower() and attempt < max_retries - 1:
+                    print(f'Timeout detected, retrying...')
+                    continue
+        
+        # Если все попытки исчерпаны
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'isBase64Encoded': False,
+            'body': json.dumps({'response': f'Извините, не могу ответить прямо сейчас. Попробуйте ещё раз через минуту или обратитесь к администратору: @Fou9725'})
+        }
     
     return {
         'statusCode': 405,
