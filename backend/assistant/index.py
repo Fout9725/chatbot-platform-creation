@@ -151,7 +151,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 {'role': 'user', 'content': user_message}
             ],
             'temperature': 0.7,
-            'max_tokens': 800
+            'max_tokens': 2000
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         api_key = openrouter_key
@@ -170,7 +170,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            response_text = urllib.request.urlopen(req, timeout=30).read().decode('utf-8')
+            response_text = urllib.request.urlopen(req, timeout=60).read().decode('utf-8')
             response_data = json.loads(response_text)
             print(f'OpenRouter response: {response_data}')
             
