@@ -151,8 +151,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         request_data = {
             'model': 'deepseek/deepseek-r1-0528:free',
             'messages': messages,
-            'temperature': 0.3,
-            'max_tokens': 200,
+            'temperature': 0.7,
+            'max_tokens': 1500,
             'stream': True,
             'top_p': 0.9
         }
@@ -173,14 +173,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
             
             import time
-            response = urllib.request.urlopen(req, timeout=20)
+            response = urllib.request.urlopen(req, timeout=50)
             full_response = ''
             reasoning = ''
             in_think = False
             start_time = time.time()
             
             for line in response:
-                if time.time() - start_time > 18:
+                if time.time() - start_time > 48:
                     print('Breaking stream - approaching timeout')
                     break
                     
@@ -212,7 +212,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if not full_response:
                 full_response = 'Извините, ИИ не смог сгенерировать ответ. Попробуйте упростить вопрос или спросите позже.'
             
-            truncated = len(full_response) >= 180
+            truncated = len(full_response) >= 1400
             
             return {
                 'statusCode': 200,
