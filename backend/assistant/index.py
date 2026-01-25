@@ -173,6 +173,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             response = urllib.request.urlopen(req, timeout=25)
             full_response = ''
+            reasoning = ''
+            in_think = False
             
             for line in response:
                 line_str = line.decode('utf-8').strip()
@@ -186,10 +188,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             delta = chunk_data['choices'][0].get('delta', {})
                             content = delta.get('content', '')
                             if content:
-                                full_response += content
+                                if '<think>' in content:
+                                    in_think = True
+                                if '</think>' in content:
+                                    in_think = False
+                                    continue
+                                
+                                if not in_think and '<think>' not in content and '</think>' not in content:
+                                    full_response += content
                     except json.JSONDecodeError:
                         continue
             
+            full_response = full_response.strip()
             print(f'Streaming completed. Response length: {len(full_response)}')
             
             truncated = len(full_response) >= 250
