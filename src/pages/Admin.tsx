@@ -34,6 +34,11 @@ const Admin = () => {
   const [constructorPrice, setConstructorPrice] = useState(0);
 
   useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/');
+      return;
+    }
+
     const fetchUsers = async () => {
       try {
         const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
@@ -89,7 +94,7 @@ const Admin = () => {
       }
     };
     loadPaymentHistory();
-  }, []);
+  }, [user, navigate]);
 
   const handleUpdatePrices = () => {
     toast({

@@ -108,12 +108,7 @@ const Index = () => {
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
               </Button>
-              {!isAuthenticated && (
-                <Button variant="ghost" size="sm" onClick={() => setIsAuthOpen(true)} className="hidden sm:flex">
-                  <Icon name="ShieldCheck" size={18} className="md:mr-2" />
-                  <span className="hidden md:inline">Админ</span>
-                </Button>
-              )}
+
             </div>
           </div>
         </div>
@@ -129,165 +124,9 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Общая статистика платформы */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 animate-fade-in">
-          <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Активных ИИ-агентов</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-primary">{activeBots.filter((b: any) => b.status === 'active').length}</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="Rocket" size={12} className="text-purple-500" />
-                {activeBots.length > 0 ? 'Активно работают' : 'Старт платформы'}
-              </p>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Пользователей</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-blue-600">{totalUsers}</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="Sparkles" size={12} className="text-blue-500" />
-                {totalUsers > 0 ? 'Растём каждый день' : 'Бета-версия'}
-              </p>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-gradient-to-br from-green-50 to-white border-green-200">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Сообщений/день</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-green-600">0</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="Zap" size={12} className="text-green-500" />
-                Скоро запуск
-              </p>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">Партнёров</CardDescription>
-              <CardTitle className="text-2xl md:text-3xl font-bold text-orange-600">0</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Icon name="Users" size={12} className="text-orange-500" />
-                Открыт набор
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Раздел партнерской программы */}
-        <Card className="mb-8 bg-gradient-to-r from-purple-100 via-blue-100 to-purple-100 border-purple-300 animate-fade-in">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-xl md:text-2xl mb-2 flex items-center gap-2">
-                  <Icon name="Handshake" size={28} className="text-primary" />
-                  Партнёрская программа
-                </CardTitle>
-                <CardDescription className="text-sm md:text-base">
-                  Зарабатывайте до 100,000₽/мес, рекомендуя нашу платформу
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="flex items-start gap-3 bg-white/70 p-3 rounded-lg">
-                <div className="bg-green-500 text-white p-2 rounded-lg">
-                  <Icon name="Percent" size={20} />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm md:text-base">20% комиссия</p>
-                  <p className="text-xs text-muted-foreground">От платежей рефералов (пожизненно)</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 bg-white/70 p-3 rounded-lg">
-                <div className="bg-blue-500 text-white p-2 rounded-lg">
-                  <Icon name="ShoppingCart" size={20} />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm md:text-base">70% от продаж</p>
-                  <p className="text-xs text-muted-foreground">За каждого проданного ИИ-агента</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 bg-white/70 p-3 rounded-lg">
-                <div className="bg-purple-500 text-white p-2 rounded-lg">
-                  <Icon name="Wallet" size={20} />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm md:text-base">Быстрые выплаты</p>
-                  <p className="text-xs text-muted-foreground">Еженедельно на карту</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 relative z-50">
-              <Button className="flex-1 relative z-50" size="lg" onClick={() => { console.log('Partner button clicked!'); navigate('/plan-selection'); }}>
-                <Icon name="Rocket" size={18} className="mr-2" />
-                Стать партнёром
-              </Button>
-              <Button variant="outline" size="lg" className="flex-1 relative z-50" onClick={() => { console.log('Calculator button clicked!'); setIsCalculatorOpen(true); }}>
-                <Icon name="Calculator" size={18} className="mr-2" />
-                Калькулятор дохода
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-8 animate-fade-in">
-          <Card className="bg-gradient-to-r from-blue-50 to-white border-blue-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => navigate('/legal')}>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Icon name="Building" size={20} className="text-blue-600" />
-                Юридическая информация
-              </CardTitle>
-              <CardDescription>
-                Реквизиты ИП, договоры, политики
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  ИП Дмитриева О.А. • ИНН 263504091920
-                </p>
-                <Icon name="ExternalLink" size={18} className="text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {user?.role === 'admin' && (
-            <Card className="bg-gradient-to-r from-purple-50 to-white border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => navigate('/admin')}>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Icon name="Shield" size={20} className="text-purple-600" />
-                  Административная панель
-                </CardTitle>
-                <CardDescription>
-                  Управление платформой и контентом
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Статистика, боты, шаблоны, тарифы
-                  </p>
-                  <Icon name="ArrowRight" size={18} className="text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex-1">
