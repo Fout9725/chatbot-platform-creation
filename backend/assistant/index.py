@@ -184,33 +184,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
             
             # Deepseek-модель пишет размышления без тегов в начале
-            # Ищем маркеры начала реального ответа
-            markers = [
-                'Сначала я',
-                'Отвечу',
-                'Ответ:',
-                'Вот ответ',
-                'На ваш вопрос',
-                'Партнёрская программа',
-                'Тарифные планы',
-                'ИнтеллектПро',
-                'Платформа'
+            # Удаляем всё размышление целиком - ищем фразы-маркеры начала реального ответа
+            answer_start_markers = [
+                '\n\n',  # Обычно после размышления идёт двойной перенос
             ]
             
-            # Если первое предложение начинается с "Хорошо, пользователь" - это размышление
-            lines = full_response.split('\n')
-            if lines and any(lines[0].startswith(phrase) for phrase in ['Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 'Пользователь интересуется']):
-                # Удаляем все строки до первого маркера реального ответа
-                result_lines = []
-                skip = True
-                for line in lines:
-                    if skip and any(marker in line for marker in markers):
-                        skip = False
-                    if not skip:
-                        result_lines.append(line)
-                
-                if result_lines:
-                    full_response = '\n'.join(result_lines)
+            # Если начинается с размышлений - удаляем первый блок до двойного переноса
+            thinking_patterns = ['Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 'Мне нужно']
+            if any(full_response.startswith(pattern) for pattern in thinking_patterns):
+                # Ищем первый двойной перенос строки - там начинается ответ
+                if '\n\n' in full_response:
+                    parts = full_response.split('\n\n', 1)
+                    if len(parts) > 1:
+                        full_response = parts[1].strip()
+                else:
+                    # Если двойного переноса нет - удаляем первые 2 предложения (обычно размышления)
+                    sentences = full_response.split('. ')
+                    if len(sentences) > 2:
+                        full_response = '. '.join(sentences[2:])
             
             # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
