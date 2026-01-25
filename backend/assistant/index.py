@@ -204,6 +204,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Сначала я', 'Давай продолж', 'Итак, продолж'
             ]
             
+            # Удаляем все размышления - всё до третьего двойного переноса или до реального контента
             if any(full_response.startswith(pattern) for pattern in thinking_patterns):
                 # Ищем первый двойной перенос строки - там начинается ответ
                 if '\n\n' in full_response:
@@ -215,6 +216,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     sentences = full_response.split('. ')
                     if len(sentences) > 2:
                         full_response = '. '.join(sentences[2:])
+            
+            # Дополнительная агрессивная фильтрация - удаляем ВСЕ предложения с размышлениями
+            thinking_sentence_starts = [
+                'Сначала я', 'Сначала опишу', 'Сначала вспом', 'Сначала нужно',
+                'Важно упомянуть', 'Нужно указать', 'Также стоит', 'Мне нужно',
+                'Потом упом', 'Затем опишу', 'После этого', 'В конце'
+            ]
+            
+            sentences = full_response.split('. ')
+            filtered_sentences = []
+            for sentence in sentences:
+                # Пропускаем предложения, которые являются размышлениями
+                if not any(sentence.strip().startswith(pattern) for pattern in thinking_sentence_starts):
+                    filtered_sentences.append(sentence)
+            
+            if filtered_sentences:
+                full_response = '. '.join(filtered_sentences)
             
             # Дополнительная фильтрация для режима продолжения
             if is_continue:
