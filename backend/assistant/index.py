@@ -173,15 +173,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
             
             import time
-            response = urllib.request.urlopen(req, timeout=50)
+            response = urllib.request.urlopen(req, timeout=25)
             full_response = ''
             reasoning = ''
             in_think = False
             start_time = time.time()
+            was_interrupted = False
             
             for line in response:
-                if time.time() - start_time > 48:
-                    print('Breaking stream - approaching timeout')
+                elapsed = time.time() - start_time
+                if elapsed > 23:
+                    print(f'Breaking stream - approaching timeout after {elapsed:.1f}s')
+                    was_interrupted = True
                     break
                     
                 line_str = line.decode('utf-8').strip()
@@ -207,7 +210,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         continue
             
             full_response = full_response.strip()
-            print(f'Streaming completed. Response length: {len(full_response)}')
+            elapsed_total = time.time() - start_time
+            print(f'Streaming completed. Response length: {len(full_response)}, elapsed: {elapsed_total:.1f}s, interrupted: {was_interrupted}')
             
             if not full_response:
                 full_response = 'Извините, ИИ не смог сгенерировать ответ. Попробуйте упростить вопрос или спросите позже.'
@@ -220,7 +224,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'isBase64Encoded': False,
                 'body': json.dumps({
                     'response': full_response.strip(),
-                    'truncated': truncated
+                    'truncated': truncated,
+                    'incomplete': was_interrupted
                 })
             }
         except urllib.error.HTTPError as e:
