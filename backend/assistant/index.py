@@ -33,7 +33,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'Message is required'})
             }
         
-        # Используем OpenRouter API с бесплатной моделью Xiaomi
         openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
         
         if not openrouter_key:
@@ -143,7 +142,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        # Используем бесплатную модель Xiaomi Mimo от OpenRouter
         request_data = {
             'model': 'xiaomi/mimo-v2-flash:free',
             'messages': [
@@ -151,18 +149,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 {'role': 'user', 'content': user_message}
             ],
             'temperature': 0.7,
-            'max_tokens': 2000
+            'max_tokens': 600,
+            'stream': True
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
-        api_key = openrouter_key
         
         try:
-            print(f'Making request to OpenRouter API with model: xiaomi/mimo-v2-flash:free')
+            print(f'Making streaming request to OpenRouter API')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
                 headers={
-                    'Authorization': f'Bearer {api_key}',
+                    'Authorization': f'Bearer {openrouter_key}',
                     'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://intellektpro.ru',
                     'X-Title': 'IntellektPro AI Assistant'
@@ -170,18 +168,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            response_text = urllib.request.urlopen(req, timeout=60).read().decode('utf-8')
-            response_data = json.loads(response_text)
-            print(f'OpenRouter response: {response_data}')
+            response = urllib.request.urlopen(req, timeout=25)
+            full_response = ''
             
-            # OpenRouter возвращает стандартный формат OpenAI
-            ai_response = response_data['choices'][0]['message']['content'].strip()
+            for line in response:
+                line_str = line.decode('utf-8').strip()
+                if not line_str or line_str == 'data: [DONE]':
+                    continue
+                    
+                if line_str.startswith('data: '):
+                    try:
+                        chunk_data = json.loads(line_str[6:])
+                        if 'choices' in chunk_data and len(chunk_data['choices']) > 0:
+                            delta = chunk_data['choices'][0].get('delta', {})
+                            content = delta.get('content', '')
+                            if content:
+                                full_response += content
+                    except json.JSONDecodeError:
+                        continue
+            
+            print(f'Streaming completed. Response length: {len(full_response)}')
             
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'isBase64Encoded': False,
-                'body': json.dumps({'response': ai_response})
+                'body': json.dumps({'response': full_response.strip()})
             }
         except Exception as e:
             print(f'ERROR in assistant: {str(e)}')
