@@ -152,7 +152,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'model': 'deepseek/deepseek-r1-0528:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 600,
+            'max_tokens': 300,
             'stream': True
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
@@ -192,7 +192,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             print(f'Streaming completed. Response length: {len(full_response)}')
             
-            truncated = len(full_response) >= 550
+            truncated = len(full_response) >= 250
             
             return {
                 'statusCode': 200,
