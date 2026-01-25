@@ -143,10 +143,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
 
-        messages = [{'role': 'system', 'content': system_prompt}]
-        if context:
-            messages.append({'role': 'assistant', 'content': context})
-        messages.append({'role': 'user', 'content': user_message})
+        # Специальная обработка для продолжения ответа
+        is_continue = user_message.lower() in ['продолжи ответ', 'продолжи', 'continue']
+        
+        if is_continue and context:
+            # Для продолжения - используем упрощённый промпт без размышлений
+            messages = [
+                {'role': 'system', 'content': 'Продолжи текст без вступлений и размышлений. Просто продолжи с того места, где остановился:'},
+                {'role': 'assistant', 'content': context},
+                {'role': 'user', 'content': 'Продолжи'}
+            ]
+        else:
+            messages = [{'role': 'system', 'content': system_prompt}]
+            if context:
+                messages.append({'role': 'assistant', 'content': context})
+            messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
             'model': 'tngtech/deepseek-r1t-chimera:free',
@@ -185,12 +196,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Deepseek-модель пишет размышления без тегов в начале
             # Удаляем всё размышление целиком - ищем фразы-маркеры начала реального ответа
-            answer_start_markers = [
-                '\n\n',  # Обычно после размышления идёт двойной перенос
+            
+            # Расширенные паттерны размышлений (для обычных ответов и продолжений)
+            thinking_patterns = [
+                'Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 
+                'Мне нужно', 'Хорошо, продолж', 'Нужно продолж', 'Продолжу',
+                'Сначала я', 'Давай продолж', 'Итак, продолж'
             ]
             
-            # Если начинается с размышлений - удаляем первый блок до двойного переноса
-            thinking_patterns = ['Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 'Мне нужно']
             if any(full_response.startswith(pattern) for pattern in thinking_patterns):
                 # Ищем первый двойной перенос строки - там начинается ответ
                 if '\n\n' in full_response:
@@ -202,6 +215,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     sentences = full_response.split('. ')
                     if len(sentences) > 2:
                         full_response = '. '.join(sentences[2:])
+            
+            # Дополнительная фильтрация для режима продолжения
+            if is_continue:
+                # Убираем фразы типа "Продолжу с того места..." в начале
+                continue_phrases = ['Продолжу', 'Продолжаю', 'Далее', 'Итак', 'Хорошо']
+                for phrase in continue_phrases:
+                    if full_response.startswith(phrase):
+                        if '. ' in full_response:
+                            full_response = full_response.split('. ', 1)[1]
+                        break
             
             # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
