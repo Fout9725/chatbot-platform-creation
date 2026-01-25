@@ -149,16 +149,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'xiaomi/mimo-v2-flash:free',
+            'model': 'google/gemini-flash-1.5-8b',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 600,
-            'stream': True
+            'max_tokens': 500,
+            'stream': False
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
         try:
-            print(f'Making streaming request to OpenRouter API')
+            print(f'Making request to OpenRouter API')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
@@ -171,28 +171,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            response = urllib.request.urlopen(req, timeout=25)
-            full_response = ''
+            response = urllib.request.urlopen(req, timeout=20)
+            response_data = json.loads(response.read().decode('utf-8'))
             
-            for line in response:
-                line_str = line.decode('utf-8').strip()
-                if not line_str or line_str == 'data: [DONE]':
-                    continue
-                    
-                if line_str.startswith('data: '):
-                    try:
-                        chunk_data = json.loads(line_str[6:])
-                        if 'choices' in chunk_data and len(chunk_data['choices']) > 0:
-                            delta = chunk_data['choices'][0].get('delta', {})
-                            content = delta.get('content', '')
-                            if content:
-                                full_response += content
-                    except json.JSONDecodeError:
-                        continue
+            print(f'OpenRouter response: {response_data}')
             
-            print(f'Streaming completed. Response length: {len(full_response)}')
-            
-            truncated = len(full_response) >= 550
+            full_response = response_data['choices'][0]['message']['content']
+            truncated = len(full_response) >= 450
             
             return {
                 'statusCode': 200,
