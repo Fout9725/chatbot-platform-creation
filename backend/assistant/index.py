@@ -163,7 +163,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'model': 'xiaomi/mimo-v2-flash:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 500
+            'max_tokens': 300
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
@@ -181,7 +181,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 method='POST'
             )
             
-            response = urllib.request.urlopen(req, timeout=25)
+            response = urllib.request.urlopen(req, timeout=28)
             response_data = json.loads(response.read().decode('utf-8'))
             
             print(f'OpenRouter response received')
