@@ -160,7 +160,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'xiaomi/mimo-v2-flash:free',
+            'model': 'tngtech/deepseek-r1t-chimera:free',
             'messages': messages,
             'temperature': 0.7,
             'max_tokens': 500
@@ -168,7 +168,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
         try:
-            print(f'Making request to OpenRouter API with model: xiaomi/mimo-v2-flash:free')
+            print(f'Making request to OpenRouter API with model: tngtech/deepseek-r1t-chimera:free')
             req = urllib.request.Request(
                 api_url,
                 data=json.dumps(request_data).encode('utf-8'),
