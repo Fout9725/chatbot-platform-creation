@@ -22,6 +22,20 @@ const AIAssistant = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const savedHistory = localStorage.getItem('ai-assistant-history');
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const dismissed = localStorage.getItem('ai-assistant-dismissed');
     const dismissedTime = dismissed ? parseInt(dismissed) : 0;
     const now = Date.now();
@@ -37,6 +51,9 @@ const AIAssistant = () => {
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    if (messages.length > 0) {
+      localStorage.setItem('ai-assistant-history', JSON.stringify(messages));
     }
   }, [messages]);
 
@@ -209,6 +226,21 @@ const AIAssistant = () => {
             </div>
           </div>
           <div className="flex gap-1">
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Очистить историю чата?')) {
+                    setMessages([]);
+                    localStorage.removeItem('ai-assistant-history');
+                  }
+                }}
+                title="Очистить историю"
+              >
+                <Icon name="Trash2" size={16} />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

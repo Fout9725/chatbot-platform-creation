@@ -17,12 +17,29 @@ export default function OfferConstructor() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('offer-constructor-history');
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (error) {
+        console.error('Failed to load offer constructor history:', error);
+      }
+    }
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     scrollToBottom();
+    if (messages.length > 0) {
+      localStorage.setItem('offer-constructor-history', JSON.stringify(messages));
+    }
   }, [messages]);
 
   const sendMessage = async () => {
@@ -89,14 +106,31 @@ export default function OfferConstructor() {
                 <p className="text-sm text-gray-500">Создай сильный оффер по методике P.R.S.T.S.</p>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.href = '/'}
-            >
-              <Icon name="ArrowLeft" size={16} className="mr-2" />
-              На главную
-            </Button>
+            <div className="flex gap-2">
+              {messages.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Очистить историю чата?')) {
+                      setMessages([]);
+                      localStorage.removeItem('offer-constructor-history');
+                    }
+                  }}
+                >
+                  <Icon name="Trash2" size={16} className="mr-2" />
+                  Очистить
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/'}
+              >
+                <Icon name="ArrowLeft" size={16} className="mr-2" />
+                На главную
+              </Button>
+            </div>
           </div>
         </div>
       </div>
