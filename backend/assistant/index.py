@@ -183,11 +183,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
             full_response = re.sub(r'<thinking>.*?</thinking>', '', full_response, flags=re.DOTALL | re.IGNORECASE)
             
-            # Если в начале есть "Размышление:" или подобное - удаляем весь блок до первого абзаца ответа
-            if full_response.strip().startswith(('Размышление', 'Reasoning', 'Think')):
-                parts = full_response.split('\n\n', 1)
-                if len(parts) > 1:
-                    full_response = parts[1]
+            # Deepseek-модель пишет размышления без тегов в начале
+            # Ищем маркеры начала реального ответа
+            markers = [
+                'Сначала я',
+                'Отвечу',
+                'Ответ:',
+                'Вот ответ',
+                'На ваш вопрос',
+                'Партнёрская программа',
+                'Тарифные планы',
+                'ИнтеллектПро',
+                'Платформа'
+            ]
+            
+            # Если первое предложение начинается с "Хорошо, пользователь" - это размышление
+            lines = full_response.split('\n')
+            if lines and any(lines[0].startswith(phrase) for phrase in ['Хорошо, пользователь', 'Итак, пользователь', 'Пользователь спрашивает', 'Пользователь интересуется']):
+                # Удаляем все строки до первого маркера реального ответа
+                result_lines = []
+                skip = True
+                for line in lines:
+                    if skip and any(marker in line for marker in markers):
+                        skip = False
+                    if not skip:
+                        result_lines.append(line)
+                
+                if result_lines:
+                    full_response = '\n'.join(result_lines)
             
             # Убираем форматирование markdown
             full_response = full_response.replace('**', '')
