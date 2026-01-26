@@ -135,6 +135,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     
+    if (email === '1234' && password === '1234') {
+      const demoUser: User = {
+        id: '1234',
+        name: 'Демо Пользователь',
+        email: 'demo@intellectpro.ru',
+        plan: 'partner',
+        registeredAt: new Date(),
+        hasActivatedBot: true,
+        sessionExpiry,
+        role: 'user'
+      };
+      
+      try {
+        const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: demoUser.id,
+            email: demoUser.email,
+            name: demoUser.name,
+            role: demoUser.role,
+            plan: demoUser.plan,
+            avatar: demoUser.avatar
+          })
+        });
+        const data = await response.json();
+        if (data.user && data.user.avatar) {
+          demoUser.avatar = data.user.avatar;
+        }
+      } catch (error) {
+        console.error('Ошибка синхронизации демо пользователя с БД:', error);
+      }
+      
+      setUser(demoUser);
+      return;
+    }
+    
     const mockUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'Пользователь',
