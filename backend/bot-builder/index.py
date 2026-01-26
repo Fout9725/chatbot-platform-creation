@@ -169,7 +169,7 @@ app.run_polling()
             'model': 'tngtech/deepseek-r1t2-chimera:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 3000,
+            'max_tokens': 1500,
             'stream': False
         }
         
@@ -194,7 +194,7 @@ app.run_polling()
                     method='POST'
                 )
                 
-                response = urllib.request.urlopen(req, timeout=90)
+                response = urllib.request.urlopen(req, timeout=120)
                 response_data = json.loads(response.read().decode('utf-8'))
                 
                 ai_response = response_data['choices'][0]['message']['content']
