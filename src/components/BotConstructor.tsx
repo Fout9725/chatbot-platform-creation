@@ -23,12 +23,16 @@ interface ScenarioNode {
   content?: string;
 }
 
-const BotConstructor = () => {
+interface BotConstructorProps {
+  initialConfig?: any;
+}
+
+const BotConstructor = ({ initialConfig }: BotConstructorProps) => {
   const { toast } = useToast();
-  const [botName, setBotName] = useState('');
+  const [botName, setBotName] = useState(initialConfig?.botName || '');
   const [botType, setBotType] = useState('');
   const [platform, setPlatform] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(initialConfig?.description || '');
   const [aiModel, setAiModel] = useState('google/gemini-2.0-flash-exp:free');
   const [aiPrompt, setAiPrompt] = useState('Ты вежливый помощник. Отвечай кратко и по делу.');
   const [scenarios, setScenarios] = useState<ScenarioNode[]>([

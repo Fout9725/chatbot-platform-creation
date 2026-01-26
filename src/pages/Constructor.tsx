@@ -5,14 +5,18 @@ import Icon from '@/components/ui/icon';
 import BotConstructor from '@/components/BotConstructor';
 import AdvancedVisualConstructor from '@/components/AdvancedVisualConstructor';
 import InteractiveTutorial from '@/components/InteractiveTutorial';
+import AIBotBuilder from '@/components/AIBotBuilder';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Constructor = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode') || 'professional';
   const [showTutorial, setShowTutorial] = useState(true);
+  const [activeTab, setActiveTab] = useState('builder');
+  const [generatedBotConfig, setGeneratedBotConfig] = useState<any>(null);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -21,6 +25,11 @@ const Constructor = () => {
       navigate('/pricing');
     }
   }, [isAuthenticated, user, navigate]);
+
+  const handleBotGenerated = (config: any) => {
+    setGeneratedBotConfig(config);
+    setActiveTab('builder');
+  };
 
   return (
     <>
@@ -77,7 +86,49 @@ const Constructor = () => {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <BotConstructor />
+
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="ai">
+                    <Icon name="Sparkles" size={16} className="mr-2" />
+                    ИИ-Агент
+                  </TabsTrigger>
+                  <TabsTrigger value="builder">
+                    <Icon name="Code2" size={16} className="mr-2" />
+                    Код редактор
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="ai" className="mt-6">
+                  <AIBotBuilder mode="professional" onBotGenerated={handleBotGenerated} />
+                </TabsContent>
+
+                <TabsContent value="builder" className="mt-6">
+                  {generatedBotConfig && (
+                    <Card className="mb-4 bg-green-50 border-green-200">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon name="CheckCircle" size={20} className="text-green-600" />
+                            <span className="font-semibold text-green-900">
+                              Бот создан ИИ-агентом: {generatedBotConfig.botName}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setGeneratedBotConfig(null)}
+                          >
+                            <Icon name="X" size={16} />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  )}
+                  <BotConstructor initialConfig={generatedBotConfig} />
+                </TabsContent>
+              </Tabs>
             </div>
           ) : (
             <div className="space-y-6">
@@ -92,7 +143,49 @@ const Constructor = () => {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <AdvancedVisualConstructor />
+
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="ai">
+                    <Icon name="Sparkles" size={16} className="mr-2" />
+                    ИИ-Агент
+                  </TabsTrigger>
+                  <TabsTrigger value="builder">
+                    <Icon name="Workflow" size={16} className="mr-2" />
+                    Визуальный редактор
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="ai" className="mt-6">
+                  <AIBotBuilder mode="visual" onBotGenerated={handleBotGenerated} />
+                </TabsContent>
+
+                <TabsContent value="builder" className="mt-6">
+                  {generatedBotConfig && (
+                    <Card className="mb-4 bg-green-50 border-green-200">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon name="CheckCircle" size={20} className="text-green-600" />
+                            <span className="font-semibold text-green-900">
+                              Workflow создан ИИ-агентом: {generatedBotConfig.botName}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setGeneratedBotConfig(null)}
+                          >
+                            <Icon name="X" size={16} />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  )}
+                  <AdvancedVisualConstructor initialConfig={generatedBotConfig} />
+                </TabsContent>
+              </Tabs>
             </div>
           )}
         </main>

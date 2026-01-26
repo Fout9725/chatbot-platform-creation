@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Test OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test empty prompt error",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "prompt": "",
+        "mode": "visual"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "Prompt is required"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

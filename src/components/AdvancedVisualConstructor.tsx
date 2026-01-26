@@ -39,11 +39,17 @@ const nodeTypes = [
   { type: 'end', label: 'Конец', icon: 'Flag', color: 'bg-red-500', desc: 'Завершение' },
 ];
 
-const AdvancedVisualConstructor = () => {
-  const [nodes, setNodes] = useState<Node[]>([
-    { id: 'start-1', type: 'start', x: 100, y: 100, data: { label: 'Начало' } }
-  ]);
-  const [connections, setConnections] = useState<Connection[]>([]);
+interface AdvancedVisualConstructorProps {
+  initialConfig?: any;
+}
+
+const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorProps) => {
+  const [nodes, setNodes] = useState<Node[]>(
+    initialConfig?.nodes || [
+      { id: 'start-1', type: 'start', x: 100, y: 100, data: { label: 'Начало' } }
+    ]
+  );
+  const [connections, setConnections] = useState<Connection[]>(initialConfig?.connections || []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [draggedNode, setDraggedNode] = useState<Node | null>(null);
   const [connecting, setConnecting] = useState<{ from: string; x: number; y: number } | null>(null);
