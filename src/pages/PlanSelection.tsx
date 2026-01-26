@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -13,9 +15,11 @@ const plans = [
     id: 'free',
     name: 'Бесплатный',
     price: 0,
+    yearlyPrice: 0,
     period: 'навсегда',
     icon: 'Rocket',
     color: 'from-gray-500 to-gray-600',
+    discount: 0,
     features: [
       '1 ИИ-агент',
       'До 100 сообщений/месяц',
@@ -31,10 +35,12 @@ const plans = [
     id: 'optimal',
     name: 'Оптимальный',
     price: 990,
+    yearlyPrice: 10692,
     period: 'в месяц',
     icon: 'Zap',
     color: 'from-blue-500 to-cyan-500',
     popular: true,
+    discount: 10,
     features: [
       'До 5 ИИ-агентов',
       'До 10,000 сообщений/месяц',
@@ -51,9 +57,11 @@ const plans = [
     id: 'premium',
     name: 'Премиум',
     price: 2990,
+    yearlyPrice: 30498,
     period: 'в месяц',
     icon: 'Crown',
     color: 'from-purple-500 to-pink-500',
+    discount: 15,
     features: [
       'Неограниченное количество ИИ-агентов',
       'До 100,000 сообщений/месяц',
@@ -73,10 +81,12 @@ const plans = [
     id: 'partner',
     name: 'Партнёрский',
     price: 9990,
+    yearlyPrice: 95904,
     period: 'в месяц',
     icon: 'Users',
     color: 'from-green-500 to-emerald-500',
     exclusive: true,
+    discount: 20,
     features: [
       'Всё из тарифа Премиум',
       'Конструктор Partner: все + приоритет',
@@ -102,6 +112,7 @@ const PlanSelection = () => {
   const [selectedPlan, setSelectedPlan] = useState<string>('optimal');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentPlan, setPaymentPlan] = useState<any>(null);
+  const [isYearly, setIsYearly] = useState(false);
 
   const handleSelectPlan = (planId: string) => {
     if (!isAuthenticated) {
@@ -168,9 +179,26 @@ const PlanSelection = () => {
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Выберите тарифный план
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
             Начните с бесплатного тарифа и масштабируйте по мере роста вашего бизнеса
           </p>
+
+          <div className="flex items-center justify-center gap-3">
+            <Label htmlFor="billing-toggle" className={!isYearly ? 'font-semibold' : ''}>
+              Ежемесячно
+            </Label>
+            <Switch
+              id="billing-toggle"
+              checked={isYearly}
+              onCheckedChange={setIsYearly}
+            />
+            <Label htmlFor="billing-toggle" className={isYearly ? 'font-semibold' : ''}>
+              Ежегодно
+            </Label>
+            {isYearly && (
+              <Badge className="bg-green-500">Экономия до 20%</Badge>
+            )}
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
@@ -209,10 +237,24 @@ const PlanSelection = () => {
                 <CardDescription>{plan.limits}</CardDescription>
                 <div className="mt-4">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold">{plan.price}₽</span>
-                    <span className="text-muted-foreground">/{plan.period}</span>
+                    {isYearly && plan.price > 0 ? (
+                      <>
+                        <span className="text-3xl font-bold">{plan.yearlyPrice.toLocaleString()}₽</span>
+                        <span className="text-muted-foreground">/год</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-3xl font-bold">{plan.price}₽</span>
+                        <span className="text-muted-foreground">/{plan.period}</span>
+                      </>
+                    )}
                   </div>
-                  {plan.earning && (
+                  {isYearly && plan.discount > 0 && (
+                    <Badge variant="outline" className="mt-2 text-xs text-green-600">
+                      Экономия {plan.discount}%
+                    </Badge>
+                  )}
+                  {!isYearly && plan.earning && (
                     <p className="text-sm text-green-600 font-medium mt-2">
                       {plan.earning}
                     </p>

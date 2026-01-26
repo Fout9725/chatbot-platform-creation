@@ -34,7 +34,7 @@ const Pricing = () => {
       name: 'Оптимальный',
       description: 'Для растущего бизнеса',
       monthlyPrice: 990,
-      yearlyPrice: 10890,
+      yearlyPrice: 10692,
       features: [
         { text: 'До 5 ИИ-агентов', included: true },
         { text: 'До 10,000 сообщений/месяц', included: true },
@@ -52,7 +52,7 @@ const Pricing = () => {
       name: 'Премиум',
       description: 'Для профессионалов',
       monthlyPrice: 2990,
-      yearlyPrice: 32890,
+      yearlyPrice: 30498,
       features: [
         { text: 'Неограниченное количество ИИ-агентов', included: true },
         { text: 'До 100,000 сообщений/месяц', included: true },
@@ -70,7 +70,7 @@ const Pricing = () => {
       name: 'Партнёрский',
       description: 'Зарабатывайте вместе с нами',
       monthlyPrice: 9990,
-      yearlyPrice: 109890,
+      yearlyPrice: 95904,
       features: [
         { text: 'Всё из тарифа Премиум', included: true },
         { text: 'Конструктор Partner: приоритет', included: true },
@@ -139,7 +139,7 @@ const Pricing = () => {
               Ежегодно
             </Label>
             {isYearly && (
-              <Badge className="bg-green-500 animate-scale-in">Экономия до 17%</Badge>
+              <Badge className="bg-green-500 animate-scale-in">Экономия до 20%</Badge>
             )}
           </div>
         </div>

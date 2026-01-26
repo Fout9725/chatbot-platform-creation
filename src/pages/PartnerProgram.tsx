@@ -186,6 +186,7 @@ const PartnerProgram = () => {
                   <div>
                     <div className="font-medium">Оптимальный</div>
                     <div className="text-sm text-muted-foreground">990₽/мес</div>
+                    <div className="text-xs text-green-600">Скидка на год: 10%</div>
                   </div>
                   <Badge className="bg-blue-600">198₽</Badge>
                 </div>
@@ -194,6 +195,7 @@ const PartnerProgram = () => {
                   <div>
                     <div className="font-medium">Премиум</div>
                     <div className="text-sm text-muted-foreground">2,990₽/мес</div>
+                    <div className="text-xs text-green-600">Скидка на год: 15%</div>
                   </div>
                   <Badge className="bg-purple-600">598₽</Badge>
                 </div>
@@ -201,9 +203,10 @@ const PartnerProgram = () => {
                 <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                   <div>
                     <div className="font-medium">Партнёрский</div>
-                    <div className="text-sm text-muted-foreground">4,990₽/мес</div>
+                    <div className="text-sm text-muted-foreground">9,990₽/мес</div>
+                    <div className="text-xs text-green-600">Скидка на год: 20%</div>
                   </div>
-                  <Badge className="bg-green-600">998₽</Badge>
+                  <Badge className="bg-green-600">1,998₽</Badge>
                 </div>
               </CardContent>
             </Card>
