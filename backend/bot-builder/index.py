@@ -47,12 +47,41 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'AI service temporarily unavailable'})
             }
         
+        # Используем сокращенную базу знаний если это первый запрос
+        use_full_knowledge = len(conversation_history) > 0
+        
+        knowledge_snippet = BOT_BUILDING_KNOWLEDGE if use_full_knowledge else """
+# Краткая база: Создание ботов
+
+## ВИЗУАЛЬНЫЙ (N8N):
+Ноды: Telegram Trigger → AI Agent (OpenAI + Memory) → Telegram Response
+RAG: Document → Embeddings → Vector Store → Search → AI Agent
+
+## ПРОФЕССИОНАЛЬНЫЙ (Python):
+```python
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+
+async def start(update, context):
+    await update.message.reply_text('Привет!')
+
+async def handle_message(update, context):
+    user_msg = update.message.text
+    await update.message.reply_text(f'Вы сказали: {user_msg}')
+
+app = Application.builder().token("TOKEN").build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT, handle_message))
+app.run_polling()
+```
+"""
+        
         system_prompt = f"""Ты — экспертный ИИ-агент для автоматического создания ботов в платформе ИнтеллектПро.
 
 **Текущий режим:** {'Визуальный конструктор (N8N)' if mode == 'visual' else 'Профессиональный режим (Код)'}
 
 **Твоя база знаний:**
-{BOT_BUILDING_KNOWLEDGE}
+{knowledge_snippet}
 
 **Твои задачи:**
 1. Понимать запрос пользователя и определять тип бота
@@ -140,7 +169,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'model': 'tngtech/deepseek-r1t2-chimera:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 4000
+            'max_tokens': 3000,
+            'stream': False
         }
         
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
@@ -164,7 +194,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     method='POST'
                 )
                 
-                response = urllib.request.urlopen(req, timeout=45)
+                response = urllib.request.urlopen(req, timeout=90)
                 response_data = json.loads(response.read().decode('utf-8'))
                 
                 ai_response = response_data['choices'][0]['message']['content']
