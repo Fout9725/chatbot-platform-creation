@@ -91,12 +91,12 @@ export default function EarningsCalculatorModal({ isOpen, onClose }: EarningsCal
                 value={avgPlan}
                 onChange={(e) => setAvgPlan(Number(e.target.value))}
                 min={990}
-                max={4990}
+                max={9990}
                 step={500}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Оптимальный: 990₽, Премиум: 2990₽, Партнёрский: 4990₽
+                Оптимальный: 990₽, Премиум: 2990₽, Партнёрский: 9990₽
               </p>
             </div>
           </div>

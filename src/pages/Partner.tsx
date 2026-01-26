@@ -57,7 +57,7 @@ const Partner = () => {
   const [recentReferrals] = useState([
     { id: 1, name: 'Иван И.', plan: 'Оптимальный', date: '2024-11-05', earning: 198 },
     { id: 2, name: 'Мария С.', plan: 'Премиум', date: '2024-11-04', earning: 598 },
-    { id: 3, name: 'Петр К.', plan: 'Партнёрский', date: '2024-11-03', earning: 998 },
+    { id: 3, name: 'Петр К.', plan: 'Партнёрский', date: '2024-11-03', earning: 1998 },
     { id: 4, name: 'Анна В.', plan: 'Оптимальный', date: '2024-11-02', earning: 198 },
   ]);
 
