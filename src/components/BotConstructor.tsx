@@ -29,10 +29,13 @@ interface BotConstructorProps {
 
 const BotConstructor = ({ initialConfig }: BotConstructorProps) => {
   const { toast } = useToast();
-  const [botName, setBotName] = useState(initialConfig?.botName || '');
+  
+  const safeInitialConfig = initialConfig && typeof initialConfig === 'object' && !initialConfig.isPlainText ? initialConfig : null;
+  
+  const [botName, setBotName] = useState(safeInitialConfig?.botName || '');
   const [botType, setBotType] = useState('');
   const [platform, setPlatform] = useState('');
-  const [description, setDescription] = useState(initialConfig?.description || '');
+  const [description, setDescription] = useState(safeInitialConfig?.description || '');
   const [aiModel, setAiModel] = useState('google/gemini-2.0-flash-exp:free');
   const [aiPrompt, setAiPrompt] = useState('Ты вежливый помощник. Отвечай кратко и по делу.');
   const [scenarios, setScenarios] = useState<ScenarioNode[]>([

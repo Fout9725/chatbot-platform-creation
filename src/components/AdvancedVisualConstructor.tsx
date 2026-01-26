@@ -44,12 +44,14 @@ interface AdvancedVisualConstructorProps {
 }
 
 const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorProps) => {
+  const safeInitialConfig = initialConfig && typeof initialConfig === 'object' && !initialConfig.isPlainText ? initialConfig : null;
+  
   const [nodes, setNodes] = useState<Node[]>(
-    initialConfig?.nodes || [
+    safeInitialConfig?.nodes || [
       { id: 'start-1', type: 'start', x: 100, y: 100, data: { label: 'Начало' } }
     ]
   );
-  const [connections, setConnections] = useState<Connection[]>(initialConfig?.connections || []);
+  const [connections, setConnections] = useState<Connection[]>(safeInitialConfig?.connections || []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [draggedNode, setDraggedNode] = useState<Node | null>(null);
   const [connecting, setConnecting] = useState<{ from: string; x: number; y: number } | null>(null);

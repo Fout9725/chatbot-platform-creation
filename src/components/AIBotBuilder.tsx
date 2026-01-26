@@ -67,31 +67,52 @@ const AIBotBuilder = ({ mode, onBotGenerated }: AIBotBuilderProps) => {
         })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      console.log('AI Bot Builder Response:', data);
 
       if (data.success && data.botConfig) {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: data.botConfig.description || 'Бот успешно создан!',
-          botConfig: data.botConfig,
-          timestamp: new Date()
-        };
+        if (data.botConfig.isPlainText) {
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: data.botConfig.rawResponse || data.botConfig.description || 'Ответ получен, но не в формате JSON. Попробуйте переформулировать запрос.',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          
+          toast({
+            title: 'Ответ получен',
+            description: 'ИИ ответил, но не в структурированном формате. Уточните запрос.',
+            variant: 'default'
+          });
+        } else {
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: data.botConfig.explanation || data.botConfig.description || 'Бот успешно создан!',
+            botConfig: data.botConfig,
+            timestamp: new Date()
+          };
 
-        setMessages(prev => [...prev, assistantMessage]);
+          setMessages(prev => [...prev, assistantMessage]);
 
-        if (onBotGenerated) {
-          onBotGenerated(data.botConfig);
+          if (onBotGenerated) {
+            onBotGenerated(data.botConfig);
+          }
+
+          toast({
+            title: '✨ Бот создан!',
+            description: data.botConfig.botName || 'Конфигурация готова к использованию'
+          });
         }
-
-        toast({
-          title: '✨ Бот создан!',
-          description: data.botConfig.botName || 'Конфигурация готова к использованию'
-        });
       } else {
         throw new Error(data.error || 'Не удалось создать бота');
       }
     } catch (error) {
       console.error('Bot generation error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       
       const errorMessage: Message = {
         role: 'assistant',
