@@ -137,16 +137,36 @@ const BotMarketplace = () => {
         onCategoryChange={setSelectedCategory} 
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <PriceFilter 
-          maxPrice={maxPrice}
-          priceRange={priceRange}
-          onPriceChange={setPriceRange}
-        />
-        <RatingFilter 
-          minRating={minRating}
-          onRatingChange={setMinRating}
-        />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Найдено ботов: {filteredBots.length}
+          </p>
+          {(searchQuery || selectedCategory !== 'Все' || priceRange[0] !== 0 || priceRange[1] !== maxPrice || minRating !== 0) && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('Все');
+                setPriceRange([0, maxPrice]);
+                setMinRating(0);
+              }}
+              className="text-sm text-primary hover:underline"
+            >
+              Сбросить фильтры
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <PriceFilter 
+            maxPrice={maxPrice}
+            priceRange={priceRange}
+            onPriceChange={setPriceRange}
+          />
+          <RatingFilter 
+            minRating={minRating}
+            onRatingChange={setMinRating}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -163,10 +183,21 @@ const BotMarketplace = () => {
       </div>
 
       {filteredBots.length === 0 && (
-        <div className="text-center py-12">
+        <div className="text-center py-12 space-y-4">
           <p className="text-muted-foreground text-sm md:text-base">
-            Ботов не найдено. Попробуйте изменить фильтры.
+            Ботов не найдено по запросу "{searchQuery || 'выбранным фильтрам'}"
           </p>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedCategory('Все');
+              setPriceRange([0, maxPrice]);
+              setMinRating(0);
+            }}
+            className="text-primary hover:underline text-sm"
+          >
+            Сбросить все фильтры
+          </button>
         </div>
       )}
       
