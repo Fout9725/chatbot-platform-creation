@@ -8,7 +8,7 @@ interface SearchBarProps {
 
 export default function SearchBar({ searchQuery, onSearchChange }: SearchBarProps) {
   return (
-    <div className="relative mb-6 z-10">
+    <div className="relative mb-6">
       <Icon
         name="Search"
         className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"

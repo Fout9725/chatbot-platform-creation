@@ -12,7 +12,7 @@ const ratings = [0, 3, 4, 4.5];
 
 export default function RatingFilter({ minRating, onRatingChange }: RatingFilterProps) {
   return (
-    <Card className="p-4 space-y-3 relative z-10">
+    <Card className="p-4 space-y-3">
       <Label className="text-sm font-semibold">Минимальный рейтинг</Label>
       <div className="flex flex-wrap gap-2">
         {ratings.map((rating) => (

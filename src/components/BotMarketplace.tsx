@@ -137,7 +137,7 @@ const BotMarketplace = () => {
         onCategoryChange={setSelectedCategory} 
       />
 
-      <div className="space-y-3 relative">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Найдено ботов: {filteredBots.length}
@@ -157,7 +157,7 @@ const BotMarketplace = () => {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PriceFilter 
             maxPrice={maxPrice}
             priceRange={priceRange}

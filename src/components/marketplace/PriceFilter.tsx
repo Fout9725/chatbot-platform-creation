@@ -20,7 +20,7 @@ export default function PriceFilter({ maxPrice, priceRange, onPriceChange }: Pri
   };
 
   return (
-    <Card className="p-4 space-y-3 relative z-10">
+    <Card className="p-4 space-y-3">
       <Label className="text-sm font-semibold">Цена покупки</Label>
       <div className="space-y-3">
         <div className="flex items-center gap-2">
