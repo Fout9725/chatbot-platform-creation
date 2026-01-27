@@ -1,0 +1,38 @@
+{
+  "tests": [
+    {
+      "name": "Test workflow generation with valid data",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "googleSheetId": "1A2B3C4D5E6F7G8H9I0J",
+        "anthropicApiKey": "sk-ant-test123",
+        "openaiApiKey": "sk-test456",
+        "cloudinaryCloudName": "test-cloud",
+        "cloudinaryApiKey": "123456789",
+        "cloudinaryApiSecret": "secret123",
+        "scheduleTime": "10:00"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "workflow": {
+          "name": "Instagram Post Automation"
+        }
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test missing required fields",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "googleSheetId": ""
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

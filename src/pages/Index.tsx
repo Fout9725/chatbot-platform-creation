@@ -82,6 +82,10 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/instagram-automation')}>
+                <Icon name="Instagram" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Instagram Авто</span>
+              </Button>
               <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/docs')}>
                 <Icon name="BookOpen" size={18} className="mr-2" />
                 <span className="hidden lg:inline">Документация</span>
