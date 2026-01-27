@@ -14,7 +14,7 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap gap-2 mb-6 relative z-10">
       {categories.map((category) => {
         const count = getCategoryCount(category);
         return (
@@ -22,12 +22,18 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
             key={category}
             variant={selectedCategory === category ? 'default' : 'outline'}
             size="sm"
-            className={`transition-all text-xs md:text-sm active:scale-95 ${
+            className={`transition-all text-xs md:text-sm active:scale-95 cursor-pointer ${
               selectedCategory === category
                 ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md'
                 : 'hover:bg-accent hover:border-primary/50'
             }`}
-            onClick={() => onCategoryChange(category)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Category clicked:', category);
+              onCategoryChange(category);
+            }}
+            type="button"
           >
             {category} <span className="ml-1.5 opacity-70">({count})</span>
           </Button>
