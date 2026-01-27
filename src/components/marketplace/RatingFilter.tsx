@@ -12,19 +12,24 @@ const ratings = [0, 3, 4, 4.5];
 
 export default function RatingFilter({ minRating, onRatingChange }: RatingFilterProps) {
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3 relative z-10">
       <Label className="text-sm font-semibold">Минимальный рейтинг</Label>
       <div className="flex flex-wrap gap-2">
         {ratings.map((rating) => (
           <Badge
             key={rating}
             variant={minRating === rating ? 'default' : 'outline'}
-            className={`cursor-pointer transition-all ${
+            className={`cursor-pointer transition-all select-none ${
               minRating === rating
                 ? 'bg-gradient-to-r from-primary to-secondary'
                 : 'hover:bg-accent'
             }`}
-            onClick={() => onRatingChange(rating)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Rating clicked:', rating);
+              onRatingChange(rating);
+            }}
           >
             <Icon name="Star" size={14} className={minRating === rating ? 'fill-white' : 'fill-yellow-500'} />
             <span className="ml-1">{rating === 0 ? 'Все' : `${rating}+`}</span>

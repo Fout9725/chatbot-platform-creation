@@ -135,11 +135,11 @@ const Index = () => {
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex-1">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-              <div className="flex gap-2 relative z-50">
-                <TabsList className="flex-1 grid grid-cols-1 h-auto p-1 relative z-50">
+              <div className="flex gap-2">
+                <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
                   <TabsTrigger 
                     value="marketplace" 
-                    className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
+                    className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   >
                     <Icon name="Store" size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="hidden sm:inline">Маркетплейс</span>
@@ -149,7 +149,7 @@ const Index = () => {
                 
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
+                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (!isAuthenticated) {
                       setIsAuthOpen(true);
@@ -167,7 +167,7 @@ const Index = () => {
 
                 <Button
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm relative z-50"
+                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (isAuthenticated) {
                       navigate('/my-bots');
