@@ -17,6 +17,12 @@ import { useAuth } from '@/contexts/AuthContext';
 const BotMarketplace = () => {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('Все');
+  
+  const handleCategoryChange = (category: string) => {
+    console.log('🔵 BotMarketplace: Category change requested:', category);
+    setSelectedCategory(category);
+    console.log('🟢 BotMarketplace: State updated to:', category);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   
   const maxPrice = useMemo(() => Math.max(...mockBots.map(bot => bot.price)), []);
@@ -134,7 +140,7 @@ const BotMarketplace = () => {
       <CategoryFilter 
         categories={categories} 
         selectedCategory={selectedCategory} 
-        onCategoryChange={setSelectedCategory} 
+        onCategoryChange={handleCategoryChange} 
       />
 
       <div className="space-y-3">
