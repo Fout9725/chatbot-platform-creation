@@ -14,7 +14,7 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap gap-2 mb-6 relative z-[99999] bg-red-500/50 p-4">
       {categories.map((category) => {
         const count = getCategoryCount(category);
         return (

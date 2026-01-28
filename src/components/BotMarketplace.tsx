@@ -128,7 +128,7 @@ const BotMarketplace = () => {
   const selectedBot = mockBots.find(bot => bot.id === paymentModal.botId);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative z-[1]">
       <div>
         <h2 className="text-xl md:text-2xl font-bold mb-2">Маркетплейс готовых решений</h2>
         <p className="text-sm md:text-base text-muted-foreground">
