@@ -182,7 +182,7 @@ const Index = () => {
                 </Button>
               </div>
 
-              <TabsContent value="marketplace" className="animate-fade-in">
+              <TabsContent value="marketplace" className="animate-fade-in pointer-events-auto">
                 <BotMarketplace />
               </TabsContent>
             </Tabs>

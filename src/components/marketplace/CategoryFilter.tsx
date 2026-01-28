@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { mockBots } from './mockBots';
 
 interface CategoryFilterProps {
@@ -14,18 +13,16 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6 relative z-[99999] bg-red-500/50 p-4">
+    <div className="flex flex-wrap gap-2 mb-6 relative z-50" style={{ pointerEvents: 'auto' }}>
       {categories.map((category) => {
         const count = getCategoryCount(category);
         return (
-          <Button
+          <button
             key={category}
-            variant={selectedCategory === category ? 'default' : 'outline'}
-            size="lg"
-            className={`min-h-[60px] px-6 text-lg font-bold ${
+            className={`min-h-[60px] px-6 text-lg font-bold rounded-md border-2 transition-all cursor-pointer ${
               selectedCategory === category
-                ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md'
-                : 'hover:bg-accent hover:border-primary/50'
+                ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md text-white border-transparent'
+                : 'hover:bg-accent hover:border-primary/50 border-border bg-background'
             }`}
             onClick={(e) => {
               e.preventDefault();
@@ -35,9 +32,10 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
               onCategoryChange(category);
             }}
             type="button"
+            style={{ pointerEvents: 'auto' }}
           >
             {category} <span className="ml-1.5 opacity-70">({count})</span>
-          </Button>
+          </button>
         );
       })}
     </div>
