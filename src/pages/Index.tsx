@@ -132,9 +132,9 @@ const Index = () => {
 
 
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="flex-1">
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6" style={{ pointerEvents: 'auto' }}>
+          <div className="flex-1" style={{ pointerEvents: 'auto' }}>
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6" style={{ pointerEvents: 'auto' }}>
               <div className="flex gap-2">
                 <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
                   <TabsTrigger 

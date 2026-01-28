@@ -20,7 +20,7 @@ export default function PriceFilter({ maxPrice, priceRange, onPriceChange }: Pri
   };
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3" style={{ pointerEvents: 'auto' }}>
       <Label className="text-sm font-semibold">Цена покупки</Label>
       <div className="space-y-3">
         <div className="flex items-center gap-2">
@@ -36,6 +36,7 @@ export default function PriceFilter({ maxPrice, priceRange, onPriceChange }: Pri
                 handleMinChange(e.target.value);
               }}
               className="h-9 cursor-text"
+              style={{ pointerEvents: 'auto' }}
             />
           </div>
           <div className="flex-1">
@@ -50,6 +51,7 @@ export default function PriceFilter({ maxPrice, priceRange, onPriceChange }: Pri
                 handleMaxChange(e.target.value);
               }}
               className="h-9 cursor-text"
+              style={{ pointerEvents: 'auto' }}
             />
           </div>
         </div>

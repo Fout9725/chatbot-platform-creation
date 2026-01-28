@@ -12,7 +12,7 @@ const ratings = [0, 3, 4, 4.5];
 
 export default function RatingFilter({ minRating, onRatingChange }: RatingFilterProps) {
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3" style={{ pointerEvents: 'auto' }}>
       <Label className="text-sm font-semibold">Минимальный рейтинг</Label>
       <div className="flex flex-wrap gap-2">
         {ratings.map((rating) => (
@@ -30,6 +30,7 @@ export default function RatingFilter({ minRating, onRatingChange }: RatingFilter
               console.log('Rating clicked:', rating);
               onRatingChange(rating);
             }}
+            style={{ pointerEvents: 'auto' }}
           >
             <Icon name="Star" size={14} className={minRating === rating ? 'fill-white' : 'fill-yellow-500'} />
             <span className="ml-1">{rating === 0 ? 'Все' : `${rating}+`}</span>
