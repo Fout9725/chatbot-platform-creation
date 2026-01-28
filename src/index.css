@@ -117,3 +117,14 @@
     linear-gradient(rgba(128, 128, 128, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(128, 128, 128, 0.1) 1px, transparent 1px);
 }
+
+/* Force enable pointer events for all interactive elements */
+input,
+button,
+a,
+select,
+textarea,
+[role="button"],
+[role="tab"] {
+  pointer-events: auto !important;
+}

@@ -118,7 +118,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8" style={{ pointerEvents: 'auto' }}>
         <div className="mb-6 md:mb-8 animate-fade-in">
           <h2 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
             Создавайте умных ИИ-сотрудников за минуты
