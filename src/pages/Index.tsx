@@ -14,6 +14,17 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('marketplace');
+
+  // Debug: глобальный перехватчик событий
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      console.log('🟢 GLOBAL CLICK:', e.target);
+      const target = e.target as HTMLElement;
+      console.log('Tag:', target.tagName, 'Classes:', target.className);
+    };
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, []);
   const [isConstructorOpen, setIsConstructorOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
