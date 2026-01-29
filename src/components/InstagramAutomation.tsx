@@ -101,7 +101,7 @@ const InstagramAutomation = () => {
               <Icon name="Instagram" className="text-white" size={32} />
             </div>
             <div>
-              <CardTitle className="text-2xl">Автоматизация постов для Instagram</CardTitle>
+              <CardTitle className="text-2xl">Автоматизация постов для Instagram*</CardTitle>
               <CardDescription>Генерация текста и картинок через n8n workflow</CardDescription>
             </div>
           </div>
@@ -357,6 +357,7 @@ const InstagramAutomation = () => {
           </Tabs>
         </CardContent>
       </Card>
+      <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
     </div>
   );
 };
