@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const InstagramAutomation = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [workflowJson, setWorkflowJson] = useState('');
@@ -86,6 +88,12 @@ const InstagramAutomation = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-4">
+        <Button variant="outline" onClick={() => navigate('/')}>
+          <Icon name="Home" size={18} className="mr-2" />
+          Главная
+        </Button>
+      </div>
       <Card className="border-2">
         <CardHeader>
           <div className="flex items-center gap-3">
