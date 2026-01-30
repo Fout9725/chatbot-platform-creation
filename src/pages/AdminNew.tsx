@@ -29,19 +29,10 @@ const AdminNew = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    const savedAuth = sessionStorage.getItem('adminAuthenticated');
-    console.log('🔐 Проверка авторизации админ-панели:', savedAuth);
-    if (savedAuth === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
-
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
-      sessionStorage.setItem('adminAuthenticated', 'true');
       toast({
         title: 'Доступ разрешён',
         description: 'Добро пожаловать в административную панель'
@@ -58,11 +49,11 @@ const AdminNew = () => {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('adminAuthenticated');
     toast({
       title: 'Выход выполнен',
       description: 'Вы вышли из административной панели'
     });
+    navigate('/');
   };
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [templateText, setTemplateText] = useState('');
