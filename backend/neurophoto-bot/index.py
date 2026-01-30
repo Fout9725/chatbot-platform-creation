@@ -537,7 +537,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"[WEBHOOK] Has callback_query: {'callback_query' in update}")
         print(f"[WEBHOOK] Has message: {'message' in update}")
         
-        bot_token = '8388674714:AAGkP3PmvRibKsPDpoX3z66ErPiKAfvQhy4'
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN', '8257588939:AAEYZYndyra3FLca5VpIFRkk8gHH1GGd48w')
         db_url = os.environ.get('DATABASE_URL')
         
         if not db_url:
