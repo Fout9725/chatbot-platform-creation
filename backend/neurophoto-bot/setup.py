@@ -7,7 +7,7 @@ import urllib.request
 import os
 
 # Конфигурация
-BOT_TOKEN = "8346998195:AAFZBCS2xPHCT-_AY191Fqr3TGpZ59HUKWg"
+BOT_TOKEN = "8257588939:AAEYZYndyra3FLca5VpIFRkk8gHH1GGd48w"
 BOT_NAME = "Нейрофотосессия PRO"
 BOT_DESCRIPTION = "AI-бот для генерации профессиональных изображений через DALL-E 3"
 WEBHOOK_URL = "https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f"
