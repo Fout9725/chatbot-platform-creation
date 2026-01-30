@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,11 +18,51 @@ import AdminDocsTab from '@/components/admin/AdminDocsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminBotBuilderTab from '@/components/admin/AdminBotBuilderTab';
 
+const ADMIN_PASSWORD = 'neuro2024';
+
 const AdminNew = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('stats');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const savedAuth = sessionStorage.getItem('adminAuthenticated');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('adminAuthenticated', 'true');
+      toast({
+        title: 'Доступ разрешён',
+        description: 'Добро пожаловать в административную панель'
+      });
+    } else {
+      toast({
+        title: 'Неверный пароль',
+        description: 'Попробуйте ещё раз',
+        variant: 'destructive'
+      });
+      setPassword('');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('adminAuthenticated');
+    toast({
+      title: 'Выход выполнен',
+      description: 'Вы вышли из административной панели'
+    });
+  };
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [templateText, setTemplateText] = useState('');
   const [n8nJson, setN8nJson] = useState('');
@@ -55,6 +97,55 @@ const AdminNew = () => {
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               Вернуться на главную
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="Lock" />
+              Вход в административную панель
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">Пароль</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Введите пароль"
+                    className="pr-10"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
+                  <Icon name="LogIn" size={18} className="mr-2" />
+                  Войти
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate('/')}>
+                  <Icon name="ArrowLeft" size={18} />
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>
@@ -164,10 +255,21 @@ const AdminNew = () => {
                 Управление платформой, ботами, шаблонами и контентом
               </p>
             </div>
-            <Badge variant="destructive" className="flex items-center gap-2">
-              <Icon name="Shield" size={16} />
-              Администратор
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant="destructive" className="flex items-center gap-2">
+                <Icon name="Shield" size={16} />
+                Администратор
+              </Badge>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+              >
+                <Icon name="LogOut" size={16} className="mr-2" />
+                Выход
+              </Button>
+            </div>
           </div>
         </div>
 
