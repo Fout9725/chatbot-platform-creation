@@ -890,7 +890,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addpro [@login] - выдать Pro подписку
+        # Команда /addpro [@login] - выдать Pro подписку (создает пользователя если не существует)
         if message_text.startswith('/addpro'):
             if not is_admin(telegram_id):
                 send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
@@ -904,18 +904,39 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
+                    # Сначала пробуем обновить существующего пользователя
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s RETURNING telegram_id, username", (user_id,))
+                    result = cur.fetchone()
+                    
+                    # Если пользователя нет - создаем нового с PRO подпиской
+                    if not result:
+                        cur.execute(
+                            f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, paid_generations) "
+                            f"VALUES (%s, %s, 999999) RETURNING telegram_id, username",
+                            (user_id, str(user_id))
+                        )
+                        result = cur.fetchone()
+                        conn.commit()
+                        send_telegram_message(bot_token, chat_id, f'✅ Создан новый пользователь с ID {user_id} и выдана Pro подписка')
+                    else:
+                        conn.commit()
+                        send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
+                        
                 except ValueError:
+                    # Поиск по username
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE username = %s RETURNING telegram_id, username", (user_input,))
-                
-                result = cur.fetchone()
-                if result:
-                    conn.commit()
-                    send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
-                else:
-                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+                    result = cur.fetchone()
+                    
+                    if result:
+                        conn.commit()
+                        send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
+                    else:
+                        send_telegram_message(bot_token, chat_id, f'❌ Пользователь @{user_input} не найден.\n\nℹ️ Для создания нового пользователя используйте Telegram ID вместо username.\nПример: /addpro 123456789')
+                        
+            except IndexError:
+                send_telegram_message(bot_token, chat_id, '❌ Формат: /addpro [@username или ID]\n\nПримеры:\n/addpro @coach_year\n/addpro 123456789')
             except Exception as e:
-                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addpro [@login или ID]')
+                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
