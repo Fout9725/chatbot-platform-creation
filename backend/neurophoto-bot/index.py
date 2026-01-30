@@ -537,19 +537,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"[PRIORITY] /start detected - bypassing deduplication and processing immediately")
                 chat_id = str(quick_message['chat']['id'])
                 telegram_id = quick_message['from']['id']
+                username = quick_message['from'].get('username', '')
+                first_name = quick_message['from'].get('first_name', 'User')
                 
-                # Очищаем сессию пользователя
+                # Создаем или обновляем пользователя и очищаем сессию
                 try:
                     cur.execute(
-                        f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
-                        f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
-                        f"WHERE telegram_id = %s",
-                        (telegram_id,)
+                        f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) "
+                        f"VALUES (%s, %s, %s) "
+                        f"ON CONFLICT (telegram_id) DO UPDATE SET "
+                        f"username = EXCLUDED.username, first_name = EXCLUDED.first_name, "
+                        f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL",
+                        (telegram_id, username, first_name)
                     )
                     conn.commit()
-                    print(f"[PRIORITY] User {telegram_id} session cleared")
+                    print(f"[PRIORITY] User {telegram_id} (@{username}) created/updated and session cleared")
                 except Exception as e:
-                    print(f"[PRIORITY] Failed to clear session: {e}")
+                    print(f"[PRIORITY] Failed to create/update user: {e}")
                 
                 help_text = (
                     '🎨 <b>Нейрофотосессия PRO</b>\n\n'
