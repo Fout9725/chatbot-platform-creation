@@ -79,30 +79,6 @@ const AdminNew = () => {
     { id: 'admin-001', name: 'Администратор', email: 'admin@intellectpro.ru', plan: 'partner' as const, role: 'admin' as const, registeredAt: '01.01.2024', activeBots: 0, status: 'active' as const },
   ]);
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <Icon name="ShieldAlert" />
-              Доступ запрещён
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Эта страница доступна только администраторам.
-            </p>
-            <Button onClick={() => navigate('/')}>
-              <Icon name="ArrowLeft" size={18} className="mr-2" />
-              Вернуться на главную
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white flex items-center justify-center">
