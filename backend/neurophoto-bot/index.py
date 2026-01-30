@@ -9,12 +9,11 @@ import boto3
 
 ADMIN_IDS = [285675692]  # Список ID администраторов
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.21 - Удалили бесплатные модели (в OpenRouter их нет), оставили только Pro
+# v3.22 - Убрали бесплатные модели полностью, теперь только платная подписка PRO
 # v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
 
-IMAGE_MODELS = {
-    'free': [],
-    'paid': [
+IMAGE_MODELS = [
+    {
         {
             'id': 'google/gemini-3-pro-image-preview',
             'name': 'Gemini 3 Pro',
@@ -39,14 +38,13 @@ IMAGE_MODELS = {
             'emoji': '💫',
             'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
         },
-        {
-            'id': 'openai/gpt-5-image',
-            'name': 'GPT-5 Image',
-            'emoji': '🎨',
-            'info': 'Новейшая модель OpenAI. Революционное качество генерации.'
-        }
-    ]
-}
+    {
+        'id': 'openai/gpt-5-image',
+        'name': 'GPT-5 Image',
+        'emoji': '🎨',
+        'info': 'Новейшая модель OpenAI. Революционное качество генерации.'
+    }
+]
 
 def is_admin(telegram_id: int) -> bool:
     '''Проверка является ли пользователь администратором'''
@@ -473,29 +471,15 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         print(traceback.format_exc())
         return None
 
-def get_model_keyboard(tier: str):
-    '''Генерация клавиатуры выбора модели по тарифу'''
+def get_model_keyboard():
+    '''Генерация клавиатуры выбора модели'''
     buttons = []
     
-    if tier == 'free':
-        for model in IMAGE_MODELS['free']:
-            buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
-    else:
-        for model in IMAGE_MODELS['paid']:
-            buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
+    for model in IMAGE_MODELS:
+        buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
     
     buttons.append([{'text': '↩️ Назад', 'callback_data': 'back'}])
     return {'inline_keyboard': buttons}
-
-def get_tier_keyboard():
-    '''Клавиатура выбора тарифа'''
-    return {
-        'inline_keyboard': [
-            [{'text': '🆓 Бесплатная модель', 'callback_data': 'tier:free'}],
-            [{'text': '💎 Pro модели', 'callback_data': 'tier:paid'}],
-            [{'text': '↩️ Назад', 'callback_data': 'back'}]
-        ]
-    }
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''Telegram бот для генерации AI-изображений (Нейрофотосессия)'''
@@ -579,15 +563,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     '1. Выберите модель командой /models\n'
                     '2. Опишите изображение текстом\n'
                     '3. Получите фото за 10-60 секунд\n\n'
-                    '<b>Доступно только Pro:</b>\n'
-                    '<b>Pro модели:</b>\n'
+                    '<b>Доступные модели:</b>\n'
                     '💎 Gemini 3 Pro - топ от Google\n'
+                    '⚡ Gemini 2.5 Flash - быстрая Pro-версия\n'
                     '🌟 FLUX 2 Flex - любые стили\n'
                     '💫 FLUX 2 Pro - максимум качества\n'
                     '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
-                    '<b>Тарифы:</b>\n'
-                    '🆓 Бесплатно: 3 изображения\n'
-                    '💎 PRO: 299₽/мес - безлимит + Pro модели'
+                    '<b>Тариф:</b>\n'
+                    '💎 PRO: 299₽/мес - безлимит'
                 )
                 send_telegram_message(bot_token, chat_id, help_text)
                 cur.close()
@@ -658,14 +641,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.commit()
                 print("[CALLBACK] User created/updated")
                 
-                if data == 'tier:free':
-                    print("[CALLBACK] Showing free models keyboard")
-                    keyboard = get_model_keyboard('free')
-                    print(f"[CALLBACK] Keyboard generated: {keyboard}")
-                    result = send_telegram_message(bot_token, chat_id, '🆓 <b>Бесплатные модели:</b>\n\nВыберите модель:', keyboard)
-                    print(f"[CALLBACK] Message sent: {result}")
-                
-                elif data == 'tier:paid':
+                if data == 'tier:paid' or data == 'tier:free':
                     print("[CALLBACK] Checking paid status")
                     cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
                     user = cur.fetchone()
@@ -675,9 +651,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     
                     if not is_paid:
                         result = send_telegram_message(bot_token, chat_id, 
-                            '💎 <b>Pro модели доступны только по подписке</b>\n\n'
+                            '💎 <b>Доступ только по подписке</b>\n\n'
                             '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
                             '✅ Gemini 3 Pro - топовая модель Google\n'
+                            '✅ Gemini 2.5 Flash - быстрая Pro-версия\n'
+                            '✅ FLUX 2 Flex - гибкая генерация\n'
                             '✅ FLUX 2 Pro - максимальное качество\n'
                             '✅ GPT-5 Image - новейшая от OpenAI\n'
                             '✅ Неограниченные генерации\n'
@@ -686,10 +664,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         )
                         print(f"[CALLBACK] Subscription message sent: {result}")
                     else:
-                        keyboard = get_model_keyboard('paid')
-                        print(f"[CALLBACK] Paid keyboard generated: {keyboard}")
-                        result = send_telegram_message(bot_token, chat_id, '💎 <b>Pro модели:</b>\n\nВыберите модель:', keyboard)
-                        print(f"[CALLBACK] Paid models message sent: {result}")
+                        keyboard = get_model_keyboard()
+                        print(f"[CALLBACK] Model keyboard generated: {keyboard}")
+                        result = send_telegram_message(bot_token, chat_id, '💎 <b>Выберите модель:</b>', keyboard)
+                        print(f"[CALLBACK] Models message sent: {result}")
                 
                 elif data.startswith('model:'):
                     model_id = data.split(':', 1)[1]
@@ -697,8 +675,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
                     conn.commit()
                     
-                    all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-                    selected_model = next((m for m in all_models if m['id'] == model_id), None)
+                    selected_model = next((m for m in IMAGE_MODELS if m['id'] == model_id), None)
                     
                     if selected_model:
                         model_text = (
@@ -1142,7 +1119,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if message_text == '/models':
-            send_telegram_message(bot_token, chat_id, '📱 <b>Выберите тариф:</b>', get_tier_keyboard())
+            # Проверка подписки
+            cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+            user = cur.fetchone()
+            is_paid = user and user['paid_generations'] > 0 if user else False
+            
+            if not is_paid:
+                send_telegram_message(bot_token, chat_id,
+                    '💎 <b>Доступ только по подписке</b>\n\n'
+                    '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
+                    '✅ Gemini 3 Pro - топовая модель Google\n'
+                    '✅ Gemini 2.5 Flash - быстрая Pro-версия\n'
+                    '✅ FLUX 2 Flex - гибкая генерация\n'
+                    '✅ FLUX 2 Pro - максимальное качество\n'
+                    '✅ GPT-5 Image - новейшая от OpenAI\n'
+                    '✅ Неограниченные генерации\n'
+                    '✅ Приоритетная обработка\n\n'
+                    'Для оплаты напишите: /pay'
+                )
+            else:
+                send_telegram_message(bot_token, chat_id, '💎 <b>Выберите модель:</b>', get_model_keyboard())
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
