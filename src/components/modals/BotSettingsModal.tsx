@@ -301,8 +301,8 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
                     <Icon name="Instagram" size={24} className="text-pink-600" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold">Instagram</h4>
-                    <p className="text-sm text-muted-foreground">Подключите бота к Instagram Direct</p>
+                    <h4 className="font-semibold">Instagram*</h4>
+                    <p className="text-sm text-muted-foreground">Подключите бота к Instagram* Direct</p>
                   </div>
                 </div>
                 <Input placeholder="API токен" disabled />
@@ -404,6 +404,11 @@ export default function BotSettingsModal({ isOpen, onClose, botName }: BotSettin
             <Icon name="Save" size={16} className="mr-2" />
             Сохранить настройки
           </Button>
+        </div>
+        <div className="pt-2 pb-2 border-t">
+          <p className="text-xs text-muted-foreground text-center">
+            * Instagram признан экстремистской организацией и запрещен на территории РФ
+          </p>
         </div>
       </DialogContent>
     </Dialog>

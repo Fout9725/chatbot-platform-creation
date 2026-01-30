@@ -261,8 +261,12 @@ const SocialMediaGuide = () => {
             </div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
       </CardContent>
+      <div className="border-t pt-4 px-6 pb-6">
+        <p className="text-xs text-muted-foreground text-center">
+          * Instagram признан экстремистской организацией и запрещен на территории РФ
+        </p>
+      </div>
     </Card>
   );
 };
