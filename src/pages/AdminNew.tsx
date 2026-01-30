@@ -29,6 +29,11 @@ const AdminNew = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    sessionStorage.removeItem('adminAuthenticated');
+    localStorage.removeItem('adminAuthenticated');
+  }, []);
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === ADMIN_PASSWORD) {
