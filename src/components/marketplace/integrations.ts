@@ -59,11 +59,11 @@ export const whatsappIntegration: Integration = {
 
 export const instagramIntegration: Integration = {
   id: 'instagram-messaging',
-  name: 'Instagram Messaging API',
+  name: 'Instagram* Messaging API',
   type: 'instagram',
   status: 'active',
   config: {
-    description: 'Интеграция с Instagram Direct через Facebook API',
+    description: 'Интеграция с Instagram* Direct через Facebook API',
     features: [
       'Ответы в Direct',
       'Автоматические приветствия',
@@ -72,12 +72,12 @@ export const instagramIntegration: Integration = {
       'Быстрые ответы'
     ],
     requirements: {
-      pageId: 'ID страницы Instagram',
+      pageId: 'ID страницы Instagram*',
       accessToken: 'Токен доступа',
       appId: 'ID приложения Facebook'
     },
     setupSteps: [
-      '1. Подключите Instagram к странице Facebook',
+      '1. Подключите Instagram* к странице Facebook',
       '2. Создайте приложение в Facebook Developers',
       '3. Получите права instagram_manage_messages',
       '4. Добавьте токен доступа',

@@ -114,7 +114,8 @@ const SocialMediaGuide = () => {
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-3">
                 <Icon name="Instagram" size={20} className="text-pink-500" />
-                <span className="font-semibold">Instagram</span>
+                <span className="font-semibold">Instagram*</span>
+                <Badge variant="outline" className="text-xs ml-2">Запрещен в РФ</Badge>
               </div>
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -260,6 +261,7 @@ const SocialMediaGuide = () => {
             </div>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
       </CardContent>
     </Card>
   );

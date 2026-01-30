@@ -131,7 +131,7 @@ const MessengerIntegration = () => {
       case 'telegram': return 'Telegram';
       case 'whatsapp': return 'WhatsApp';
       case 'vk': return 'ВКонтакте';
-      case 'instagram': return 'Instagram';
+      case 'instagram': return 'Instagram*';
       default: return platform;
     }
   };
@@ -339,6 +339,7 @@ const MessengerIntegration = () => {
           </Tabs>
         </CardContent>
       </Card>
+      <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
     </div>
   );
 };

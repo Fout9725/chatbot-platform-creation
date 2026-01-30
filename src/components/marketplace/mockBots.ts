@@ -4,7 +4,7 @@ export const mockBots: Bot[] = [
   {
     id: 1,
     name: 'Помощник продаж',
-    description: 'Отвечает на вопросы о товаре, отправляет коммерческие предложения и записывает клиентов на консультацию через Instagram Direct и WhatsApp',
+    description: 'Отвечает на вопросы о товаре, отправляет коммерческие предложения и записывает клиентов на консультацию через Instagram* Direct и WhatsApp',
     category: 'Продажи',
     price: 45000,
     rentPrice: 3000,

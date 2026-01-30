@@ -162,7 +162,7 @@ const BotConstructor = ({ initialConfig }: BotConstructorProps) => {
                 <SelectContent>
                   <SelectItem value="telegram">Telegram</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="instagram">Instagram* <Badge variant="outline" className="text-xs ml-1">Запрещен в РФ</Badge></SelectItem>
                   <SelectItem value="vk">ВКонтакте</SelectItem>
                   <SelectItem value="web">Веб-сайт</SelectItem>
                 </SelectContent>
@@ -404,6 +404,7 @@ const BotConstructor = ({ initialConfig }: BotConstructorProps) => {
           <SocialMediaGuide />
         </div>
       </div>
+      <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
     </div>
   );
 };

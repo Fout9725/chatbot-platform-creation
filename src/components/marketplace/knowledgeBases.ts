@@ -239,7 +239,7 @@ export const marketingKnowledgeBase: KnowledgeBase[] = [
 - Вовлекающий (10%) - опросы, конкурсы
 
 **Частота постов:**
-- Instagram: 1-2 раза в день
+- Instagram*: 1-2 раза в день
 - VK: 2-3 раза в день
 - Telegram: 3-5 постов в день
 - Facebook: 1 раз в день

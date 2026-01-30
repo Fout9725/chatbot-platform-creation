@@ -38,7 +38,7 @@ const BotDetails = () => {
   const apiIntegrations = [
     { name: 'Telegram Bot API', status: 'connected', icon: 'Send', color: 'text-blue-500' },
     { name: 'WhatsApp Business', status: 'connected', icon: 'MessageCircle', color: 'text-green-500' },
-    { name: 'Instagram Graph API', status: 'disconnected', icon: 'Instagram', color: 'text-pink-500' },
+    { name: 'Instagram* Graph API', status: 'disconnected', icon: 'Instagram', color: 'text-pink-500' },
     { name: 'VK API', status: 'disconnected', icon: 'Share2', color: 'text-blue-600' },
   ];
 
@@ -383,6 +383,8 @@ const BotDetails = () => {
           </TabsContent>
         </Tabs>
       </main>
+      
+      <p className="text-xs text-muted-foreground text-center mt-6 mb-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
       
       <BotSettingsModal 
         isOpen={isSettingsOpen} 
