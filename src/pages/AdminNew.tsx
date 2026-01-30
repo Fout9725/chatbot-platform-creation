@@ -31,6 +31,7 @@ const AdminNew = () => {
 
   useEffect(() => {
     const savedAuth = sessionStorage.getItem('adminAuthenticated');
+    console.log('🔐 Проверка авторизации админ-панели:', savedAuth);
     if (savedAuth === 'true') {
       setIsAuthenticated(true);
     }
