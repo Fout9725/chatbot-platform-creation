@@ -14,30 +14,29 @@ DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
 
 IMAGE_MODELS = [
     {
-        {
-            'id': 'google/gemini-3-pro-image-preview',
-            'name': 'Gemini 3 Pro',
-            'emoji': '💎',
-            'info': 'Топовая модель Google для профессиональной генерации изображений.'
-        },
-        {
-            'id': 'google/gemini-2.5-flash-image',
-            'name': 'Gemini 2.5 Flash',
-            'emoji': '⚡',
-            'info': 'Быстрая Pro-версия с расширенными возможностями обработки.'
-        },
-        {
-            'id': 'black-forest-labs/flux.2-flex',
-            'name': 'FLUX 2 Flex',
-            'emoji': '🌟',
-            'info': 'Гибкая генерация любых стилей. От реализма до арта.'
-        },
-        {
-            'id': 'black-forest-labs/flux.2-pro',
-            'name': 'FLUX 2 Pro',
-            'emoji': '💫',
-            'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
-        },
+        'id': 'google/gemini-3-pro-image-preview',
+        'name': 'Gemini 3 Pro',
+        'emoji': '💎',
+        'info': 'Топовая модель Google для профессиональной генерации изображений.'
+    },
+    {
+        'id': 'google/gemini-2.5-flash-image',
+        'name': 'Gemini 2.5 Flash',
+        'emoji': '⚡',
+        'info': 'Быстрая Pro-версия с расширенными возможностями обработки.'
+    },
+    {
+        'id': 'black-forest-labs/flux.2-flex',
+        'name': 'FLUX 2 Flex',
+        'emoji': '🌟',
+        'info': 'Гибкая генерация любых стилей. От реализма до арта.'
+    },
+    {
+        'id': 'black-forest-labs/flux.2-pro',
+        'name': 'FLUX 2 Pro',
+        'emoji': '💫',
+        'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
+    },
     {
         'id': 'openai/gpt-5-image',
         'name': 'GPT-5 Image',
@@ -641,35 +640,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.commit()
                 print("[CALLBACK] User created/updated")
                 
-                if data == 'tier:paid' or data == 'tier:free':
-                    print("[CALLBACK] Checking paid status")
-                    cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
-                    user = cur.fetchone()
-                    is_paid = user and user['paid_generations'] > 0 if user else False
-                    
-                    print(f"[CALLBACK] User paid status: {is_paid}, paid_generations: {user['paid_generations'] if user else 'None'}")
-                    
-                    if not is_paid:
-                        result = send_telegram_message(bot_token, chat_id, 
-                            '💎 <b>Доступ только по подписке</b>\n\n'
-                            '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
-                            '✅ Gemini 3 Pro - топовая модель Google\n'
-                            '✅ Gemini 2.5 Flash - быстрая Pro-версия\n'
-                            '✅ FLUX 2 Flex - гибкая генерация\n'
-                            '✅ FLUX 2 Pro - максимальное качество\n'
-                            '✅ GPT-5 Image - новейшая от OpenAI\n'
-                            '✅ Неограниченные генерации\n'
-                            '✅ Приоритетная обработка\n\n'
-                            'Для оплаты напишите: /pay'
-                        )
-                        print(f"[CALLBACK] Subscription message sent: {result}")
-                    else:
-                        keyboard = get_model_keyboard()
-                        print(f"[CALLBACK] Model keyboard generated: {keyboard}")
-                        result = send_telegram_message(bot_token, chat_id, '💎 <b>Выберите модель:</b>', keyboard)
-                        print(f"[CALLBACK] Models message sent: {result}")
-                
-                elif data.startswith('model:'):
+                if data.startswith('model:'):
                     model_id = data.split(':', 1)[1]
                     print(f"[CALLBACK] Setting model: {model_id}")
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
@@ -885,12 +856,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            cur.execute(f"SELECT telegram_id, username, first_name, total_used, free_generations, paid_generations FROM {DB_SCHEMA}.neurophoto_users ORDER BY created_at DESC LIMIT 20")
+            cur.execute(f"SELECT telegram_id, username, first_name, total_used, paid_generations FROM {DB_SCHEMA}.neurophoto_users ORDER BY created_at DESC LIMIT 20")
             users = cur.fetchall()
             
             users_text = '👥 <b>Последние 20 пользователей:</b>\n\n'
             for user in users:
-                status = '💎 Pro' if user['paid_generations'] > 0 else f"🆓 {user['free_generations']}"
+                status = '💎 Pro' if user['paid_generations'] > 0 else '❌'
                 users_text += f"{user['telegram_id']} (@{user['username'] or 'noname'}) - {user['total_used']} ген. - {status}\n"
             
             send_telegram_message(bot_token, chat_id, users_text)
@@ -1103,15 +1074,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 '1. Выберите модель командой /models\n'
                 '2. Опишите изображение текстом\n'
                 '3. Получите фото за 10-60 секунд\n\n'
-                '<b>Доступно только Pro:</b>\n'
-                '<b>Pro модели:</b>\n'
+                '<b>Доступные модели:</b>\n'
                 '💎 Gemini 3 Pro - топ от Google\n'
+                '⚡ Gemini 2.5 Flash - быстрая Pro-версия\n'
                 '🌟 FLUX 2 Flex - любые стили\n'
                 '💫 FLUX 2 Pro - максимум качества\n'
                 '🎨 GPT-5 Image - новейшая от OpenAI\n\n'
-                '<b>Тарифы:</b>\n'
-                '💎 PRO: 299₽/мес - безлимит генерации\n\n'
-                'Напишите /pay для подключения'
+                '<b>Тариф:</b>\n'
+                '💎 PRO: 299₽/мес - безлимит\n\n'
+                'Напишите /pay для подключения PRO'
             )
             send_telegram_message(bot_token, chat_id, help_text)
             cur.close()
@@ -1144,24 +1115,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if message_text == '/stats':
-            cur.execute(f"SELECT free_generations, paid_generations, total_used, preferred_model FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+            cur.execute(f"SELECT paid_generations, total_used, preferred_model FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
             user = cur.fetchone()
             
             if user:
                 is_paid = user['paid_generations'] > 0
-                all_models = IMAGE_MODELS['paid']
-                model_name = next((m['name'] for m in all_models if m['id'] == user.get('preferred_model', '')), 'GPT-5 Image')
+                model_name = next((m['name'] for m in IMAGE_MODELS if m['id'] == user.get('preferred_model', '')), 'GPT-5 Image')
                 
                 stats_text = (
                     f'📊 <b>Ваша статистика</b>\n\n'
                     f'🎨 Текущая модель: {model_name}\n'
                     f'📈 Всего сгенерировано: {user["total_used"]}\n'
-                    f'🆓 Бесплатных осталось: {user["free_generations"]}\n'
                 )
                 if is_paid:
                     stats_text += f'💎 Pro доступ: активен (безлимит)\n'
                 else:
-                    stats_text += '\n💡 Хотите безлимит? Напишите /pay'
+                    stats_text += '\n💎 Для доступа к генерации напишите /pay'
             else:
                 stats_text = '❌ Пользователь не найден. Напишите /start'
             
@@ -1231,19 +1200,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Проверка доступа к платной модели
-        is_paid_model = preferred_model not in [m['id'] for m in IMAGE_MODELS['free']]
-        if is_paid_model and not is_paid:
-            send_telegram_message(bot_token, chat_id, 
-                '⚠️ Вы выбрали Pro модель, но у вас нет подписки.\n\n'
-                'Используется GPT-5 Image.\n\n'
-                'Напишите /pay для подключения Pro'
-            )
-            preferred_model = 'openai/gpt-5-image'
-        
         print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}, Photos: {len(photo_urls)}")
-        all_models = IMAGE_MODELS['free'] + IMAGE_MODELS['paid']
-        model_name = next((m['name'] for m in all_models if m['id'] == preferred_model), preferred_model)
+        model_name = next((m['name'] for m in IMAGE_MODELS if m['id'] == preferred_model), preferred_model)
         
         # Список моделей с поддержкой vision (работа с фото)
         vision_models = [
