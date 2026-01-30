@@ -27,8 +27,6 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('🔴 Category clicked:', category);
-              alert(`Клик по категории: ${category}`);
               onCategoryChange(category);
             }}
             type="button"
