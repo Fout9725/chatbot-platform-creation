@@ -244,54 +244,14 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     print(f"[OPENROUTER] Request size: {len(data)} bytes")
     
     try:
-        print(f"[OPENROUTER] Opening connection with 120s timeout...")
-        with urllib.request.urlopen(req, timeout=120) as response:
-            print(f"[OPENROUTER] Got response! Status: {response.status}")
-            print(f"[OPENROUTER] Reading response body in chunks (streaming mode)...")
+        print(f"[OPENROUTER] Sending request to API...")
+        with urllib.request.urlopen(req, timeout=180) as response:
+            # CRITICAL: Быстро читаем весь ответ БЕЗ логирования промежуточных шагов
+            response_body = response.read().decode('utf-8')
+            print(f"[OPENROUTER] ✅ Response received: {len(response_body)} bytes")
             
-            # CRITICAL: Читаем ОГРОМНЫЕ ответы по частям, чтобы не превысить таймаут
-            try:
-                chunks = []
-                total_size = 0
-                chunk_count = 0
-                
-                # Читаем по 512 KB за раз
-                while True:
-                    chunk = response.read(512 * 1024)  # 512 KB chunks
-                    if not chunk:
-                        break
-                    chunks.append(chunk)
-                    total_size += len(chunk)
-                    chunk_count += 1
-                    
-                    # Логируем каждые 2 MB для отладки
-                    if chunk_count % 4 == 0:
-                        print(f"[OPENROUTER] Read {total_size / (1024*1024):.1f} MB so far ({chunk_count} chunks)...")
-                
-                response_body = b''.join(chunks).decode('utf-8')
-                print(f"[OPENROUTER] ✅ Response fully read: {len(response_body)} bytes ({len(response_body)/(1024*1024):.2f} MB)")
-            except Exception as read_error:
-                print(f"[ERROR] Failed to read response body: {type(read_error).__name__}: {read_error}")
-                import traceback
-                print(traceback.format_exc())
-                return None
-            
-            print(f"[OPENROUTER] Parsing JSON...")
             result = json.loads(response_body)
-            print(f"[OPENROUTER] ✅ JSON parsed successfully")
-            
-            # CRITICAL: Выводим ПОЛНЫЙ ответ для диагностики (без огромных base64)
             print(f"[OPENROUTER] Response keys: {list(result.keys())}")
-            print(f"[OPENROUTER] Choices count: {len(result.get('choices', []))}")
-            
-            # Выводим весь ответ, но ограничиваем размер каждого поля
-            result_debug = {}
-            for key, val in result.items():
-                if isinstance(val, str) and len(val) > 500:
-                    result_debug[key] = f"{val[:500]}... (truncated, total {len(val)} chars)"
-                else:
-                    result_debug[key] = val
-            print(f"[OPENROUTER] Full response: {json.dumps(result_debug, ensure_ascii=False, indent=2)}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
@@ -299,128 +259,40 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                 return None
             
             message = result['choices'][0].get('message', {})
-            print(f"[OPENROUTER] Message keys: {list(message.keys())}")
             
-            # CRITICAL: Check for refusal first (model rejected the request)
-            if 'refusal' in message and message['refusal']:
-                print(f"[ERROR] Model refused the request: {message['refusal']}")
-                return None
-            
-            content = message.get('content', '')
-            print(f"[OPENROUTER] Content type: {type(content).__name__}")
-            if isinstance(content, str):
-                print(f"[OPENROUTER] Content length: {len(content)} chars")
-                if len(content) > 0:
-                    print(f"[OPENROUTER] Content preview: {content[:100]}...")
-            elif isinstance(content, dict):
-                print(f"[OPENROUTER] Content dict keys: {list(content.keys())}")
-            elif isinstance(content, list):
-                print(f"[OPENROUTER] Content list length: {len(content)}")
-            
-            # ===== STRATEGY 1: Check 'images' field in message (PRIMARY FOR IMAGE GENERATION) =====
-            # CRITICAL: Gemini 3 Pro и другие модели генерации изображений возвращают массив изображений
+            # CRITICAL: Для Gemini моделей изображение в поле 'images'
             if 'images' in message:
                 images = message['images']
-                print(f"[OPENROUTER] ✅ Found 'images' field: {type(images).__name__}")
-                
                 if isinstance(images, list) and len(images) > 0:
-                    first_image = images[0]
-                    print(f"[OPENROUTER] ✅ Returning first image from list (type: {type(first_image).__name__}, size: {len(str(first_image))} chars)")
-                    return first_image
+                    print(f"[OPENROUTER] ✅ Found image in 'images' field")
+                    return images[0]
                 elif isinstance(images, str):
-                    print(f"[OPENROUTER] ✅ Returning images string (size: {len(images)} chars)")
+                    print(f"[OPENROUTER] ✅ Found image string")
                     return images
-                else:
-                    print(f"[OPENROUTER] ⚠️ Unexpected images type: {type(images).__name__}")
-            else:
-                print(f"[OPENROUTER] No 'images' field in message")
             
-            # ===== STRATEGY 2: Check content as list (structured content with image_url) =====
+            # Fallback: проверяем content
+            content = message.get('content', '')
+            
+            # Проверка content как список
             if isinstance(content, list):
-                print(f"[OPENROUTER] Content is list with {len(content)} items")
-                for i, item in enumerate(content):
-                    if isinstance(item, dict):
-                        if item.get('type') == 'image_url':
-                            img_url = item.get('image_url', {}).get('url', '')
-                            if img_url:
-                                print(f"[OPENROUTER] ✅ Found image_url in list item {i}")
-                                return img_url
-                        if 'url' in item:
-                            print(f"[OPENROUTER] ✅ Found url in list item {i}")
-                            return item['url']
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'image_url':
+                        img_url = item.get('image_url', {}).get('url', '')
+                        if img_url:
+                            return img_url
             
-            # ===== STRATEGY 3: Check content as dict (structured response) =====
-            elif isinstance(content, dict):
-                print(f"[OPENROUTER] Content is dict")
-                if 'url' in content:
-                    print(f"[OPENROUTER] ✅ Found url in dict")
-                    return content['url']
-                if 'data' in content:
-                    print(f"[OPENROUTER] ✅ Found data in dict")
-                    return content['data']
-                if 'image_url' in content:
-                    img_data = content['image_url']
-                    if isinstance(img_data, dict) and 'url' in img_data:
-                        print(f"[OPENROUTER] ✅ Found nested image_url.url")
-                        return img_data['url']
-                    elif isinstance(img_data, str):
-                        print(f"[OPENROUTER] ✅ Found image_url as string")
-                        return img_data
-            
-            # ===== STRATEGY 4: Check content as string (base64 or URL) =====
+            # Проверка content как строка с base64
             elif isinstance(content, str):
-                if 'data:image' in content:
-                    print(f"[OPENROUTER] Found 'data:image' in content")
-                    start = content.find('data:image')
-                    end = start
-                    for end_char in ['"', "'", ' ', '\n', ')', '}']:
-                        pos = content.find(end_char, start + 20)
-                        if pos != -1:
-                            end = pos
-                            break
-                    if end == start:
-                        end = len(content)
-                    base64_data = content[start:end].strip()
-                    print(f"[OPENROUTER] Extracted base64 data (length: {len(base64_data)})")
-                    return base64_data
-                
-                if content.startswith('iVBOR') or content.startswith('/9j/') or content.startswith('R0lGOD'):
-                    print(f"[OPENROUTER] Found raw base64 image")
-                    # Добавляем data URI схему
-                    if content.startswith('iVBOR'):
-                        return f"data:image/png;base64,{content}"
-                    elif content.startswith('/9j/'):
-                        return f"data:image/jpeg;base64,{content}"
-                    else:
-                        return f"data:image/gif;base64,{content}"
-                
-                if 'https://' in content:
-                    print(f"[OPENROUTER] ✅ Found HTTPS URL in content")
-                    start = content.find('https://')
-                    end = content.find(')', start)
-                    if end == -1:
-                        end = content.find(' ', start)
-                    if end == -1:
-                        end = content.find('\n', start)
-                    if end == -1:
-                        end = len(content)
-                    image_url = content[start:end].strip()
-                    print(f"[OPENROUTER] Extracted URL: {image_url[:100]}")
-                    return image_url
+                if content.startswith('data:image') or content.startswith('iVBOR') or content.startswith('/9j/'):
+                    if not content.startswith('data:image'):
+                        # Добавляем data URI схему
+                        if content.startswith('iVBOR'):
+                            return f"data:image/png;base64,{content}"
+                        elif content.startswith('/9j/'):
+                            return f"data:image/jpeg;base64,{content}"
+                    return content
             
-            # Последняя попытка - вывести полную структуру для диагностики
-            print(f"[ERROR] ❌ No image found in response!")
-            print(f"[ERROR] Message keys: {list(message.keys())}")
-            print(f"[ERROR] Content type: {type(content).__name__}")
-            if isinstance(content, str):
-                print(f"[ERROR] Content preview: {content[:200]}")
-            
-            # CRITICAL: Проверяем все возможные поля где может быть изображение
-            for key in message.keys():
-                if key not in ['role', 'content', 'refusal']:
-                    val = message[key]
-                    print(f"[ERROR] Field '{key}': type={type(val).__name__}, value={str(val)[:100]}")
-            
+            print(f"[ERROR] No image found. Message keys: {list(message.keys())}")
             return None
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
