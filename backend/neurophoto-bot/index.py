@@ -775,10 +775,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     )
                     session = cur.fetchone()
                     if session and session['session_photo_url']:
-                        # Filter out empty strings from split
+                        # CRITICAL: Обновляем переменную photo_urls для последующей генерации
                         photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
-                        print(f"[MESSAGE] Loaded {len(photo_urls)} photos from session")
-                        print(f"[MESSAGE] Proceeding to SINGLE generation with {len(photo_urls)} photos")
+                        print(f"[MESSAGE] ✅ Loaded {len(photo_urls)} photos from session into photo_urls variable")
+                        print(f"[MESSAGE] Photos: {photo_urls}")
+                        print(f"[MESSAGE] Proceeding to SINGLE generation with {len(photo_urls)} photos and prompt: '{message_text}'")
                         # Очищаем сессию
                         cur.execute(
                             f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
@@ -787,7 +788,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             (telegram_id,)
                         )
                         conn.commit()
-                        # Не возвращаем - продолжаем к генерации
+                        # CRITICAL: НЕ возвращаемся - продолжаем к генерации с обновленными photo_urls и message_text!
                     else:
                         print(f"[WARNING] Caption found but no photos in session")
                         cur.close()
