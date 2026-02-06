@@ -24,6 +24,24 @@ IMAGE_MODELS = [
         'name': 'Gemini 2.5 Flash',
         'emoji': '⚡',
         'info': 'Быстрая Pro-версия с расширенными возможностями обработки.'
+    },
+    {
+        'id': 'black-forest-labs/flux.2-flex',
+        'name': 'FLUX 2 Flex',
+        'emoji': '🌟',
+        'info': 'Гибкая генерация любых стилей. От реализма до арта.'
+    },
+    {
+        'id': 'black-forest-labs/flux.2-pro',
+        'name': 'FLUX 2 Pro',
+        'emoji': '💫',
+        'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
+    },
+    {
+        'id': 'openai/gpt-5-image',
+        'name': 'GPT-5 Image',
+        'emoji': '🎨',
+        'info': 'Новейшая модель OpenAI. Революционное качество генерации.'
     }
 ]
 
@@ -133,15 +151,20 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     url = 'https://openrouter.ai/api/v1/chat/completions'
     
-    # Работаем только с Gemini моделями
-    gemini_models = [
+    # Определяем, является ли модель image generation моделью
+    image_gen_models = [
         'google/gemini-3-pro-image-preview',
-        'google/gemini-2.5-flash-image'
+        'google/gemini-2.5-flash-image',
+        'black-forest-labs/flux.2-flex',
+        'black-forest-labs/flux.2-pro',
+        'openai/gpt-5-image'
     ]
     
-    is_image_gen = model in gemini_models
+    is_image_gen = model in image_gen_models
     
-    is_gemini = True  # Всегда True, работаем только с Gemini
+    # CRITICAL: Для gemini-3-pro и gemini-2.5-flash с изображениями используем специальный формат
+    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']
+    is_gemini = model in gemini_models
     
     # Формируем content для сообщения
     content = []
@@ -184,9 +207,14 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
         'max_tokens': max_tokens
     }
     
-    # CRITICAL: Для Gemini моделей ВСЕГДА добавляем modalities=['image']
-    print(f"[OPENROUTER] Adding modalities=['image'] for Gemini image generation model")
-    request_body['modalities'] = ['image']
+    # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
+    # Это указывает API что нужно вернуть изображение в поле message.images
+    # ⚠️ GPT-5 НЕ поддерживает modalities - только для Gemini!
+    if is_image_gen and model not in ['openai/gpt-5-image']:
+        print(f"[OPENROUTER] Adding modalities=['image'] for Gemini image generation model")
+        request_body['modalities'] = ['image']  # Только для Gemini моделей
+    elif model == 'openai/gpt-5-image':
+        print(f"[OPENROUTER] GPT-5 Image mode - NO modalities parameter")
     
     print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
     print(f"[OPENROUTER] Model: {model}")
@@ -216,8 +244,8 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     print(f"[OPENROUTER] Request size: {len(data)} bytes")
     
     try:
-        print(f"[OPENROUTER] Opening connection with 180s timeout...")
-        with urllib.request.urlopen(req, timeout=180) as response:
+        print(f"[OPENROUTER] Opening connection with 120s timeout...")
+        with urllib.request.urlopen(req, timeout=120) as response:
             print(f"[OPENROUTER] Got response! Status: {response.status}")
             print(f"[OPENROUTER] Reading response body in chunks (streaming mode)...")
             
