@@ -245,35 +245,30 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     try:
         print(f"[OPENROUTER] Sending request to API...")
-        with urllib.request.urlopen(req, timeout=180) as response:
-            # CRITICAL: Быстро читаем весь ответ БЕЗ логирования промежуточных шагов
+        with urllib.request.urlopen(req, timeout=240) as response:
+            # CRITICAL: Читаем весь ответ за раз - максимально быстро!
             response_body = response.read().decode('utf-8')
-            print(f"[OPENROUTER] ✅ Response received: {len(response_body)} bytes")
+            print(f"[OPENROUTER] ✅ Response: {len(response_body)} bytes")
             
             result = json.loads(response_body)
-            print(f"[OPENROUTER] Response keys: {list(result.keys())}")
             
-            # Проверяем наличие choices
+            # Быстрая проверка на ошибки
             if 'choices' not in result or len(result['choices']) == 0:
-                print(f"[ERROR] No choices in response")
+                print(f"[ERROR] No choices")
                 return None
             
             message = result['choices'][0].get('message', {})
             
-            # CRITICAL: Для Gemini моделей изображение в поле 'images'
+            # CRITICAL: Для Gemini моделей - проверяем поле 'images' ПЕРВЫМ
             if 'images' in message:
                 images = message['images']
                 if isinstance(images, list) and len(images) > 0:
-                    print(f"[OPENROUTER] ✅ Found image in 'images' field")
                     return images[0]
                 elif isinstance(images, str):
-                    print(f"[OPENROUTER] ✅ Found image string")
                     return images
             
-            # Fallback: проверяем content
+            # Fallback: content как список
             content = message.get('content', '')
-            
-            # Проверка content как список
             if isinstance(content, list):
                 for item in content:
                     if isinstance(item, dict) and item.get('type') == 'image_url':
@@ -281,18 +276,16 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
                         if img_url:
                             return img_url
             
-            # Проверка content как строка с base64
-            elif isinstance(content, str):
-                if content.startswith('data:image') or content.startswith('iVBOR') or content.startswith('/9j/'):
-                    if not content.startswith('data:image'):
-                        # Добавляем data URI схему
-                        if content.startswith('iVBOR'):
-                            return f"data:image/png;base64,{content}"
-                        elif content.startswith('/9j/'):
-                            return f"data:image/jpeg;base64,{content}"
-                    return content
+            # Fallback: content как base64 строка
+            elif isinstance(content, str) and (content.startswith('data:image') or content.startswith('iVBOR') or content.startswith('/9j/')):
+                if not content.startswith('data:image'):
+                    if content.startswith('iVBOR'):
+                        return f"data:image/png;base64,{content}"
+                    elif content.startswith('/9j/'):
+                        return f"data:image/jpeg;base64,{content}"
+                return content
             
-            print(f"[ERROR] No image found. Message keys: {list(message.keys())}")
+            print(f"[ERROR] No image found")
             return None
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
