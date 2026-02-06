@@ -211,23 +211,7 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     # Это указывает API что нужно вернуть изображение в поле message.images
     # ⚠️ GPT-5 НЕ поддерживает modalities - только для Gemini!
     if is_image_gen and model not in ['openai/gpt-5-image']:
-        print(f"[OPENROUTER] Adding modalities=['image'] for Gemini image generation model")
         request_body['modalities'] = ['image']  # Только для Gemini моделей
-    elif model == 'openai/gpt-5-image':
-        print(f"[OPENROUTER] GPT-5 Image mode - NO modalities parameter")
-    
-    print(f"[OPENROUTER] ===== REQUEST DEBUG =====")
-    print(f"[OPENROUTER] Model: {model}")
-    print(f"[OPENROUTER] Is image gen: {is_image_gen}")
-    print(f"[OPENROUTER] Has images: {bool(image_urls)}")
-    print(f"[OPENROUTER] Images count: {len(image_urls) if image_urls else 0}")
-    print(f"[OPENROUTER] Request body keys: {list(request_body.keys())}")
-    print(f"[OPENROUTER] Content items: {len(content)}")
-    for i, item in enumerate(content):
-        if item.get('type') == 'text':
-            print(f"[OPENROUTER]   [{i}] text: {item['text'][:100]}")
-        elif item.get('type') == 'image_url':
-            print(f"[OPENROUTER]   [{i}] image_url: {item['image_url']['url'][:100]}")
     
     data = json.dumps(request_body).encode('utf-8')
     
@@ -240,18 +224,11 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
     
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
-    print(f"[OPENROUTER] Sending request to OpenRouter...")
-    print(f"[OPENROUTER] Request size: {len(data)} bytes")
-    
     try:
-        print(f"[OPENROUTER] Sending request to API...")
         with urllib.request.urlopen(req, timeout=180) as response:
             # Read entire response at once
             response_body = response.read().decode('utf-8')
-            print(f"[OPENROUTER] ✅ Response received: {len(response_body)} bytes")
-            
             result = json.loads(response_body)
-            print(f"[OPENROUTER] Response keys: {list(result.keys())}")
             
             # Проверяем наличие choices
             if 'choices' not in result or len(result['choices']) == 0:
@@ -264,10 +241,8 @@ def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = N
             if 'images' in message:
                 images = message['images']
                 if isinstance(images, list) and len(images) > 0:
-                    print(f"[OPENROUTER] ✅ Found image in 'images' field")
                     return images[0]
                 elif isinstance(images, str):
-                    print(f"[OPENROUTER] ✅ Found image string")
                     return images
             
             # Fallback: проверяем content
@@ -314,12 +289,10 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
     try:
         # Проверяем, является ли изображение base64 data URL
         if image_url.startswith('data:image'):
-            print("[S3] Processing base64 data URL")
             # Формат: data:image/png;base64,iVBORw0KG...
             header, encoded = image_url.split(',', 1)
             image_data = base64.b64decode(encoded)
         else:
-            print(f"[S3] Downloading from URL: {image_url[:100]}")
             req = urllib.request.Request(image_url)
             with urllib.request.urlopen(req, timeout=30) as response:
                 image_data = response.read()
@@ -334,7 +307,6 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         s3.put_object(Bucket='files', Key=key, Body=image_data, ContentType='image/png')
         
         cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
-        print(f"[S3] Uploaded successfully: {cdn_url}")
         return cdn_url
     except Exception as e:
         print(f"[ERROR] Upload to S3: {e}")
@@ -1132,53 +1104,36 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
         
-        # DEBUG: отправляем информацию о полученном ответе
         if not image_url:
             print(f"[ERROR] No image_url returned from OpenRouter")
-            send_telegram_message(bot_token, chat_id, '🔍 DEBUG: OpenRouter вернул ответ, но изображение не найдено.\n\nПроверьте логи функции.')
+            send_telegram_message(bot_token, chat_id, '❌ Не удалось сгенерировать изображение. Попробуйте еще раз или смените модель через /models')
         
         if image_url:
             # CRITICAL: image_url может быть строкой, списком или dict!
-            print(f"[SUCCESS] Image received from OpenRouter!")
-            print(f"[SUCCESS] Image type: {type(image_url).__name__}")
-            
             # Если это список - берем первый элемент
             if isinstance(image_url, list):
-                print(f"[SUCCESS] Image is a list with {len(image_url)} items, taking first")
                 if len(image_url) > 0:
                     image_url = image_url[0]
                 else:
-                    print(f"[ERROR] Image list is empty!")
                     image_url = None
             
             # Если это dict - ищем URL внутри
             if isinstance(image_url, dict):
-                print(f"[SUCCESS] Image is dict with keys: {list(image_url.keys())}")
                 if 'url' in image_url:
                     image_url = image_url['url']
                 elif 'data' in image_url:
                     image_url = image_url['data']
                 elif 'image_url' in image_url:
                     # CRITICAL: Gemini 3 Pro возвращает {'type': '...', 'image_url': '...', 'index': ...}
-                    print(f"[SUCCESS] Found nested 'image_url' key")
                     nested = image_url['image_url']
                     if isinstance(nested, dict) and 'url' in nested:
                         image_url = nested['url']
                     elif isinstance(nested, str):
                         image_url = nested
                     else:
-                        print(f"[ERROR] Unexpected nested image_url type: {type(nested).__name__}")
                         image_url = None
                 else:
-                    print(f"[ERROR] No 'url', 'data', or 'image_url' key in image dict!")
                     image_url = None
-            
-            if image_url and isinstance(image_url, str):
-                print(f"[SUCCESS] Final image_url (first 100 chars): {image_url[:100]}")
-                print(f"[SUCCESS] Is base64 data URL: {image_url.startswith('data:image')}")
-            else:
-                print(f"[ERROR] image_url is not a string after processing: {type(image_url).__name__}")
-                image_url = None
         
         if image_url:
             
@@ -1186,13 +1141,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             cdn_url = upload_to_s3(image_url, telegram_id)
             
             if not cdn_url:
-                print(f"[ERROR] S3 upload failed, cannot send image to user")
-                send_telegram_message(bot_token, chat_id, '❌ Изображение сгенерировано, но произошла ошибка при сохранении.\n\nПопробуйте еще раз.')
+                send_telegram_message(bot_token, chat_id, '❌ Ошибка сохранения. Попробуйте еще раз.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            print(f"[SUCCESS] CDN URL: {cdn_url}")
             final_url = cdn_url
             
             caption = f'✅ Готово!\n\n💬 {message_text[:100]}\n🎨 {model_name}'
