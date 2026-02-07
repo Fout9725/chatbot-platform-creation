@@ -1,0 +1,114 @@
+{
+  "automations": [
+    {
+      "id": "instagram",
+      "name": "Instagram Автопостинг",
+      "description": "Генерация и публикация постов в Instagram через n8n",
+      "status": "ready",
+      "requirements": [
+        "Google Sheets API (для хранения контента)",
+        "Anthropic API Key (Claude для генерации текста)",
+        "OpenAI API Key (DALL-E 3 для изображений)",
+        "Cloudinary Account (опционально, для наложения текста)"
+      ],
+      "features": [
+        "Автоматическая генерация текста постов",
+        "Генерация изображений через DALL-E 3",
+        "Наложение текста на изображения",
+        "Планирование публикаций",
+        "Хранение контента в Google Sheets"
+      ],
+      "workflow_nodes": ["Schedule Trigger", "Google Sheets", "Claude AI", "DALL-E 3", "Cloudinary", "Instagram"]
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram Каналы",
+      "description": "Автопостинг в Telegram-каналы",
+      "status": "ready",
+      "requirements": [
+        "Telegram Bot Token (от @BotFather)",
+        "ID Telegram-канала",
+        "Google Sheets (опционально)"
+      ],
+      "features": [
+        "Публикация постов по расписанию",
+        "Markdown форматирование",
+        "Поддержка медиа-групп",
+        "Интеграция с Google Sheets"
+      ],
+      "workflow_nodes": ["Schedule Trigger", "Google Sheets", "Telegram Bot API"]
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube Контент",
+      "description": "Генератор идей для YouTube видео",
+      "status": "ready",
+      "requirements": [
+        "Тематика канала",
+        "Целевая аудитория (опционально)"
+      ],
+      "features": [
+        "Генерация названий видео",
+        "SEO-оптимизированные описания",
+        "Подбор тегов",
+        "Советы по превью",
+        "Примеры hooks для видео"
+      ],
+      "workflow_nodes": ["AI Generator", "SEO Optimizer", "Tag Suggester"]
+    },
+    {
+      "id": "vk",
+      "name": "ВКонтакте Кросспостинг",
+      "description": "Автоматическая публикация в группы ВК",
+      "status": "ready",
+      "requirements": [
+        "VK Access Token (с правами wall, offline)",
+        "ID группы ВКонтакте"
+      ],
+      "features": [
+        "Публикация по расписанию",
+        "VK API интеграция",
+        "Поддержка текста и медиа",
+        "Отложенная публикация"
+      ],
+      "workflow_nodes": ["Schedule Trigger", "VK API", "Content Formatter"]
+    },
+    {
+      "id": "tiktok",
+      "name": "TikTok / Reels / Shorts",
+      "description": "Генератор идей для коротких видео",
+      "status": "ready",
+      "requirements": [
+        "Тематика контента"
+      ],
+      "features": [
+        "Идеи для вирусных видео",
+        "Сценарии и hooks",
+        "Трендовые звуки",
+        "Подбор хэштегов",
+        "Советы по монтажу"
+      ],
+      "workflow_nodes": ["AI Idea Generator", "Trend Analyzer", "Hashtag Suggester"]
+    }
+  ],
+  "coming_soon": [
+    {
+      "id": "linkedin",
+      "name": "LinkedIn Посты",
+      "description": "Профессиональный контент для LinkedIn",
+      "eta": "Q2 2024"
+    },
+    {
+      "id": "twitter",
+      "name": "Twitter/X Треды",
+      "description": "Генерация вирусных тредов",
+      "eta": "Q2 2024"
+    },
+    {
+      "id": "multichannel",
+      "name": "Мультиканальный постинг",
+      "description": "Публикация во все соцсети одновременно",
+      "eta": "Q3 2024"
+    }
+  ]
+}

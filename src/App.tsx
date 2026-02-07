@@ -33,6 +33,11 @@ import OfferConstructor from "./pages/OfferConstructor";
 import PollWorkerTrigger from "./pages/PollWorkerTrigger";
 import PollCronSetup from "./pages/PollCronSetup";
 import InstagramAutomation from "./components/InstagramAutomation";
+import AutomationHub from "./pages/AutomationHub";
+import TelegramAutomation from "./components/TelegramAutomation";
+import YouTubeAutomation from "./components/YouTubeAutomation";
+import VKAutomation from "./components/VKAutomation";
+import TikTokAutomation from "./components/TikTokAutomation";
 
 const queryClient = new QueryClient();
 
@@ -69,7 +74,12 @@ const App = () => (
           <Route path="/offer-constructor" element={<OfferConstructor />} />
           <Route path="/poll-worker" element={<PollWorkerTrigger />} />
           <Route path="/poll-cron-setup" element={<PollCronSetup />} />
+          <Route path="/automation-hub" element={<AutomationHub />} />
           <Route path="/instagram-automation" element={<InstagramAutomation />} />
+          <Route path="/telegram-automation" element={<TelegramAutomation />} />
+          <Route path="/youtube-automation" element={<YouTubeAutomation />} />
+          <Route path="/vk-automation" element={<VKAutomation />} />
+          <Route path="/tiktok-automation" element={<TikTokAutomation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
