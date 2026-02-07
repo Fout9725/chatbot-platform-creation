@@ -8,7 +8,7 @@ interface RatingFilterProps {
   onRatingChange: (rating: number) => void;
 }
 
-const ratings = [0, 3, 4, 4.5];
+const ratings = [0, 4.5, 4.6, 4.7, 4.8, 4.9];
 
 export default function RatingFilter({ minRating, onRatingChange }: RatingFilterProps) {
   return (
