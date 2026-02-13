@@ -9,9 +9,9 @@ import boto3
 
 ADMIN_IDS = [285675692]
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'
-# v4.0 - Убраны все модели и выбор моделей. Единственная модель: Gemini через Google AI API напрямую.
+# v4.1 - Исправлена модель на gemini-2.5-flash-image для генерации изображений через Google AI API.
 
-GEMINI_MODEL = 'gemini-2.5-flash-preview-05-20'
+GEMINI_MODEL = 'gemini-2.5-flash-image'
 
 def is_admin(telegram_id: int) -> bool:
     return telegram_id in ADMIN_IDS
@@ -106,12 +106,16 @@ def download_image_as_base64(url: str) -> Optional[str]:
         print(f"[ERROR] Download image: {e}")
         return None
 
-def generate_image_gemini(prompt: str, image_urls: List[str] = None) -> Optional[str]:
+def generate_image_gemini(prompt: str, image_urls: List[str] = None, bot_token: str = None, chat_id: str = None) -> Optional[str]:
     """Генерация изображения через Google Gemini API напрямую"""
     api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
         print("[ERROR] No GEMINI_API_KEY")
+        if bot_token and chat_id:
+            send_telegram_message(bot_token, chat_id, '❌ DEBUG: GEMINI_API_KEY не найден в env')
         return None
+    
+    print(f"[GEMINI] API key found, length: {len(api_key)}, starts with: {api_key[:10]}...")
     
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}'
     
@@ -179,11 +183,15 @@ def generate_image_gemini(prompt: str, image_urls: List[str] = None) -> Optional
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
         print(f"[ERROR] Gemini API error {e.code}: {error_body[:500]}")
+        if bot_token and chat_id:
+            send_telegram_message(bot_token, chat_id, f'❌ DEBUG Gemini {e.code}: {error_body[:200]}')
         return None
     except Exception as e:
         print(f"[ERROR] Gemini exception: {type(e).__name__}: {e}")
         import traceback
         print(traceback.format_exc())
+        if bot_token and chat_id:
+            send_telegram_message(bot_token, chat_id, f'❌ DEBUG exception: {type(e).__name__}: {str(e)[:200]}')
         return None
 
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
@@ -924,7 +932,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             send_telegram_message(bot_token, chat_id, '⏳ Генерирую изображение через Gemini...\n\nЭто займет 15-30 секунд.')
         
-        image_url = generate_image_gemini(message_text, photo_urls)
+        image_url = generate_image_gemini(message_text, photo_urls, bot_token, chat_id)
         
         if not image_url:
             send_telegram_message(bot_token, chat_id, '❌ Не удалось сгенерировать. Попробуйте изменить описание или повторить позже.')
