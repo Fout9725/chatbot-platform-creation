@@ -9,7 +9,8 @@ import boto3
 
 ADMIN_IDS = [285675692]
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'
-# v4.1 - Исправлена модель на gemini-2.5-flash-image для генерации изображений через Google AI API.
+# v5.0 - gemini-2.5-flash-image + version marker
+BOT_VERSION = 'v5.0'
 
 GEMINI_MODEL = 'gemini-2.5-flash-image'
 
@@ -933,9 +934,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if photo_urls:
-            send_telegram_message(bot_token, chat_id, f'⏳ Обрабатываю {len(photo_urls)} фото через Gemini...\n\nЭто займет 15-30 секунд.')
+            send_telegram_message(bot_token, chat_id, f'⏳ [{BOT_VERSION}] Обрабатываю {len(photo_urls)} фото через Gemini...')
         else:
-            send_telegram_message(bot_token, chat_id, '⏳ Генерирую изображение через Gemini...\n\nЭто займет 15-30 секунд.')
+            send_telegram_message(bot_token, chat_id, f'⏳ [{BOT_VERSION}] Генерирую через {GEMINI_MODEL}...')
         
         image_url = generate_image_gemini(message_text, photo_urls, bot_token, chat_id)
         
