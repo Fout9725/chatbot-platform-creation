@@ -108,14 +108,17 @@ def download_image_as_base64(url: str) -> Optional[str]:
 
 def generate_image_gemini(prompt: str, image_urls: List[str] = None, bot_token: str = None, chat_id: str = None) -> Optional[str]:
     """Генерация изображения через Google Gemini API напрямую"""
+    def dbg(msg):
+        print(f"[GEMINI] {msg}")
+        if bot_token and chat_id:
+            send_telegram_message(bot_token, chat_id, f'🔧 {msg}')
+
     api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
-        print("[ERROR] No GEMINI_API_KEY")
-        if bot_token and chat_id:
-            send_telegram_message(bot_token, chat_id, '❌ DEBUG: GEMINI_API_KEY не найден в env')
+        dbg('GEMINI_API_KEY не найден в env')
         return None
     
-    print(f"[GEMINI] API key found, length: {len(api_key)}, starts with: {api_key[:10]}...")
+    dbg(f'Key: {api_key[:8]}..., model: {GEMINI_MODEL}')
     
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}'
     
@@ -149,20 +152,22 @@ def generate_image_gemini(prompt: str, image_urls: List[str] = None, bot_token: 
     
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
-    print(f"[GEMINI] Sending request to {GEMINI_MODEL}, photos: {len(image_urls) if image_urls else 0}")
-    
     try:
         with urllib.request.urlopen(req, timeout=180) as response:
             response_body = response.read().decode('utf-8')
             result = json.loads(response_body)
             
             if 'candidates' not in result or len(result['candidates']) == 0:
-                print(f"[ERROR] No candidates in Gemini response: {response_body[:500]}")
+                dbg(f'No candidates. Keys: {list(result.keys())}. Body: {response_body[:300]}')
                 return None
             
             candidate = result['candidates'][0]
+            
+            finish_reason = candidate.get('finishReason', 'unknown')
             content = candidate.get('content', {})
             parts_resp = content.get('parts', [])
+            
+            dbg(f'Got {len(parts_resp)} parts, finishReason={finish_reason}')
             
             for part in parts_resp:
                 if 'inlineData' in part:
@@ -170,28 +175,28 @@ def generate_image_gemini(prompt: str, image_urls: List[str] = None, bot_token: 
                     mime = inline.get('mimeType', 'image/png')
                     b64_data = inline.get('data', '')
                     if b64_data:
+                        dbg(f'Image found! mime={mime}, size={len(b64_data)}')
                         return f"data:{mime};base64,{b64_data}"
                 if 'inline_data' in part:
                     inline = part['inline_data']
                     mime = inline.get('mime_type', 'image/png')
                     b64_data = inline.get('data', '')
                     if b64_data:
+                        dbg(f'Image found! mime={mime}, size={len(b64_data)}')
                         return f"data:{mime};base64,{b64_data}"
             
-            print(f"[ERROR] No image in Gemini response parts: {[list(p.keys()) for p in parts_resp]}")
+            part_keys = [list(p.keys()) for p in parts_resp]
+            text_parts = [p.get('text', '')[:100] for p in parts_resp if 'text' in p]
+            dbg(f'No image! Part keys: {part_keys}. Texts: {text_parts}')
             return None
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
-        print(f"[ERROR] Gemini API error {e.code}: {error_body[:500]}")
-        if bot_token and chat_id:
-            send_telegram_message(bot_token, chat_id, f'❌ DEBUG Gemini {e.code}: {error_body[:200]}')
+        dbg(f'HTTP {e.code}: {error_body[:300]}')
         return None
     except Exception as e:
-        print(f"[ERROR] Gemini exception: {type(e).__name__}: {e}")
         import traceback
+        dbg(f'Exception: {type(e).__name__}: {str(e)[:200]}')
         print(traceback.format_exc())
-        if bot_token and chat_id:
-            send_telegram_message(bot_token, chat_id, f'❌ DEBUG exception: {type(e).__name__}: {str(e)[:200]}')
         return None
 
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
