@@ -7,50 +7,16 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import boto3
 
-ADMIN_IDS = [285675692]  # Список ID администраторов
-DB_SCHEMA = 't_p60354232_chatbot_platform_cre'  # Схема БД
-# v3.22 - Убрали бесплатные модели полностью, теперь только платная подписка PRO
-# v3.13 - Handle nested image_url in dict response from Gemini 3 Pro
+ADMIN_IDS = [285675692]
+DB_SCHEMA = 't_p60354232_chatbot_platform_cre'
+# v4.0 - Убраны все модели и выбор моделей. Единственная модель: Gemini через Google AI API напрямую.
 
-IMAGE_MODELS = [
-    {
-        'id': 'google/gemini-3-pro-image-preview',
-        'name': 'Gemini 3 Pro',
-        'emoji': '💎',
-        'info': 'Топовая модель Google для профессиональной генерации изображений.'
-    },
-    {
-        'id': 'google/gemini-2.5-flash-image',
-        'name': 'Gemini 2.5 Flash',
-        'emoji': '⚡',
-        'info': 'Быстрая Pro-версия с расширенными возможностями обработки.'
-    },
-    {
-        'id': 'black-forest-labs/flux.2-flex',
-        'name': 'FLUX 2 Flex',
-        'emoji': '🌟',
-        'info': 'Гибкая генерация любых стилей. От реализма до арта.'
-    },
-    {
-        'id': 'black-forest-labs/flux.2-pro',
-        'name': 'FLUX 2 Pro',
-        'emoji': '💫',
-        'info': 'Профессиональная FLUX модель. Максимальное качество и детализация.'
-    },
-    {
-        'id': 'openai/gpt-5-image',
-        'name': 'GPT-5 Image',
-        'emoji': '🎨',
-        'info': 'Новейшая модель OpenAI. Революционное качество генерации.'
-    }
-]
+GEMINI_MODEL = 'gemini-2.5-flash-preview-05-20'
 
 def is_admin(telegram_id: int) -> bool:
-    '''Проверка является ли пользователь администратором'''
     return telegram_id in ADMIN_IDS
 
 def send_telegram_message(bot_token: str, chat_id: str, text: str, reply_markup: Optional[dict] = None) -> bool:
-    '''Отправка текстового сообщения в Telegram'''
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
     payload = {
         'chat_id': chat_id,
@@ -71,7 +37,6 @@ def send_telegram_message(bot_token: str, chat_id: str, text: str, reply_markup:
         return False
 
 def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: str = '', reply_markup: Optional[dict] = None) -> bool:
-    '''Отправка изображения в Telegram'''
     telegram_url = f'https://api.telegram.org/bot{bot_token}/sendPhoto'
     payload = {
         'chat_id': chat_id,
@@ -85,14 +50,9 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(telegram_url, data=data, headers={'Content-Type': 'application/json'})
     
-    print(f"[TELEGRAM] Sending photo to chat {chat_id}")
-    print(f"[TELEGRAM] Photo URL: {photo_url}")
-    print(f"[TELEGRAM] Caption length: {len(caption)}")
-    
     try:
         with urllib.request.urlopen(req, timeout=60) as response:
             result = json.loads(response.read().decode('utf-8'))
-            print(f"[TELEGRAM] Response: {json.dumps(result, ensure_ascii=False)[:500]}")
             return result.get('ok', False)
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
@@ -100,14 +60,10 @@ def send_telegram_photo(bot_token: str, chat_id: str, photo_url: str, caption: s
         return False
     except Exception as e:
         print(f"[ERROR] Send photo exception: {type(e).__name__}: {e}")
-        import traceback
-        print(traceback.format_exc())
         return False
 
 def get_telegram_file_url(bot_token: str, file_id: str) -> Optional[str]:
-    '''Получение URL файла из Telegram'''
     try:
-        # Получаем информацию о файле
         get_file_url = f'https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}'
         req = urllib.request.Request(get_file_url)
         
@@ -115,7 +71,6 @@ def get_telegram_file_url(bot_token: str, file_id: str) -> Optional[str]:
             result = json.loads(response.read().decode('utf-8'))
             if result.get('ok'):
                 file_path = result['result']['file_path']
-                # Формируем URL для скачивания файла
                 download_url = f'https://api.telegram.org/file/bot{bot_token}/{file_path}'
                 return download_url
             return None
@@ -124,7 +79,6 @@ def get_telegram_file_url(bot_token: str, file_id: str) -> Optional[str]:
         return None
 
 def answer_callback_query(bot_token: str, callback_query_id: str, text: str = '', show_alert: bool = False) -> bool:
-    '''Ответ на callback query для убирания "загрузки" на кнопке'''
     telegram_url = f'https://api.telegram.org/bot{bot_token}/answerCallbackQuery'
     payload = {
         'callback_query_id': callback_query_id,
@@ -142,154 +96,99 @@ def answer_callback_query(bot_token: str, callback_query_id: str, text: str = ''
         print(f"[ERROR] Answer callback: {e}")
         return False
 
-def generate_image_openrouter(prompt: str, model: str, image_urls: List[str] = None) -> Optional[str]:
-    '''Генерация изображения через OpenRouter API'''
-    api_key = os.environ.get('OPENROUTER_API_KEY')
+def download_image_as_base64(url: str) -> Optional[str]:
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as response:
+            image_data = response.read()
+            return base64.b64encode(image_data).decode('utf-8')
+    except Exception as e:
+        print(f"[ERROR] Download image: {e}")
+        return None
+
+def generate_image_gemini(prompt: str, image_urls: List[str] = None) -> Optional[str]:
+    """Генерация изображения через Google Gemini API напрямую"""
+    api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
-        print("[ERROR] No OPENROUTER_API_KEY")
+        print("[ERROR] No GEMINI_API_KEY")
         return None
     
-    url = 'https://openrouter.ai/api/v1/chat/completions'
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}'
     
-    # Определяем, является ли модель image generation моделью
-    image_gen_models = [
-        'google/gemini-3-pro-image-preview',
-        'google/gemini-2.5-flash-image',
-        'black-forest-labs/flux.2-flex',
-        'black-forest-labs/flux.2-pro',
-        'openai/gpt-5-image'
-    ]
+    parts = []
     
-    is_image_gen = model in image_gen_models
-    
-    # CRITICAL: Для gemini-3-pro и gemini-2.5-flash с изображениями используем специальный формат
-    gemini_models = ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image']
-    is_gemini = model in gemini_models
-    
-    # Формируем content для сообщения
-    content = []
-    
-    # CRITICAL: Для Gemini с фото - добавляем текст ПЕРЕД изображениями
-    if image_urls and is_gemini:
-        print(f"[OPENROUTER] Gemini mode: Adding prompt before {len(image_urls)} images")
-        # Сначала промпт
-        content.append({'type': 'text', 'text': f"{prompt}\n\nСоздай изображение на основе этих примеров:"})
-        # Потом изображения
+    if image_urls:
+        parts.append({'text': f"{prompt}\n\nСоздай изображение на основе этих примеров:"})
         for img_url in image_urls:
-            content.append({
-                'type': 'image_url',
-                'image_url': {'url': img_url}
-            })
-    elif image_urls:
-        # Для остальных vision моделей - стандартный порядок
-        print(f"[OPENROUTER] Standard vision mode: Adding {len(image_urls)} images")
-        for img_url in image_urls:
-            content.append({
-                'type': 'image_url',
-                'image_url': {'url': img_url}
-            })
-        content.append({'type': 'text', 'text': prompt})
+            img_b64 = download_image_as_base64(img_url)
+            if img_b64:
+                parts.append({
+                    'inline_data': {
+                        'mime_type': 'image/jpeg',
+                        'data': img_b64
+                    }
+                })
     else:
-        # Только текст - генерация без примеров
-        print(f"[OPENROUTER] Text-only generation mode")
-        content.append({'type': 'text', 'text': prompt})
-    
-    # Формируем запрос в зависимости от типа модели
-    # CRITICAL: Для генерации изображений нужно МНОГО токенов (base64 изображения очень длинные)
-    max_tokens = 16000 if is_image_gen else 1000
+        parts.append({'text': prompt})
     
     request_body = {
-        'model': model,
-        'messages': [{
-            'role': 'user',
-            'content': content
+        'contents': [{
+            'parts': parts
         }],
-        'max_tokens': max_tokens
+        'generationConfig': {
+            'responseModalities': ['TEXT', 'IMAGE']
+        }
     }
-    
-    # CRITICAL: Для Gemini image generation моделей ВСЕГДА добавляем modalities
-    # Это указывает API что нужно вернуть изображение в поле message.images
-    # ⚠️ GPT-5 НЕ поддерживает modalities - только для Gemini!
-    if is_image_gen and model not in ['openai/gpt-5-image']:
-        request_body['modalities'] = ['image']  # Только для Gemini моделей
     
     data = json.dumps(request_body).encode('utf-8')
-    
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://poehali.dev',
-        'X-Title': 'Neurophoto Bot'
-    }
+    headers = {'Content-Type': 'application/json'}
     
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
+    print(f"[GEMINI] Sending request to {GEMINI_MODEL}, photos: {len(image_urls) if image_urls else 0}")
+    
     try:
         with urllib.request.urlopen(req, timeout=180) as response:
-            # Read entire response at once
             response_body = response.read().decode('utf-8')
             result = json.loads(response_body)
             
-            # Проверяем наличие choices
-            if 'choices' not in result or len(result['choices']) == 0:
-                print(f"[ERROR] No choices in response")
+            if 'candidates' not in result or len(result['candidates']) == 0:
+                print(f"[ERROR] No candidates in Gemini response: {response_body[:500]}")
                 return None
             
-            message = result['choices'][0].get('message', {})
+            candidate = result['candidates'][0]
+            content = candidate.get('content', {})
+            parts_resp = content.get('parts', [])
             
-            # CRITICAL: Для Gemini моделей изображение в поле 'images'
-            if 'images' in message:
-                images = message['images']
-                if isinstance(images, list) and len(images) > 0:
-                    return images[0]
-                elif isinstance(images, str):
-                    return images
+            for part in parts_resp:
+                if 'inlineData' in part:
+                    inline = part['inlineData']
+                    mime = inline.get('mimeType', 'image/png')
+                    b64_data = inline.get('data', '')
+                    if b64_data:
+                        return f"data:{mime};base64,{b64_data}"
+                if 'inline_data' in part:
+                    inline = part['inline_data']
+                    mime = inline.get('mime_type', 'image/png')
+                    b64_data = inline.get('data', '')
+                    if b64_data:
+                        return f"data:{mime};base64,{b64_data}"
             
-            # Fallback: проверяем content
-            content = message.get('content', '')
-            
-            # Проверка content как список
-            if isinstance(content, list):
-                for item in content:
-                    if isinstance(item, dict) and item.get('type') == 'image_url':
-                        img_url = item.get('image_url', {}).get('url', '')
-                        if img_url:
-                            return img_url
-            
-            # Проверка content как строка с base64
-            elif isinstance(content, str):
-                if content.startswith('data:image') or content.startswith('iVBOR') or content.startswith('/9j/'):
-                    if not content.startswith('data:image'):
-                        # Добавляем data URI схему
-                        if content.startswith('iVBOR'):
-                            return f"data:image/png;base64,{content}"
-                        elif content.startswith('/9j/'):
-                            return f"data:image/jpeg;base64,{content}"
-                    return content
-            
-            print(f"[ERROR] No image found. Message keys: {list(message.keys())}")
+            print(f"[ERROR] No image in Gemini response parts: {[list(p.keys()) for p in parts_resp]}")
             return None
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
-        print(f"[ERROR] OpenRouter API error {e.code}: {error_body}")
-        try:
-            error_json = json.loads(error_body)
-            print(f"[ERROR] Parsed error: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
-        except:
-            pass
+        print(f"[ERROR] Gemini API error {e.code}: {error_body[:500]}")
         return None
     except Exception as e:
-        print(f"[ERROR] Generate image exception: {type(e).__name__}: {e}")
+        print(f"[ERROR] Gemini exception: {type(e).__name__}: {e}")
         import traceback
         print(traceback.format_exc())
         return None
 
 def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
-    '''Загрузка изображения в S3 для постоянного хранения'''
     try:
-        # Проверяем, является ли изображение base64 data URL
         if image_url.startswith('data:image'):
-            # Формат: data:image/png;base64,iVBORw0KG...
             header, encoded = image_url.split(',', 1)
             image_data = base64.b64decode(encoded)
         else:
@@ -314,18 +213,8 @@ def upload_to_s3(image_url: str, telegram_id: int) -> Optional[str]:
         print(traceback.format_exc())
         return None
 
-def get_model_keyboard():
-    '''Генерация клавиатуры выбора модели'''
-    buttons = []
-    
-    for model in IMAGE_MODELS:
-        buttons.append([{'text': f"{model['emoji']} {model['name']}", 'callback_data': f"model:{model['id']}"}])
-    
-    buttons.append([{'text': '↩️ Назад', 'callback_data': 'back'}])
-    return {'inline_keyboard': buttons}
-
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''Telegram бот для генерации AI-изображений (Нейрофотосессия)'''
+    '''Telegram бот для генерации AI-изображений (Нейрофотосессия) через Google Gemini API'''
     method: str = event.get('httpMethod', 'POST')
     
     if method == 'OPTIONS':
@@ -352,17 +241,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         body_str = event.get('body', '{}')
         print(f"[WEBHOOK] ========== NEW REQUEST ==========")
-        print(f"[WEBHOOK] Method: {method}")
-        print(f"[WEBHOOK] Event keys: {list(event.keys())}")
         print(f"[WEBHOOK] Body length: {len(body_str)}")
-        print(f"[WEBHOOK] Full body: {body_str}")
         
         update = json.loads(body_str)
         update_id = update.get('update_id')
-        print(f"[WEBHOOK] Update keys: {list(update.keys())}")
-        print(f"[WEBHOOK] Update ID: {update_id}")
-        print(f"[WEBHOOK] Has callback_query: {'callback_query' in update}")
-        print(f"[WEBHOOK] Has message: {'message' in update}")
         
         bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN', '8257588939:AAEYZYndyra3FLca5VpIFRkk8gHH1GGd48w')
         db_url = os.environ.get('DATABASE_URL')
@@ -373,18 +255,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # CRITICAL: Проверка на /start ДО дедупликации (приоритетная команда)
+        # /start
         if 'message' in update:
             quick_message = update['message']
             quick_text = quick_message.get('text', '')
             if quick_text == '/start':
-                print(f"[PRIORITY] /start detected - bypassing deduplication and processing immediately")
                 chat_id = str(quick_message['chat']['id'])
                 telegram_id = quick_message['from']['id']
                 username = quick_message['from'].get('username', '')
                 first_name = quick_message['from'].get('first_name', 'User')
                 
-                # Создаем или обновляем пользователя и очищаем сессию
                 try:
                     cur.execute(
                         f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) "
@@ -395,28 +275,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         (telegram_id, username, first_name)
                     )
                     conn.commit()
-                    print(f"[PRIORITY] User {telegram_id} (@{username}) created/updated and session cleared")
                 except Exception as e:
-                    print(f"[PRIORITY] Failed to create/update user: {e}")
+                    print(f"[ERROR] Create user: {e}")
                 
                 keyboard = {
                     'inline_keyboard': [
                         [{'text': '📖 Инструкция', 'callback_data': 'instruction'}],
-                        [{'text': '🎨 Выбрать модель', 'callback_data': 'choose_model'}],
                         [{'text': '📊 Статистика', 'callback_data': 'show_stats'}]
                     ]
                 }
                 help_text = (
                     '🎨 <b>Нейрофотосессия PRO</b>\n\n'
                     'Создавайте профессиональные AI-фотографии!\n\n'
-                    '<b>Основные команды:</b>\n'
-                    '/models - Выбрать модель\n'
-                    '/stats - Статистика\n'
-                    '/instruction - Подробная инструкция\n\n'
-                    '<b>Быстрый старт:</b>\n'
-                    '1. Выберите модель /models\n'
-                    '2. Отправьте текст или фото\n'
-                    '3. Получите результат за 10-60 сек\n\n'
+                    '<b>Как пользоваться:</b>\n'
+                    '1. Отправьте текст — получите изображение\n'
+                    '2. Отправьте фото с подписью — редактирование\n'
+                    '3. Несколько фото + подпись — объединение\n\n'
+                    '⚡ Модель: Gemini 2.5 Flash\n'
                     '💎 PRO: 299₽/мес - безлимит'
                 )
                 send_telegram_message(bot_token, chat_id, help_text, keyboard)
@@ -424,9 +299,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # CRITICAL: Дедупликация через PostgreSQL (память НЕ сохраняется между Cloud Function инстансами!)
+        # Дедупликация
         if update_id:
-            print(f"[DEDUP] Checking if update_id {update_id} already processed...")
             cur.execute(
                 f"SELECT COUNT(*) as count FROM {DB_SCHEMA}.neurophoto_processed_updates WHERE update_id = %s",
                 (update_id,)
@@ -434,37 +308,25 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             already_processed = cur.fetchone()['count'] > 0
             
             if already_processed:
-                print(f"[DEDUP] ⚠️ DUPLICATE update_id {update_id} detected - ignoring!")
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True, 'skipped': 'duplicate'})}
             
-            # CRITICAL: Записываем update_id как обработанный и делаем COMMIT СРАЗУ!
-            # Это гарантирует что даже если функция таймаутится, следующий запрос увидит дубликат
-            print(f"[DEDUP] Marking update_id {update_id} as processed...")
             cur.execute(
                 f"INSERT INTO {DB_SCHEMA}.neurophoto_processed_updates (update_id) VALUES (%s) ON CONFLICT DO NOTHING",
                 (update_id,)
             )
-            conn.commit()  # COMMIT СРАЗУ, ДО обработки запроса!
-            print(f"[DEDUP] ✅ Update {update_id} COMMITTED to DB - safe from duplicates now")
+            conn.commit()
             
-            # Очищаем старые записи (старше 1 часа) для экономии места
             cur.execute(
                 f"DELETE FROM {DB_SCHEMA}.neurophoto_processed_updates WHERE processed_at < NOW() - INTERVAL '1 hour'"
             )
-            deleted = cur.rowcount
-            if deleted > 0:
-                print(f"[DEDUP] Cleaned up {deleted} old processed updates")
             conn.commit()
         
-        # Обработка callback кнопок
+        # Callback кнопки
         if 'callback_query' in update:
-            print("[CALLBACK] ========== CALLBACK QUERY DETECTED ==========")
             try:
                 callback = update['callback_query']
-                print(f"[CALLBACK] Full callback object: {callback}")
-                
                 chat_id = str(callback['message']['chat']['id'])
                 telegram_id = callback['from']['id']
                 username = callback['from'].get('username', '')
@@ -472,169 +334,68 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 callback_query_id = callback['id']
                 data = callback['data']
                 
-                print(f"[CALLBACK] START: User {telegram_id} (@{username}) pressed: {data}")
+                answer_callback_query(bot_token, callback_query_id)
                 
-                # Ответить на callback query (убирает "загрузку" на кнопке)
-                answer_result = answer_callback_query(bot_token, callback_query_id)
-                print(f"[CALLBACK] Answer result: {answer_result}")
-                
-                # Создать пользователя если не существует
-                print(f"[CALLBACK] Creating/updating user {telegram_id}")
                 cur.execute(
                     f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
                     f"ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name",
                     (telegram_id, username, first_name)
                 )
                 conn.commit()
-                print("[CALLBACK] User created/updated")
                 
-                if data.startswith('model:'):
-                    model_id = data.split(':', 1)[1]
-                    print(f"[CALLBACK] Setting model: {model_id}")
-                    cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (model_id, telegram_id))
-                    conn.commit()
-                    
-                    selected_model = next((m for m in IMAGE_MODELS if m['id'] == model_id), None)
-                    
-                    if selected_model:
-                        model_text = (
-                            f"✅ <b>Модель выбрана:</b> {selected_model['emoji']} {selected_model['name']}\n\n"
-                            f"ℹ️ {selected_model['info']}\n\n"
-                            f"Теперь просто отправьте описание изображения!"
-                        )
-                        result = send_telegram_message(bot_token, chat_id, model_text)
-                    else:
-                        result = send_telegram_message(bot_token, chat_id, f"✅ Модель изменена\n\nТеперь просто отправьте описание изображения!")
-                    print(f"[CALLBACK] Model changed message sent: {result}")
-                
-                elif data == 'instruction':
-                    print("[CALLBACK] Instruction requested")
+                if data == 'instruction':
                     instruction_text = (
-                        '📖 <b>Подробная инструкция по использованию</b>\n\n'
+                        '📖 <b>Инструкция</b>\n\n'
                         '<b>🎨 Что умеет бот:</b>\n'
                         '• Генерация изображений из текста\n'
                         '• Обработка фото (редактирование, стилизация)\n'
-                        '• Работа с несколькими фото одновременно\n'
-                        '• Профессиональное качество результата\n\n'
-                        '<b>💎 Доступные модели:</b>\n\n'
-                        '<b>Gemini 3 Pro</b> 💎\n'
-                        'Топовая модель от Google. Лучший выбор для:'
-                        '\n• Обработки нескольких фото сразу'
-                        '\n• Сложных задач редактирования'
-                        '\n• Максимального качества результата'
-                        '\n⏱ Скорость: ~30 сек\n\n'
-                        '<b>Gemini 2.5 Flash</b> ⚡\n'
-                        'Быстрая Pro-версия. Идеальна для:'
-                        '\n• Работы с несколькими фото'
-                        '\n• Быстрой обработки изображений'
-                        '\n• Профессионального качества'
-                        '\n⏱ Скорость: ~15 сек\n\n'
-                        '<b>FLUX 2 Flex</b> 🌟\n'
-                        'Гибкая генерация. Подходит для:'
-                        '\n• Создания в любых стилях'
-                        '\n• Реалистичных фотографий'
-                        '\n• Художественных работ'
-                        '\n⏱ Скорость: ~25 сек'
-                        '\n⚠️ Работает только с текстом (без фото)\n\n'
-                        '<b>FLUX 2 Pro</b> 💫\n'
-                        'Профессиональная версия. Для:'
-                        '\n• Максимальной детализации'
-                        '\n• Сложных композиций'
-                        '\n• Коммерческого использования'
-                        '\n⏱ Скорость: ~35 сек'
-                        '\n⚠️ Работает только с текстом (без фото)\n\n'
-                        '<b>GPT-5 Image</b> 🎨\n'
-                        'Новейшая модель OpenAI. Сильна в:'
-                        '\n• Понимании сложных промптов'
-                        '\n• Креативной генерации'
-                        '\n• Нестандартных решениях'
-                        '\n⏱ Скорость: ~20 сек'
-                        '\n⚠️ Работает только с текстом (без фото)\n\n'
-                        '<b>📸 Как работать с фото:</b>\n'
+                        '• Работа с несколькими фото одновременно\n\n'
+                        '<b>📸 Работа с фото:</b>\n'
                         '1. Отправьте одно или несколько фото\n'
-                        '2. К последнему фото добавьте подпись с заданием\n'
-                        '3. Используйте Gemini 3 Pro или Gemini 2.5 Flash\n\n'
+                        '2. К последнему фото добавьте подпись с заданием\n\n'
                         '<b>Примеры заданий:</b>\n'
                         '• "Сделай фон белым"\n'
                         '• "Убери лишние объекты"\n'
                         '• "Улучши качество фото"\n'
                         '• "Объедини эти фото в одно"\n\n'
-                        '<b>✍️ Как работать с текстом:</b>\n'
-                        '1. Выберите любую модель командой /models\n'
-                        '2. Опишите что хотите увидеть\n'
-                        '3. Чем подробнее описание - тем лучше результат\n\n'
-                        '<b>Примеры промптов:</b>\n'
+                        '<b>✍️ Работа с текстом:</b>\n'
+                        'Просто опишите что хотите увидеть!\n\n'
+                        '<b>Примеры:</b>\n'
                         '• "Космонавт в открытом космосе, реалистично"\n'
                         '• "Уютное кафе в Париже, вечер, дождь"\n'
                         '• "Портрет девушки, стиль ренессанс"\n\n'
-                        '<b>💡 Советы:</b>\n'
-                        '• Для работы с фото используйте только Gemini модели\n'
-                        '• FLUX и GPT-5 работают только с текстом\n'
-                        '• Подробное описание = лучший результат\n'
-                        '• Генерация занимает 10-60 секунд\n'
-                        '• Можно отправлять новый запрос сразу\n\n'
-                        '💎 <b>Тариф PRO: 299₽/мес</b>\n'
-                        '✅ Все 5 моделей\n'
-                        '✅ Безлимитные генерации\n'
-                        '✅ Приоритетная обработка\n\n'
+                        '⚡ Модель: Gemini 2.5 Flash\n'
+                        '⏱ Скорость: ~15-30 сек\n\n'
+                        '💎 <b>PRO: 299₽/мес</b> — безлимит\n'
                         'Оформить: /pay'
                     )
-                    result = send_telegram_message(bot_token, chat_id, instruction_text)
-                    print(f"[CALLBACK] Instruction sent: {result}")
-                
-                elif data == 'choose_model':
-                    print("[CALLBACK] Choose model from menu")
-                    cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
-                    user = cur.fetchone()
-                    is_paid = user and user['paid_generations'] > 0 if user else False
-                    
-                    if not is_paid:
-                        result = send_telegram_message(bot_token, chat_id,
-                            '💎 <b>Доступ только по подписке</b>\n\n'
-                            '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
-                            '✅ Gemini 3 Pro - топовая модель Google\n'
-                            '✅ Gemini 2.5 Flash - быстрая Pro-версия\n'
-                            '✅ FLUX 2 Flex - гибкая генерация\n'
-                            '✅ FLUX 2 Pro - максимальное качество\n'
-                            '✅ GPT-5 Image - новейшая от OpenAI\n'
-                            '✅ Неограниченные генерации\n'
-                            '✅ Приоритетная обработка\n\n'
-                            'Для оплаты напишите: /pay'
-                        )
-                    else:
-                        result = send_telegram_message(bot_token, chat_id, '💎 <b>Выберите модель:</b>', get_model_keyboard())
-                    print(f"[CALLBACK] Model selection sent: {result}")
+                    send_telegram_message(bot_token, chat_id, instruction_text)
                 
                 elif data == 'show_stats':
-                    print("[CALLBACK] Show stats from menu")
-                    cur.execute(f"SELECT paid_generations, total_used, preferred_model FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+                    cur.execute(f"SELECT paid_generations, total_used FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
                     user = cur.fetchone()
                     
                     if user:
                         is_paid = user['paid_generations'] > 0
-                        model_name = next((m['name'] for m in IMAGE_MODELS if m['id'] == user.get('preferred_model', '')), 'GPT-5 Image')
-                        
                         stats_text = (
                             f'📊 <b>Ваша статистика</b>\n\n'
-                            f'🎨 Текущая модель: {model_name}\n'
+                            f'🎨 Модель: Gemini 2.5 Flash\n'
                             f'📈 Всего сгенерировано: {user["total_used"]}\n'
                         )
                         if is_paid:
-                            stats_text += f'💎 Pro доступ: активен (безлимит)\n'
+                            stats_text += '💎 Pro доступ: активен (безлимит)\n'
                         else:
                             stats_text += '\n💎 Для доступа к генерации напишите /pay'
                     else:
                         stats_text = '❌ Пользователь не найден. Напишите /start'
                     
-                    result = send_telegram_message(bot_token, chat_id, stats_text)
-                    print(f"[CALLBACK] Stats sent: {result}")
+                    send_telegram_message(bot_token, chat_id, stats_text)
                 
                 elif data == 'back':
-                    print("[CALLBACK] Back to main menu")
-                    result = send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
-                    print(f"[CALLBACK] Back message sent: {result}")
+                    send_telegram_message(bot_token, chat_id, 'Главное меню. Напишите /help для справки.')
                 
-                print(f"[CALLBACK] END: Successfully processed {data}")
+                elif data == 'choose_model' or data.startswith('model:'):
+                    send_telegram_message(bot_token, chat_id, '⚡ Сейчас используется единая модель Gemini 2.5 Flash.\nПросто отправьте текст или фото!')
                 
             except Exception as callback_error:
                 print(f"[CALLBACK ERROR] {type(callback_error).__name__}: {str(callback_error)}")
@@ -647,7 +408,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
         if 'message' not in update:
-            print("[WEBHOOK] No message in update")
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -659,40 +419,28 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         first_name = message['from'].get('first_name', '')
         message_text = message.get('text', '') or message.get('caption', '')
         
-        # Извлекаем фотографии из сообщения
         photo_urls = []
         media_group_id = message.get('media_group_id')
         file_url = None
+        generation_id = None
         
-        # CRITICAL: Для media group НЕ добавляем в photo_urls сразу, только получаем URL для сохранения
         if 'photo' in message:
-            print(f"[MESSAGE] Found {len(message['photo'])} photo sizes")
-            # Берем самое большое фото (последнее в массиве)
             largest_photo = message['photo'][-1]
             file_url = get_telegram_file_url(bot_token, largest_photo['file_id'])
             if file_url:
-                # Если это НЕ media group, тогда добавляем в photo_urls
                 if not media_group_id:
                     photo_urls.append(file_url)
-                print(f"[MESSAGE] Photo URL: {file_url}, media_group: {media_group_id or 'None'}")
         
-        # CRITICAL: Обработка media group - используем generation_id для предотвращения дублей
-        generation_id = None
-        
-        # Если это часть медиа-группы (несколько фото), сохраняем в БД
         if media_group_id and file_url:
-            print(f"[MESSAGE] Media group detected: {media_group_id}, caption: '{message_text}'")
-            generation_id = media_group_id  # Используем media_group_id как уникальный ID генерации
+            generation_id = media_group_id
             
             try:
-                # Создаем пользователя если не существует
                 cur.execute(
                     f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
                     f"ON CONFLICT (telegram_id) DO NOTHING",
                     (telegram_id, username, first_name)
                 )
                 
-                # Сохраняем фото в сессию пользователя
                 cur.execute(
                     f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
                     f"session_state = 'collecting_photos', "
@@ -703,13 +451,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     (file_url, file_url, message_text, telegram_id)
                 )
                 conn.commit()
-                print(f"[MESSAGE] Photo saved to session")
                 
-                # Если есть caption (текст к фото), значит это последнее фото - обрабатываем
                 if message_text:
-                    print(f"[MESSAGE] Caption found in media group, checking if already processed...")
-                    
-                    # CRITICAL: Проверяем, не обработали ли мы уже этот media_group_id
                     cur.execute(
                         f"SELECT COUNT(*) as count FROM {DB_SCHEMA}.neurophoto_generations "
                         f"WHERE telegram_id = %s AND prompt = %s AND created_at > NOW() - INTERVAL '2 minutes'",
@@ -718,22 +461,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     already_processed = cur.fetchone()['count'] > 0
                     
                     if already_processed:
-                        print(f"[MESSAGE] Media group {media_group_id} already processed, skipping duplicate")
                         cur.close()
                         conn.close()
                         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                     
-                    print(f"[MESSAGE] Processing media group {media_group_id} for the first time")
-                    
-                    # CRITICAL: СРАЗУ записываем маркер обработки ПЕРЕД генерацией, чтобы блокировать дубликаты
-                    print(f"[MESSAGE] Creating processing marker to prevent duplicates")
                     cur.execute(
                         f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) "
                         f"VALUES (%s, %s, %s, %s, %s)",
                         (telegram_id, f"media_group:{media_group_id}", 'processing', 'pending', False)
                     )
                     conn.commit()
-                    print(f"[MESSAGE] Processing marker created, loading photos from session")
                     
                     cur.execute(
                         f"SELECT session_photo_url FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s",
@@ -741,12 +478,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     )
                     session = cur.fetchone()
                     if session and session['session_photo_url']:
-                        # CRITICAL: Обновляем переменную photo_urls для последующей генерации
                         photo_urls = [url for url in session['session_photo_url'].split('|') if url.strip()]
-                        print(f"[MESSAGE] ✅ Loaded {len(photo_urls)} photos from session into photo_urls variable")
-                        print(f"[MESSAGE] Photos: {photo_urls}")
-                        print(f"[MESSAGE] Proceeding to SINGLE generation with {len(photo_urls)} photos and prompt: '{message_text}'")
-                        # Очищаем сессию
                         cur.execute(
                             f"UPDATE {DB_SCHEMA}.neurophoto_users SET "
                             f"session_state = NULL, session_photo_url = NULL, session_photo_prompt = NULL "
@@ -754,30 +486,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             (telegram_id,)
                         )
                         conn.commit()
-                        # CRITICAL: НЕ возвращаемся - продолжаем к генерации с обновленными photo_urls и message_text!
                     else:
-                        print(f"[WARNING] Caption found but no photos in session")
                         cur.close()
                         conn.close()
                         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                 else:
-                    # Нет caption - ждем следующее фото
-                    print(f"[MESSAGE] No caption yet, waiting for more photos in media group")
                     cur.close()
                     conn.close()
                     return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
                     
             except Exception as e:
-                print(f"[ERROR] Failed to process media group: {e}")
+                print(f"[ERROR] Media group: {e}")
                 import traceback
                 print(traceback.format_exc())
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        print(f"[MESSAGE] From {username} ({telegram_id}): {message_text}, Photos: {len(photo_urls)}")
-        
-        # Команда /admin - статистика для админов
+        # /admin
         if message_text == '/admin':
             if not is_admin(telegram_id):
                 send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
@@ -798,31 +524,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             today_gens = cur.fetchone()['today_gens']
             
             admin_text = (
-                '👑 <b>Админ-панель Нейрофотосессия</b>\n\n'
-                f'👥 Всего пользователей: {total_users}\n'
-                f'💎 Платных подписчиков: {paid_users}\n'
+                '👑 <b>Админ-панель</b>\n\n'
+                f'👥 Пользователей: {total_users}\n'
+                f'💎 Платных: {paid_users}\n'
                 f'🎨 Всего генераций: {total_gens}\n'
-                f'📊 Генераций сегодня: {today_gens}\n\n'
-                '<b>Доступные команды:</b>\n'
-                '/admin - эта панель\n'
-                '/users - список пользователей\n'
-                '/topusers - топ по генерациям\n'
-                '/addpro [@login] - выдать Pro по логину\n'
-                '/addgens [@login] [кол-во] - добавить генерации\n'
-                '/addpaidgens [@login] [кол-во] - добавить платные генерации\n'
-                '/userinfo [@login] - инфо о пользователе\n'
-                '/setwebhook - установить webhook\n'
-                '/broadcast [текст] - рассылка всем'
+                f'📊 Сегодня: {today_gens}\n\n'
+                '⚡ Модель: Gemini 2.5 Flash (Google AI)\n\n'
+                '<b>Команды:</b>\n'
+                '/admin - панель\n'
+                '/users - пользователи\n'
+                '/topusers - топ\n'
+                '/addpro [@login] - выдать Pro\n'
+                '/addgens [@login] [n] - бесплатные\n'
+                '/addpaidgens [@login] [n] - платные\n'
+                '/userinfo [@login] - инфо\n'
+                '/setwebhook - webhook\n'
+                '/broadcast [текст] - рассылка'
             )
             send_telegram_message(bot_token, chat_id, admin_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /users - список последних пользователей
+        # /users
         if message_text == '/users':
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -832,7 +559,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             users_text = '👥 <b>Последние 20 пользователей:</b>\n\n'
             for user in users:
-                status = '💎 Pro' if user['paid_generations'] > 0 else '❌'
+                status = '💎' if user['paid_generations'] > 0 else '❌'
                 users_text += f"{user['telegram_id']} (@{user['username'] or 'noname'}) - {user['total_used']} ген. - {status}\n"
             
             send_telegram_message(bot_token, chat_id, users_text)
@@ -840,10 +567,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /topusers - топ пользователей
+        # /topusers
         if message_text == '/topusers':
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -851,35 +578,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             cur.execute(f"SELECT telegram_id, username, total_used, paid_generations FROM {DB_SCHEMA}.neurophoto_users ORDER BY total_used DESC LIMIT 15")
             users = cur.fetchall()
             
-            top_text = '🏆 <b>Топ-15 пользователей:</b>\n\n'
+            top_text = '🏆 <b>Топ-15:</b>\n\n'
             for i, user in enumerate(users, 1):
                 status = '💎' if user['paid_generations'] > 0 else '🆓'
-                top_text += f"{i}. {status} @{user['username'] or user['telegram_id']} - {user['total_used']} генераций\n"
+                top_text += f"{i}. {status} @{user['username'] or user['telegram_id']} - {user['total_used']}\n"
             
             send_telegram_message(bot_token, chat_id, top_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addpro [@login] - выдать Pro подписку (создает пользователя если не существует)
+        # /addpro
         if message_text.startswith('/addpro'):
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
             try:
                 user_input = message_text.split()[1].lstrip('@')
-                
-                # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
-                    # Сначала пробуем обновить существующего пользователя
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE telegram_id = %s RETURNING telegram_id, username", (user_id,))
                     result = cur.fetchone()
-                    
-                    # Если пользователя нет - создаем нового с PRO подпиской
                     if not result:
                         cur.execute(
                             f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, paid_generations) "
@@ -888,34 +610,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         )
                         result = cur.fetchone()
                         conn.commit()
-                        send_telegram_message(bot_token, chat_id, f'✅ Создан новый пользователь с ID {user_id} и выдана Pro подписка')
+                        send_telegram_message(bot_token, chat_id, f'✅ Создан пользователь {user_id} с Pro')
                     else:
                         conn.commit()
-                        send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
-                        
+                        send_telegram_message(bot_token, chat_id, f'✅ Pro выдана @{result["username"] or result["telegram_id"]}')
                 except ValueError:
-                    # Поиск по username
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = 999999 WHERE username = %s RETURNING telegram_id, username", (user_input,))
                     result = cur.fetchone()
-                    
                     if result:
                         conn.commit()
-                        send_telegram_message(bot_token, chat_id, f'✅ Pro подписка выдана пользователю @{result["username"] or result["telegram_id"]}')
+                        send_telegram_message(bot_token, chat_id, f'✅ Pro выдана @{result["username"] or result["telegram_id"]}')
                     else:
-                        send_telegram_message(bot_token, chat_id, f'❌ Пользователь @{user_input} не найден.\n\nℹ️ Для создания нового пользователя используйте Telegram ID вместо username.\nПример: /addpro 123456789')
-                        
+                        send_telegram_message(bot_token, chat_id, f'❌ @{user_input} не найден')
             except IndexError:
-                send_telegram_message(bot_token, chat_id, '❌ Формат: /addpro [@username или ID]\n\nПримеры:\n/addpro @coach_year\n/addpro 123456789')
+                send_telegram_message(bot_token, chat_id, '❌ Формат: /addpro [@username или ID]')
             except Exception as e:
                 send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addgens [@login] [количество] - добавить бесплатные генерации
+        # /addgens
         if message_text.startswith('/addgens'):
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -924,30 +642,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 parts = message_text.split()
                 user_input = parts[1].lstrip('@')
                 amount = int(parts[2])
-                
-                # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
                 except ValueError:
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
-                
                 result = cur.fetchone()
                 if result:
                     conn.commit()
-                    send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} бесплатных генераций пользователю @{result["username"] or result["telegram_id"]}')
+                    send_telegram_message(bot_token, chat_id, f'✅ +{amount} генераций для @{result["username"] or result["telegram_id"]}')
                 else:
-                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+                    send_telegram_message(bot_token, chat_id, '❌ Не найден')
             except Exception as e:
-                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addgens [@login или ID] [количество]')
+                send_telegram_message(bot_token, chat_id, f'❌ Формат: /addgens [@login] [кол-во]')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /addpaidgens [@login] [количество] - добавить платные генерации
+        # /addpaidgens
         if message_text.startswith('/addpaidgens'):
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -956,76 +671,68 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 parts = message_text.split()
                 user_input = parts[1].lstrip('@')
                 amount = int(parts[2])
-                
-                # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s RETURNING telegram_id, username", (amount, user_id))
                 except ValueError:
                     cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET paid_generations = paid_generations + %s WHERE username = %s RETURNING telegram_id, username", (amount, user_input))
-                
                 result = cur.fetchone()
                 if result:
                     conn.commit()
-                    send_telegram_message(bot_token, chat_id, f'✅ Добавлено {amount} платных генераций пользователю @{result["username"] or result["telegram_id"]}')
+                    send_telegram_message(bot_token, chat_id, f'✅ +{amount} платных генераций для @{result["username"] or result["telegram_id"]}')
                 else:
-                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+                    send_telegram_message(bot_token, chat_id, '❌ Не найден')
             except Exception as e:
-                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /addpaidgens [@login или ID] [количество]')
+                send_telegram_message(bot_token, chat_id, f'❌ Формат: /addpaidgens [@login] [кол-во]')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /userinfo [@login] - информация о пользователе
+        # /userinfo
         if message_text.startswith('/userinfo'):
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
             try:
                 user_input = message_text.split()[1].lstrip('@')
-                
-                # Попытка найти по логину или ID
                 try:
                     user_id = int(user_input)
                     cur.execute(f"SELECT * FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (user_id,))
                 except ValueError:
                     cur.execute(f"SELECT * FROM {DB_SCHEMA}.neurophoto_users WHERE username = %s", (user_input,))
-                
                 user = cur.fetchone()
                 if user:
                     cur.execute(f"SELECT COUNT(*) as gens_count FROM {DB_SCHEMA}.neurophoto_generations WHERE telegram_id = %s", (user['telegram_id'],))
                     gens = cur.fetchone()['gens_count']
-                    
                     status = '💎 PRO' if user['paid_generations'] > 0 else '🆓 Free'
                     info_text = (
-                        f'👤 <b>Информация о пользователе</b>\n\n'
+                        f'👤 <b>Пользователь</b>\n\n'
                         f'ID: {user["telegram_id"]}\n'
-                        f'Логин: @{user["username"] or "нет"}\n'
-                        f'Имя: {user["first_name"] or "не указано"}\n'
-                        f'Статус: {status}\n\n'
-                        f'🆓 Бесплатных генераций: {user["free_generations"]}\n'
-                        f'💎 Платных генераций: {user["paid_generations"]}\n'
-                        f'📊 Всего использовано: {user["total_used"]}\n'
-                        f'🗄️ Записей в БД: {gens}\n\n'
-                        f'🎨 Модель: {user.get("preferred_model", "не выбрана")[:50]}...\n'
-                        f'📅 Регистрация: {user["created_at"]}'
+                        f'@{user["username"] or "нет"}\n'
+                        f'Имя: {user["first_name"] or "—"}\n'
+                        f'Статус: {status}\n'
+                        f'🆓 Бесплатных: {user["free_generations"]}\n'
+                        f'💎 Платных: {user["paid_generations"]}\n'
+                        f'📊 Использовано: {user["total_used"]}\n'
+                        f'🗄️ В БД: {gens}\n'
+                        f'📅 Рег: {user["created_at"]}'
                     )
                     send_telegram_message(bot_token, chat_id, info_text)
                 else:
-                    send_telegram_message(bot_token, chat_id, '❌ Пользователь не найден')
+                    send_telegram_message(bot_token, chat_id, '❌ Не найден')
             except Exception as e:
-                send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}\n\nФормат: /userinfo [@login или ID]')
+                send_telegram_message(bot_token, chat_id, f'❌ Формат: /userinfo [@login или ID]')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /setwebhook - установить webhook (только для админа)
+        # /setwebhook
         if message_text == '/setwebhook':
             if not is_admin(telegram_id):
-                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа к этой команде.')
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
                 cur.close()
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
@@ -1043,9 +750,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 with urllib.request.urlopen(req) as response:
                     result = json.loads(response.read().decode('utf-8'))
                     if result.get('ok'):
-                        send_telegram_message(bot_token, chat_id, f'✅ Webhook установлен:\n{webhook_url}')
+                        send_telegram_message(bot_token, chat_id, f'✅ Webhook установлен')
                     else:
-                        send_telegram_message(bot_token, chat_id, f'❌ Ошибка установки webhook:\n{result.get("description", "Unknown")}')
+                        send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {result.get("description", "Unknown")}')
             except Exception as e:
                 send_telegram_message(bot_token, chat_id, f'❌ Ошибка: {str(e)}')
             
@@ -1053,104 +760,46 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /help (NOTE: /start обрабатывается в самом начале, до дедупликации)
+        # /help
         if message_text == '/help':
             keyboard = {
                 'inline_keyboard': [
                     [{'text': '📖 Инструкция', 'callback_data': 'instruction'}],
-                    [{'text': '🎨 Выбрать модель', 'callback_data': 'choose_model'}],
                     [{'text': '📊 Статистика', 'callback_data': 'show_stats'}]
                 ]
             }
             help_text = (
                 '🎨 <b>Нейрофотосессия PRO</b>\n\n'
-                'Создавайте профессиональные AI-фотографии!\n\n'
-                '<b>Основные команды:</b>\n'
-                '/models - Выбрать модель\n'
+                'Создавайте AI-фотографии!\n\n'
+                '<b>Команды:</b>\n'
                 '/stats - Статистика\n'
-                '/instruction - Подробная инструкция\n\n'
+                '/instruction - Инструкция\n\n'
                 '<b>Быстрый старт:</b>\n'
-                '1. Выберите модель /models\n'
-                '2. Отправьте текст или фото\n'
-                '3. Получите результат за 10-60 сек\n\n'
-                '💎 PRO: 299₽/мес - безлимит\n\n'
-                'Напишите /pay для подключения PRO'
+                '1. Отправьте текст или фото\n'
+                '2. Получите результат за 15-30 сек\n\n'
+                '⚡ Модель: Gemini 2.5 Flash\n'
+                '💎 PRO: 299₽/мес - безлимит'
             )
             send_telegram_message(bot_token, chat_id, help_text, keyboard)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Команда /instruction - подробная инструкция
+        # /instruction
         if message_text == '/instruction':
             instruction_text = (
-                '📖 <b>Подробная инструкция по использованию</b>\n\n'
+                '📖 <b>Инструкция</b>\n\n'
                 '<b>🎨 Что умеет бот:</b>\n'
                 '• Генерация изображений из текста\n'
-                '• Обработка фото (редактирование, стилизация)\n'
-                '• Работа с несколькими фото одновременно\n'
-                '• Профессиональное качество результата\n\n'
-                '<b>💎 Доступные модели:</b>\n\n'
-                '<b>Gemini 3 Pro</b> 💎\n'
-                'Топовая модель от Google. Лучший выбор для:'
-                '\n• Обработки нескольких фото сразу'
-                '\n• Сложных задач редактирования'
-                '\n• Максимального качества результата'
-                '\n⏱ Скорость: ~30 сек\n\n'
-                '<b>Gemini 2.5 Flash</b> ⚡\n'
-                'Быстрая Pro-версия. Идеальна для:'
-                '\n• Работы с несколькими фото'
-                '\n• Быстрой обработки изображений'
-                '\n• Профессионального качества'
-                '\n⏱ Скорость: ~15 сек\n\n'
-                '<b>FLUX 2 Flex</b> 🌟\n'
-                'Гибкая генерация. Подходит для:'
-                '\n• Создания в любых стилях'
-                '\n• Реалистичных фотографий'
-                '\n• Художественных работ'
-                '\n⏱ Скорость: ~25 сек'
-                '\n⚠️ Работает только с текстом (без фото)\n\n'
-                '<b>FLUX 2 Pro</b> 💫\n'
-                'Профессиональная версия. Для:'
-                '\n• Максимальной детализации'
-                '\n• Сложных композиций'
-                '\n• Коммерческого использования'
-                '\n⏱ Скорость: ~35 сек'
-                '\n⚠️ Работает только с текстом (без фото)\n\n'
-                '<b>GPT-5 Image</b> 🎨\n'
-                'Новейшая модель OpenAI. Сильна в:'
-                '\n• Понимании сложных промптов'
-                '\n• Креативной генерации'
-                '\n• Нестандартных решениях'
-                '\n⏱ Скорость: ~20 сек'
-                '\n⚠️ Работает только с текстом (без фото)\n\n'
-                '<b>📸 Как работать с фото:</b>\n'
-                '1. Отправьте одно или несколько фото\n'
-                '2. К последнему фото добавьте подпись с заданием\n'
-                '3. Используйте Gemini 3 Pro или Gemini 2.5 Flash\n\n'
-                '<b>Примеры заданий:</b>\n'
-                '• "Сделай фон белым"\n'
-                '• "Убери лишние объекты"\n'
-                '• "Улучши качество фото"\n'
-                '• "Объедини эти фото в одно"\n\n'
-                '<b>✍️ Как работать с текстом:</b>\n'
-                '1. Выберите любую модель командой /models\n'
-                '2. Опишите что хотите увидеть\n'
-                '3. Чем подробнее описание - тем лучше результат\n\n'
-                '<b>Примеры промптов:</b>\n'
-                '• "Космонавт в открытом космосе, реалистично"\n'
-                '• "Уютное кафе в Париже, вечер, дождь"\n'
-                '• "Портрет девушки, стиль ренессанс"\n\n'
-                '<b>💡 Советы:</b>\n'
-                '• Для работы с фото используйте только Gemini модели\n'
-                '• FLUX и GPT-5 работают только с текстом\n'
-                '• Подробное описание = лучший результат\n'
-                '• Генерация занимает 10-60 секунд\n'
-                '• Можно отправлять новый запрос сразу\n\n'
-                '💎 <b>Тариф PRO: 299₽/мес</b>\n'
-                '✅ Все 5 моделей\n'
-                '✅ Безлимитные генерации\n'
-                '✅ Приоритетная обработка\n\n'
+                '• Обработка фото\n'
+                '• Работа с несколькими фото\n\n'
+                '<b>📸 Фото:</b>\n'
+                '1. Отправьте фото с подписью\n'
+                '2. Или несколько фото, подпись к последнему\n\n'
+                '<b>✍️ Текст:</b>\n'
+                'Просто опишите что хотите!\n\n'
+                '⚡ Модель: Gemini 2.5 Flash\n'
+                '💎 PRO: 299₽/мес\n'
                 'Оформить: /pay'
             )
             send_telegram_message(bot_token, chat_id, instruction_text)
@@ -1158,185 +807,135 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
+        # /models - больше нет выбора
         if message_text == '/models':
-            # Проверка подписки
-            cur.execute(f"SELECT paid_generations FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
-            user = cur.fetchone()
-            is_paid = user and user['paid_generations'] > 0 if user else False
-            
-            if not is_paid:
-                send_telegram_message(bot_token, chat_id,
-                    '💎 <b>Доступ только по подписке</b>\n\n'
-                    '<b>Нейрофотосессия PRO - 299₽/мес</b>\n\n'
-                    '✅ Gemini 3 Pro - топовая модель Google\n'
-                    '✅ Gemini 2.5 Flash - быстрая Pro-версия\n'
-                    '✅ FLUX 2 Flex - гибкая генерация\n'
-                    '✅ FLUX 2 Pro - максимальное качество\n'
-                    '✅ GPT-5 Image - новейшая от OpenAI\n'
-                    '✅ Неограниченные генерации\n'
-                    '✅ Приоритетная обработка\n\n'
-                    'Для оплаты напишите: /pay'
-                )
-            else:
-                send_telegram_message(bot_token, chat_id, '💎 <b>Выберите модель:</b>', get_model_keyboard())
+            send_telegram_message(bot_token, chat_id,
+                '⚡ Сейчас используется единая модель <b>Gemini 2.5 Flash</b>.\n\n'
+                'Просто отправьте текст или фото для генерации!'
+            )
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
+        # /stats
         if message_text == '/stats':
-            cur.execute(f"SELECT paid_generations, total_used, preferred_model FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
+            cur.execute(f"SELECT paid_generations, total_used FROM {DB_SCHEMA}.neurophoto_users WHERE telegram_id = %s", (telegram_id,))
             user = cur.fetchone()
             
             if user:
                 is_paid = user['paid_generations'] > 0
-                model_name = next((m['name'] for m in IMAGE_MODELS if m['id'] == user.get('preferred_model', '')), 'GPT-5 Image')
-                
                 stats_text = (
                     f'📊 <b>Ваша статистика</b>\n\n'
-                    f'🎨 Текущая модель: {model_name}\n'
-                    f'📈 Всего сгенерировано: {user["total_used"]}\n'
+                    f'🎨 Модель: Gemini 2.5 Flash\n'
+                    f'📈 Всего: {user["total_used"]}\n'
                 )
                 if is_paid:
-                    stats_text += f'💎 Pro доступ: активен (безлимит)\n'
+                    stats_text += '💎 Pro: активен (безлимит)\n'
                 else:
-                    stats_text += '\n💎 Для доступа к генерации напишите /pay'
+                    stats_text += '\n💎 /pay для доступа'
             else:
-                stats_text = '❌ Пользователь не найден. Напишите /start'
+                stats_text = '❌ Напишите /start'
             
             send_telegram_message(bot_token, chat_id, stats_text)
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Проверка на неизвестные команды
-        if message_text.startswith('/'):
-            send_telegram_message(bot_token, chat_id, '❓ Неизвестная команда.\n\nИспользуйте /help для списка доступных команд.')
+        # /broadcast
+        if message_text.startswith('/broadcast'):
+            if not is_admin(telegram_id):
+                send_telegram_message(bot_token, chat_id, '❌ У вас нет доступа.')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
+            broadcast_text = message_text.replace('/broadcast', '', 1).strip()
+            if not broadcast_text:
+                send_telegram_message(bot_token, chat_id, '❌ Формат: /broadcast [текст]')
+                cur.close()
+                conn.close()
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+            
+            cur.execute(f"SELECT telegram_id FROM {DB_SCHEMA}.neurophoto_users")
+            all_users = cur.fetchall()
+            
+            sent = 0
+            failed = 0
+            for u in all_users:
+                result = send_telegram_message(bot_token, str(u['telegram_id']), broadcast_text)
+                if result:
+                    sent += 1
+                else:
+                    failed += 1
+            
+            send_telegram_message(bot_token, chat_id, f'📨 Рассылка: ✅ {sent} / ❌ {failed}')
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # Генерация изображения
+        # /pay
+        if message_text == '/pay':
+            send_telegram_message(bot_token, chat_id,
+                '💎 <b>Нейрофотосессия PRO — 299₽/мес</b>\n\n'
+                '✅ Безлимитные генерации\n'
+                '✅ Gemini 2.5 Flash\n'
+                '✅ Работа с фото и текстом\n'
+                '✅ Приоритетная обработка\n\n'
+                'Для оплаты напишите администратору.'
+            )
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # Неизвестная команда
+        if message_text.startswith('/'):
+            send_telegram_message(bot_token, chat_id, '❓ Неизвестная команда. /help для справки.')
+            cur.close()
+            conn.close()
+            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
+        
+        # === ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЯ ===
         cur.execute(
             f"INSERT INTO {DB_SCHEMA}.neurophoto_users (telegram_id, username, first_name) VALUES (%s, %s, %s) "
             f"ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name "
-            f"RETURNING free_generations, paid_generations, total_used, preferred_model",
+            f"RETURNING free_generations, paid_generations, total_used",
             (telegram_id, username, first_name)
         )
         user_data = cur.fetchone()
         conn.commit()
         
-        free_left = max(0, user_data['free_generations'])
         is_paid = user_data['paid_generations'] > 0
-        preferred_model = user_data.get('preferred_model') or 'openai/gpt-5-image'
         
-        # Конвертация старых моделей в новые (если у пользователя осталась старая модель)
-        old_to_new_models = {
-            'gemini-2.5-flash-image': 'openai/gpt-5-image',
-            'google/gemini-2.0-flash-exp:free': 'openai/gpt-5-image',
-            'nvidia/nemotron-nano-12b-v2-vl:free': 'openai/gpt-5-image',
-            'google/gemma-3-27b-it:free': 'openai/gpt-5-image',
-            'mistralai/mistral-small-3.1-24b-instruct:free': 'openai/gpt-5-image',
-            'google/gemini-2.5-flash-image-preview:free': 'openai/gpt-5-image',
-            'openai/dall-e-3': 'openai/gpt-5-image',
-            'black-forest-labs/flux-pro': 'black-forest-labs/flux.2-pro',
-            'black-forest-labs/flux-1.1-pro': 'black-forest-labs/flux.2-pro',
-            'black-forest-labs/flux-2-pro': 'black-forest-labs/flux.2-pro'
-        }
-        
-        if preferred_model in old_to_new_models:
-            preferred_model = old_to_new_models[preferred_model]
-            # Обновляем модель в БД
-            cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET preferred_model = %s WHERE telegram_id = %s", (preferred_model, telegram_id))
-            conn.commit()
-        
-        print(f"[USER] Free: {free_left}, Paid: {is_paid}, Model: {preferred_model}")
-        
-        # Проверка Pro подписки (бесплатных моделей нет!)
         if not is_paid:
-            limit_text = (
+            send_telegram_message(bot_token, chat_id,
                 '⚠️ <b>Нужна Pro подписка</b>\n\n'
-                'В OpenRouter нет бесплатных моделей генерации изображений.\n\n'
-                '💎 <b>Нейрофотосессия PRO - 299₽/мес</b>\n'
-                '• Gemini 3 Pro - топ от Google\n'
-                '• FLUX 2 Pro - максимум качества\n'
-                '• GPT-5 Image - новейшая от OpenAI\n'
-                '• Неограниченные генерации\n'
-                '• Приоритетная обработка\n\n'
-                'Напишите /pay для подключения'
-            )
-            send_telegram_message(bot_token, chat_id, limit_text)
-            cur.close()
-            conn.close()
-            return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
-        
-        print(f"[GENERATE] Model: {preferred_model}, Prompt: {message_text[:50]}, Photos: {len(photo_urls)}")
-        model_name = next((m['name'] for m in IMAGE_MODELS if m['id'] == preferred_model), preferred_model)
-        
-        # Список моделей с поддержкой vision (работа с фото)
-        vision_models = [
-            'google/gemini-3-pro-image-preview',
-            'google/gemini-2.5-flash-image'
-        ]
-        
-        # Проверяем, поддерживает ли модель vision (работу с фото)
-        if photo_urls and preferred_model not in vision_models:
-            send_telegram_message(bot_token, chat_id, 
-                '⚠️ Выбранная модель не поддерживает работу с изображениями.\n\n'
-                'Для работы с фото выберите:\n'
-                '• Gemini 3 Pro\n'
-                '• Gemini 2.5 Flash\n\n'
-                'Используйте /models для выбора модели.'
+                '💎 <b>Нейрофотосессия PRO — 299₽/мес</b>\n'
+                '• Gemini 2.5 Flash\n'
+                '• Безлимитные генерации\n'
+                '• Текст + фото\n\n'
+                '/pay для подключения'
             )
             cur.close()
             conn.close()
             return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
         
-        # CRITICAL: Определяем режим работы
-        is_generation_mode = preferred_model in ['google/gemini-3-pro-image-preview', 'google/gemini-2.5-flash-image', 'black-forest-labs/flux.2-flex', 'black-forest-labs/flux.2-pro', 'openai/gpt-5-image']
-        
-        if photo_urls and is_generation_mode:
-            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение на основе {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
-        elif photo_urls:
-            send_telegram_message(bot_token, chat_id, f'⏳ Анализирую {len(photo_urls)} фото с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+        if photo_urls:
+            send_telegram_message(bot_token, chat_id, f'⏳ Обрабатываю {len(photo_urls)} фото через Gemini...\n\nЭто займет 15-30 секунд.')
         else:
-            send_telegram_message(bot_token, chat_id, f'⏳ Генерирую изображение с помощью {model_name}...\n\nЭто займет 10-60 секунд.')
+            send_telegram_message(bot_token, chat_id, '⏳ Генерирую изображение через Gemini...\n\nЭто займет 15-30 секунд.')
         
-        image_url = generate_image_openrouter(message_text, preferred_model, photo_urls)
+        image_url = generate_image_gemini(message_text, photo_urls)
         
         if not image_url:
-            print(f"[ERROR] No image_url returned from OpenRouter")
-            send_telegram_message(bot_token, chat_id, '❌ Не удалось сгенерировать изображение. Попробуйте еще раз или смените модель через /models')
+            send_telegram_message(bot_token, chat_id, '❌ Не удалось сгенерировать. Попробуйте изменить описание или повторить позже.')
         
         if image_url:
-            # CRITICAL: image_url может быть строкой, списком или dict!
-            # Если это список - берем первый элемент
             if isinstance(image_url, list):
-                if len(image_url) > 0:
-                    image_url = image_url[0]
-                else:
-                    image_url = None
-            
-            # Если это dict - ищем URL внутри
+                image_url = image_url[0] if len(image_url) > 0 else None
             if isinstance(image_url, dict):
-                if 'url' in image_url:
-                    image_url = image_url['url']
-                elif 'data' in image_url:
-                    image_url = image_url['data']
-                elif 'image_url' in image_url:
-                    # CRITICAL: Gemini 3 Pro возвращает {'type': '...', 'image_url': '...', 'index': ...}
-                    nested = image_url['image_url']
-                    if isinstance(nested, dict) and 'url' in nested:
-                        image_url = nested['url']
-                    elif isinstance(nested, str):
-                        image_url = nested
-                    else:
-                        image_url = None
-                else:
-                    image_url = None
+                image_url = image_url.get('url') or image_url.get('data') or None
         
         if image_url:
-            
-            # CRITICAL: Always upload to S3, especially for base64 images
             cdn_url = upload_to_s3(image_url, telegram_id)
             
             if not cdn_url:
@@ -1345,44 +944,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.close()
                 return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'isBase64Encoded': False, 'body': json.dumps({'ok': True})}
             
-            final_url = cdn_url
+            caption = f'✅ Готово!\n\n💬 {message_text[:100]}\n⚡ Gemini 2.5 Flash'
             
-            caption = f'✅ Готово!\n\n💬 {message_text[:100]}\n🎨 {model_name}'
-            if not is_paid:
-                caption += f'\n\n🆓 Осталось: {free_left - 1}'
-            
-            photo_sent = send_telegram_photo(bot_token, chat_id, final_url, caption)
-            print(f"[SUCCESS] Photo sent to Telegram: {photo_sent}")
+            photo_sent = send_telegram_photo(bot_token, chat_id, cdn_url, caption)
             
             if not photo_sent:
-                print(f"[ERROR] Failed to send photo to Telegram, sending URL as text")
-                send_telegram_message(bot_token, chat_id, f'{caption}\n\nИзображение: {final_url}')
+                send_telegram_message(bot_token, chat_id, f'{caption}\n\n🖼 {cdn_url}')
             
-            # Обновляем или создаем запись generation
             if generation_id:
-                # Для media group обновляем существующую запись маркера
-                print(f"[SUCCESS] Updating media group marker with actual result")
                 cur.execute(
                     f"UPDATE {DB_SCHEMA}.neurophoto_generations SET "
                     f"model = %s, image_url = %s, is_paid = %s "
                     f"WHERE telegram_id = %s AND prompt = %s",
-                    (preferred_model, final_url, is_paid, telegram_id, f"media_group:{generation_id}")
+                    (GEMINI_MODEL, cdn_url, is_paid, telegram_id, f"media_group:{generation_id}")
                 )
             else:
-                # Для обычного сообщения создаем новую запись
                 cur.execute(
                     f"INSERT INTO {DB_SCHEMA}.neurophoto_generations (telegram_id, prompt, model, image_url, is_paid) VALUES (%s, %s, %s, %s, %s)",
-                    (telegram_id, message_text, preferred_model, final_url, is_paid)
+                    (telegram_id, message_text, GEMINI_MODEL, cdn_url, is_paid)
                 )
             
-            if not is_paid:
-                cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET free_generations = free_generations - 1, total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
-            else:
-                cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
-            
+            cur.execute(f"UPDATE {DB_SCHEMA}.neurophoto_users SET total_used = total_used + 1 WHERE telegram_id = %s", (telegram_id,))
             conn.commit()
         else:
-            send_telegram_message(bot_token, chat_id, '❌ Ошибка генерации.\n\nПопробуйте:\n• Изменить описание\n• /models - выбрать другую модель\n• Повторить через минуту')
+            send_telegram_message(bot_token, chat_id, '❌ Ошибка генерации. Попробуйте другое описание или повторите позже.')
         
         cur.close()
         conn.close()
