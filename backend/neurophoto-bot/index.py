@@ -11,7 +11,7 @@ ADMIN_IDS = [285675692]
 DB_SCHEMA = 't_p60354232_chatbot_platform_cre'
 # v4.1 - Исправлена модель на gemini-2.5-flash-image для генерации изображений через Google AI API.
 
-GEMINI_MODEL = 'gemini-2.5-flash-image'
+GEMINI_MODEL = 'gemini-2.0-flash-exp'
 
 def is_admin(telegram_id: int) -> bool:
     return telegram_id in ADMIN_IDS
