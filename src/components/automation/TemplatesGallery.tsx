@@ -63,11 +63,14 @@ const TemplatesGallery = ({ onWorkflowGenerated }: TemplatesGalleryProps) => {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const categories = [...new Set(templates.map(t => t.category))];
-  const filteredTemplates = activeCategory
-    ? templates.filter(t => t.category === activeCategory)
-    : templates;
+  const filteredTemplates = templates.filter(t => {
+    const matchesCategory = !activeCategory || t.category === activeCategory;
+    const matchesSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   useEffect(() => {
     loadTemplates();
@@ -154,6 +157,17 @@ const TemplatesGallery = ({ onWorkflowGenerated }: TemplatesGalleryProps) => {
         </div>
       ) : (
         <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Icon name="Search" size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Поиск шаблонов..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+          </div>
           <div className="flex gap-2 flex-wrap">
             <Badge
               variant={activeCategory === null ? 'default' : 'outline'}
