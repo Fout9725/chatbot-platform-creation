@@ -41,7 +41,6 @@ def handler(event: dict, context) -> dict:
         cloudinary_key = body.get('cloudinaryApiKey', '')
         cloudinary_secret = body.get('cloudinaryApiSecret', '')
         cloudinary_creds_id = body.get('cloudinaryCredentialsId', '')
-        instagram_creds_id = body.get('instagramCredentialsId', '')
         schedule_time = body.get('scheduleTime', '10:00')
         
         if not all([google_sheet_id, openai_key]):
@@ -65,7 +64,6 @@ def handler(event: dict, context) -> dict:
             cloudinary_key,
             cloudinary_secret,
             cloudinary_creds_id,
-            instagram_creds_id,
             schedule_time
         )
         
@@ -100,7 +98,6 @@ def generate_n8n_workflow(
     cloudinary_key: str,
     cloudinary_secret: str,
     cloudinary_creds_id: str,
-    instagram_creds_id: str,
     schedule_time: str
 ) -> dict:
     '''Создаёт полноценный n8n workflow JSON с обработкой ошибок'''
@@ -108,7 +105,7 @@ def generate_n8n_workflow(
     hour, minute = schedule_time.split(':')
     
     workflow = {
-        "name": "Instagram Post Automation",
+        "name": "Instagram Content Autopilot",
         "nodes": [
             {
                 "parameters": {
@@ -353,83 +350,6 @@ return {
             },
             {
                 "parameters": {
-                    "url": "https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media",
-                    "authentication": "genericCredentialType",
-                    "genericAuthType": "oAuth2Api",
-                    "sendQuery": True,
-                    "queryParameters": {
-                        "parameters": [
-                            {
-                                "name": "image_url",
-                                "value": "={{ $json.secure_url }}"
-                            },
-                            {
-                                "name": "caption",
-                                "value": "={{ $('Parse Claude Response').item.json.text }}"
-                            }
-                        ]
-                    },
-                    "options": {}
-                },
-                "name": "Instagram API - Create Media",
-                "type": "n8n-nodes-base.httpRequest",
-                "typeVersion": 4.1,
-                "position": [1850, 300],
-                "credentials": {
-                    "oAuth2Api": {
-                        "id": instagram_creds_id or "YOUR_INSTAGRAM_CREDENTIALS_ID",
-                        "name": "Instagram Business account"
-                    }
-                },
-                "id": "instagram-create-media",
-                "continueOnFail": True,
-                "onError": "continueErrorOutput"
-            },
-            {
-                "parameters": {
-                    "jsCode": """// Ждём 5 секунд перед публикацией (Instagram требует задержку)
-await new Promise(resolve => setTimeout(resolve, 5000));
-
-return $input.all();"""
-                },
-                "name": "Wait 5 Seconds",
-                "type": "n8n-nodes-base.code",
-                "typeVersion": 2,
-                "position": [2050, 300],
-                "id": "wait-delay"
-            },
-            {
-                "parameters": {
-                    "url": "https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media_publish",
-                    "authentication": "genericCredentialType",
-                    "genericAuthType": "oAuth2Api",
-                    "sendQuery": True,
-                    "queryParameters": {
-                        "parameters": [
-                            {
-                                "name": "creation_id",
-                                "value": "={{ $('Instagram API - Create Media').item.json.id }}"
-                            }
-                        ]
-                    },
-                    "options": {}
-                },
-                "name": "Instagram API - Publish",
-                "type": "n8n-nodes-base.httpRequest",
-                "typeVersion": 4.1,
-                "position": [2250, 300],
-                "credentials": {
-                    "oAuth2Api": {
-                        "id": instagram_creds_id or "YOUR_INSTAGRAM_CREDENTIALS_ID",
-                        "name": "Instagram Business account"
-                    }
-                },
-                "id": "instagram-publish",
-                "continueOnFail": True,
-                "onError": "continueErrorOutput"
-            },
-            {
-                "parameters": {
                     "operation": "update",
                     "sheetId": sheet_id,
                     "range": "=B{{ $('Parse Claude Response').item.json.rowNumber }}:E{{ $('Parse Claude Response').item.json.rowNumber }}",
@@ -451,7 +371,7 @@ return $input.all();"""
                             },
                             {
                                 "column": "E",
-                                "fieldValue": "=https://www.instagram.com/p/{{ $json.id }}"
+                                "fieldValue": "Готово к модерации"
                             }
                         ]
                     }
@@ -459,7 +379,7 @@ return $input.all();"""
                 "name": "Google Sheets - Update Status",
                 "type": "n8n-nodes-base.googleSheets",
                 "typeVersion": 3,
-                "position": [2450, 300],
+                "position": [1850, 300],
                 "credentials": {
                     "googleSheetsOAuth2Api": {
                         "id": google_creds_id or "YOUR_GOOGLE_CREDENTIALS_ID",
@@ -616,53 +536,6 @@ return $input.all();"""
                 ]
             },
             "Cloudinary - Add Title": {
-                "main": [
-                    [
-                        {
-                            "node": "Instagram API - Create Media",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Instagram API - Create Media": {
-                "main": [
-                    [
-                        {
-                            "node": "Wait 5 Seconds",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Wait 5 Seconds": {
-                "main": [
-                    [
-                        {
-                            "node": "Instagram API - Publish",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Instagram API - Publish": {
                 "main": [
                     [
                         {

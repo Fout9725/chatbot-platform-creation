@@ -2,8 +2,8 @@
   "automations": [
     {
       "id": "instagram",
-      "name": "Instagram Автопостинг",
-      "description": "Генерация и публикация постов в Instagram через n8n",
+      "name": "Instagram Автопилот",
+      "description": "Генерация контента на автопилоте — без API Instagram. Ручная публикация.",
       "status": "ready",
       "requirements": [
         "Google Sheets API (для хранения контента)",
@@ -18,7 +18,7 @@
         "Планирование публикаций",
         "Хранение контента в Google Sheets"
       ],
-      "workflow_nodes": ["Schedule Trigger", "Google Sheets", "Claude AI", "DALL-E 3", "Cloudinary", "Instagram"]
+      "workflow_nodes": ["Schedule Trigger", "Google Sheets", "Claude AI", "DALL-E 3", "Cloudinary", "Google Sheets Update"]
     },
     {
       "id": "telegram",

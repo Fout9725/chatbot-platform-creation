@@ -16,7 +16,7 @@
       "expectedStatus": 200,
       "expectedBody": {
         "workflow": {
-          "name": "Instagram Post Automation"
+          "name": "Instagram Content Autopilot"
         }
       },
       "bodyMatcher": "partial"

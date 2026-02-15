@@ -101,8 +101,8 @@ const InstagramAutomation = () => {
               <Icon name="Instagram" className="text-white" size={32} />
             </div>
             <div>
-              <CardTitle className="text-2xl">Автоматизация постов для Instagram*</CardTitle>
-              <CardDescription>Генерация текста и картинок через n8n workflow</CardDescription>
+              <CardTitle className="text-2xl">Автопилот контента для Instagram*</CardTitle>
+              <CardDescription>Генерация текста и картинок на автопилоте — без API Instagram. Вы публикуете вручную.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -127,7 +127,7 @@ const InstagramAutomation = () => {
               <Alert>
                 <Icon name="Info" size={16} />
                 <AlertDescription>
-                  Заполните данные для создания автоматизации. Все API ключи остаются у вас — workflow генерируется локально.
+                  Workflow работает без подключения к Instagram API. Контент генерируется и сохраняется в Google Sheet со статусом «Готово к модерации» — вы публикуете вручную.
                 </AlertDescription>
               </Alert>
 
@@ -325,9 +325,9 @@ const InstagramAutomation = () => {
                   </div>
 
                   <div className="border-l-4 border-primary pl-4">
-                    <h4 className="font-semibold">5. Запуск</h4>
+                    <h4 className="font-semibold">5. Запуск и публикация</h4>
                     <p className="text-sm text-muted-foreground">
-                      Добавьте идею в ячейку A2 вашей Google Sheet и нажмите "Execute Workflow" в n8n
+                      Добавьте идею в ячейку A2 → запустите в n8n → в колонке E появится «Готово к модерации» → скачайте картинку и текст из таблицы → опубликуйте вручную в Instagram
                     </p>
                   </div>
                 </div>
@@ -336,7 +336,7 @@ const InstagramAutomation = () => {
                   <Icon name="Lightbulb" size={16} />
                   <AlertDescription>
                     <strong>Пример идеи:</strong> "мотивация на спорт утром"<br/>
-                    <strong>Результат:</strong> Готовый текст поста 1600-1700 символов + картинка 1080×1920 с заголовком
+                    <strong>Результат:</strong> Готовый текст + картинка с заголовком в Google Sheet. Колонка E: «Готово к модерации»
                   </AlertDescription>
                 </Alert>
 
@@ -346,10 +346,10 @@ const InstagramAutomation = () => {
                     Важно!
                   </h4>
                   <ul className="text-sm text-amber-800 list-disc pl-4 mt-2 space-y-1">
-                    <li>Workflow НЕ публикует посты автоматически — только готовит материалы</li>
-                    <li>Вы сами публикуете из Google Sheet в Instagram вручную</li>
+                    <li>Подключение к Instagram API не требуется — публикация вручную</li>
+                    <li>Контент готовится автоматически и сохраняется в Google Sheet</li>
+                    <li>Колонка E показывает статус «Готово к модерации» — вы решаете, что публиковать</li>
                     <li>API ключи не сохраняются на серверах — только в вашем workflow</li>
-                    <li>Текст генерируется на 1600-1700 символов (требование Instagram)</li>
                   </ul>
                 </div>
               </div>

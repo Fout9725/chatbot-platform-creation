@@ -1,7 +1,7 @@
 {
   "instagram-workflow": "https://functions.poehali.dev/a0badc6a-7e0c-48cd-8b5e-a5985f0d8b92",
   "bot-builder": "https://functions.poehali.dev/f74c949b-7d94-4880-aedd-ac4442889227",
-  "neurophoto-bot": "https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f",
+  "neurophoto-bot": "https://functions.poehali.dev/861d11a4-4516-4868-97c9-4f90b87d454b",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
