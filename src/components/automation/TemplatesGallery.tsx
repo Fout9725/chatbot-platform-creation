@@ -62,6 +62,12 @@ const TemplatesGallery = ({ onWorkflowGenerated }: TemplatesGalleryProps) => {
   const [templateParams, setTemplateParams] = useState<Record<string, string>>({});
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const categories = [...new Set(templates.map(t => t.category))];
+  const filteredTemplates = activeCategory
+    ? templates.filter(t => t.category === activeCategory)
+    : templates;
 
   useEffect(() => {
     loadTemplates();
@@ -147,8 +153,28 @@ const TemplatesGallery = ({ onWorkflowGenerated }: TemplatesGalleryProps) => {
           <span className="text-muted-foreground">Загрузка шаблонов...</span>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {templates.map((tpl) => (
+        <>
+          <div className="flex gap-2 flex-wrap">
+            <Badge
+              variant={activeCategory === null ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() => setActiveCategory(null)}
+            >
+              Все
+            </Badge>
+            {categories.map(cat => (
+              <Badge
+                key={cat}
+                variant={activeCategory === cat ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat}
+              </Badge>
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+          {filteredTemplates.map((tpl) => (
             <Card
               key={tpl.id}
               className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
@@ -179,7 +205,8 @@ const TemplatesGallery = ({ onWorkflowGenerated }: TemplatesGalleryProps) => {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
