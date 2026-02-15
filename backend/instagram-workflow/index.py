@@ -1,8 +1,9 @@
 import json
 import os
+from templates import TEMPLATES
 
 def handler(event: dict, context) -> dict:
-    '''Генерирует готовый n8n workflow для автоматизации Instagram-постов с интеграцией Claude API, DALL-E и Cloudinary'''
+    '''Генерирует готовый n8n workflow для автоматизации Instagram-постов или возвращает готовые шаблоны'''
     
     method = event.get('httpMethod', 'POST')
     
@@ -11,101 +12,162 @@ def handler(event: dict, context) -> dict:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
             'body': ''
         }
     
+    if method == 'GET':
+        params = event.get('queryStringParameters') or {}
+        action = params.get('action', 'templates')
+        
+        if action == 'templates':
+            catalog = []
+            for key, tpl in TEMPLATES.items():
+                catalog.append({
+                    'id': key,
+                    'name': tpl['name'],
+                    'description': tpl['description'],
+                    'category': tpl['category'],
+                    'icon': tpl['icon'],
+                    'nodes_count': tpl['nodes_count'],
+                    'integrations': tpl['integrations'],
+                    'difficulty': tpl['difficulty']
+                })
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'templates': catalog})
+            }
+        
+        if action == 'template':
+            template_id = params.get('id', '')
+            if template_id not in TEMPLATES:
+                return {
+                    'statusCode': 404,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Шаблон не найден'})
+                }
+            tpl = TEMPLATES[template_id]
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'template': tpl})
+            }
+        
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Неизвестное действие'})
+        }
+    
     if method != 'POST':
         return {
             'statusCode': 405,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'error': 'Method not allowed'})
         }
     
     try:
         body = json.loads(event.get('body', '{}'))
         
+        action = body.get('action', 'generate')
+        
+        if action == 'apply_template':
+            return apply_template(body)
+        
         google_sheet_id = body.get('googleSheetId', '')
-        google_creds_id = body.get('googleCredentialsId', '')
         anthropic_key = body.get('anthropicApiKey', '')
-        anthropic_creds_id = body.get('anthropicCredentialsId', '')
         openai_key = body.get('openaiApiKey', '')
-        openai_creds_id = body.get('openaiCredentialsId', '')
         cloudinary_cloud = body.get('cloudinaryCloudName', '')
         cloudinary_key = body.get('cloudinaryApiKey', '')
         cloudinary_secret = body.get('cloudinaryApiSecret', '')
-        cloudinary_creds_id = body.get('cloudinaryCredentialsId', '')
         schedule_time = body.get('scheduleTime', '10:00')
         
         if not all([google_sheet_id, openai_key]):
             return {
                 'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps({'error': 'Обязательные поля: googleSheetId, openaiApiKey'})
             }
         
-        workflow = generate_n8n_workflow(
-            google_sheet_id,
-            google_creds_id,
-            anthropic_key,
-            anthropic_creds_id,
-            openai_key,
-            openai_creds_id,
-            cloudinary_cloud,
-            cloudinary_key,
-            cloudinary_secret,
-            cloudinary_creds_id,
-            schedule_time
+        workflow = generate_instagram_workflow(
+            google_sheet_id, anthropic_key, openai_key,
+            cloudinary_cloud, cloudinary_key, cloudinary_secret, schedule_time
         )
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'workflow': workflow})
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'error': str(e)})
         }
 
 
-def generate_n8n_workflow(
-    sheet_id: str, 
-    google_creds_id: str,
-    anthropic_key: str,
-    anthropic_creds_id: str,
-    openai_key: str,
-    openai_creds_id: str,
-    cloudinary_cloud: str,
-    cloudinary_key: str,
-    cloudinary_secret: str,
-    cloudinary_creds_id: str,
+def apply_template(body: dict) -> dict:
+    '''Применяет готовый шаблон с пользовательскими данными'''
+    template_id = body.get('templateId', '')
+    user_params = body.get('params', {})
+    
+    if template_id not in TEMPLATES:
+        return {
+            'statusCode': 404,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Шаблон не найден'})
+        }
+    
+    tpl = TEMPLATES[template_id]
+    required = tpl.get('required_params', [])
+    missing = [p for p in required if not user_params.get(p)]
+    if missing:
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': f'Не заполнены обязательные поля: {", ".join(missing)}'})
+        }
+    
+    workflow_json = json.dumps(tpl['workflow'])
+    for key, value in user_params.items():
+        placeholder = f'{{{{USER_{key.upper()}}}}}'
+        workflow_json = workflow_json.replace(placeholder, str(value))
+    
+    workflow = json.loads(workflow_json)
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'body': json.dumps({'workflow': workflow})
+    }
+
+
+def generate_instagram_workflow(
+    sheet_id: str, anthropic_key: str, openai_key: str,
+    cloudinary_cloud: str, cloudinary_key: str, cloudinary_secret: str,
     schedule_time: str
 ) -> dict:
-    '''Создаёт полноценный n8n workflow JSON с обработкой ошибок'''
+    '''Создаёт полноценный n8n workflow JSON для Instagram-автопилота'''
     
     hour, minute = schedule_time.split(':')
     
     workflow = {
+        "meta": {
+            "instanceId": "instagram-autopilot-generated",
+            "templateCredsSetupCompleted": True
+        },
         "name": "Instagram Content Autopilot",
+        "tags": [
+            {"name": "Instagram"},
+            {"name": "Content"},
+            {"name": "Automation"}
+        ],
         "nodes": [
             {
                 "parameters": {
@@ -120,73 +182,72 @@ def generate_n8n_workflow(
                 },
                 "name": "Schedule Trigger",
                 "type": "n8n-nodes-base.scheduleTrigger",
-                "typeVersion": 1,
+                "typeVersion": 1.1,
                 "position": [250, 300],
                 "id": "schedule-trigger"
             },
             {
                 "parameters": {
                     "operation": "read",
-                    "sheetId": sheet_id,
+                    "sheetId": {"__rl": True, "value": sheet_id, "mode": "id"},
                     "range": "A:E",
-                    "options": {}
+                    "options": {"returnAllMatches": True}
                 },
                 "name": "Google Sheets - Read Ideas",
                 "type": "n8n-nodes-base.googleSheets",
-                "typeVersion": 3,
-                "position": [450, 300],
+                "typeVersion": 4.5,
+                "position": [480, 300],
                 "credentials": {
                     "googleSheetsOAuth2Api": {
-                        "id": google_creds_id or "YOUR_GOOGLE_CREDENTIALS_ID",
+                        "id": "CONFIGURE_IN_N8N",
                         "name": "Google Sheets account"
                     }
                 },
-                "id": "google-sheets-read",
-                "continueOnFail": False
+                "id": "google-sheets-read"
             },
             {
                 "parameters": {
                     "conditions": {
-                        "boolean": [
+                        "options": {"caseSensitive": True, "leftValue": ""},
+                        "conditions": [
                             {
-                                "value1": "={{ $json.A }}",
-                                "operation": "isNotEmpty"
+                                "id": "cond-idea",
+                                "leftValue": "={{ $json['A'] }}",
+                                "rightValue": "",
+                                "operator": {"type": "string", "operation": "isNotEmpty"}
                             },
                             {
-                                "value1": "={{ $json.B }}",
-                                "operation": "isEmpty"
+                                "id": "cond-empty-b",
+                                "leftValue": "={{ $json['B'] }}",
+                                "rightValue": "",
+                                "operator": {"type": "string", "operation": "isEmpty"}
                             }
-                        ]
-                    }
+                        ],
+                        "combinator": "and"
+                    },
+                    "options": {}
                 },
-                "name": "Filter Empty Rows",
-                "type": "n8n-nodes-base.if",
-                "typeVersion": 1,
-                "position": [650, 300],
-                "id": "filter-empty"
+                "name": "Filter - Only New Ideas",
+                "type": "n8n-nodes-base.filter",
+                "typeVersion": 2,
+                "position": [700, 300],
+                "id": "filter-new-ideas"
             },
             {
                 "parameters": {
+                    "method": "POST",
                     "url": "https://api.anthropic.com/v1/messages",
-                    "authentication": "genericCredentialType",
-                    "genericAuthType": "httpHeaderAuth",
+                    "authentication": "predefinedCredentialType",
+                    "nodeCredentialType": "httpHeaderAuth",
                     "sendHeaders": True,
                     "headerParameters": {
                         "parameters": [
-                            {
-                                "name": "x-api-key",
-                                "value": anthropic_key if anthropic_key else "={{ $credentials.anthropicApiKey }}"
-                            },
-                            {
-                                "name": "anthropic-version",
-                                "value": "2023-06-01"
-                            }
+                            {"name": "x-api-key", "value": anthropic_key},
+                            {"name": "anthropic-version", "value": "2023-06-01"},
+                            {"name": "content-type", "value": "application/json"}
                         ]
                     },
                     "sendBody": True,
-                    "bodyParameters": {
-                        "parameters": []
-                    },
                     "specifyBody": "json",
                     "jsonBody": json.dumps({
                         "model": "claude-3-5-sonnet-20241022",
@@ -195,379 +256,217 @@ def generate_n8n_workflow(
                         "messages": [
                             {
                                 "role": "user",
-                                "content": """Создай пост для Instagram по идее: {{ $json.A }}
-
-Требования:
-1. Заголовок: 5-10 слов, БЕЗ эмодзи, жирным шрифтом
-2. Текст: 1600-1700 символов с пробелами
-3. Стиль: эмоциональный, личный опыт, история
-4. Структура:
-   - Заголовок жирным
-   - 2-3 абзаца основного текста
-   - Призыв к действию (вопрос)
-   - 5-7 хэштегов в конце
-
-Формат ответа ТОЛЬКО JSON (без markdown):
-{
-  "title": "Заголовок без эмодзи",
-  "text": "Полный текст поста 1600-1700 символов"
-}"""
+                                "content": "Создай пост для Instagram по идее: {{ $json['A'] }}\n\nТребования:\n1. Заголовок: 5-10 слов, БЕЗ эмодзи\n2. Текст: 1600-1700 символов с пробелами\n3. Стиль: эмоциональный, личный опыт, история\n4. Структура: заголовок, 2-3 абзаца, призыв к действию, 5-7 хэштегов\n\nОтвет СТРОГО в JSON:\n{\"title\": \"заголовок\", \"text\": \"полный текст\"}"
                             }
                         ]
                     }),
-                    "options": {}
+                    "options": {
+                        "timeout": 60000,
+                        "response": {"response": {"fullResponse": False}}
+                    }
                 },
-                "name": "HTTP Request - Claude API",
+                "name": "Claude - Generate Text",
                 "type": "n8n-nodes-base.httpRequest",
-                "typeVersion": 4.1,
-                "position": [850, 300],
-                "id": "claude-api-request",
-                "continueOnFail": True,
+                "typeVersion": 4.2,
+                "position": [920, 300],
+                "id": "claude-api",
                 "onError": "continueErrorOutput"
             },
             {
                 "parameters": {
-                    "jsCode": """// Парсинг ответа от Claude API
-const claudeResponse = $input.item.json;
-
-if (!claudeResponse || !claudeResponse.content || !claudeResponse.content[0]) {
-  throw new Error('Invalid Claude API response');
-}
-
-const textContent = claudeResponse.content[0].text;
-
-// Извлекаем JSON из ответа (может быть в markdown блоке)
-let jsonMatch = textContent.match(/\\{[\\s\\S]*\\}/);
-if (!jsonMatch) {
-  throw new Error('No JSON found in Claude response');
-}
-
-const parsedContent = JSON.parse(jsonMatch[0]);
-
-if (!parsedContent.title || !parsedContent.text) {
-  throw new Error('Missing title or text in Claude response');
-}
-
-// Передаём данные дальше
-return {
-  json: {
-    idea: $input.first().json.A,
-    rowNumber: $input.first().json.rowNumber || 2,
-    title: parsedContent.title,
-    text: parsedContent.text,
-    originalClaudeResponse: claudeResponse
-  }
-};"""
+                    "mode": "runOnceForEachItem",
+                    "jsCode": "const resp = $input.item.json;\nif (!resp?.content?.[0]?.text) throw new Error('Empty Claude response');\nconst raw = resp.content[0].text;\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nif (!m) throw new Error('No JSON in response');\nconst d = JSON.parse(m[0]);\nif (!d.title || !d.text) throw new Error('Missing title/text');\nreturn {\n  json: {\n    idea: $('Filter - Only New Ideas').item.json['A'],\n    rowIndex: $('Filter - Only New Ideas').item.json['row_number'] || $itemIndex + 2,\n    title: d.title,\n    text: d.text\n  }\n};"
                 },
                 "name": "Parse Claude Response",
                 "type": "n8n-nodes-base.code",
                 "typeVersion": 2,
-                "position": [1050, 300],
+                "position": [1140, 300],
                 "id": "parse-claude",
-                "continueOnFail": True,
                 "onError": "continueErrorOutput"
             },
             {
                 "parameters": {
-                    "resource": "image",
-                    "operation": "create",
-                    "prompt": "=Create a vertical Instagram story image (1080x1920) for post about: {{ $json.idea }}. Style: modern, vibrant, eye-catching, professional. No text on image.",
-                    "model": "dall-e-3",
-                    "size": "1024x1792",
-                    "quality": "hd",
-                    "options": {}
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/images/generations",
+                    "authentication": "predefinedCredentialType",
+                    "nodeCredentialType": "httpHeaderAuth",
+                    "sendHeaders": True,
+                    "headerParameters": {
+                        "parameters": [
+                            {"name": "Authorization", "value": f"Bearer {openai_key}"},
+                            {"name": "Content-Type", "value": "application/json"}
+                        ]
+                    },
+                    "sendBody": True,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({\"model\": \"dall-e-3\", \"prompt\": \"Create a vertical Instagram story image for: \" + $json.idea + \". Modern, vibrant, professional, no text.\", \"n\": 1, \"size\": \"1024x1792\", \"quality\": \"hd\"}) }}",
+                    "options": {"timeout": 120000}
                 },
                 "name": "DALL-E 3 - Generate Image",
-                "type": "n8n-nodes-base.openAi",
-                "typeVersion": 1.3,
-                "position": [1250, 300],
-                "credentials": {
-                    "openAiApi": {
-                        "id": openai_creds_id or "YOUR_OPENAI_CREDENTIALS_ID",
-                        "name": "OpenAI account"
-                    }
-                },
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [1360, 300],
                 "id": "dalle-generate",
-                "continueOnFail": True,
                 "onError": "continueErrorOutput"
             },
             {
                 "parameters": {
                     "url": "={{ $json.data[0].url }}",
                     "options": {
-                        "response": {
-                            "response": {
-                                "responseFormat": "file"
-                            }
-                        }
+                        "response": {"response": {"responseFormat": "file"}}
                     }
                 },
-                "name": "Download Image from DALL-E",
+                "name": "Download Generated Image",
                 "type": "n8n-nodes-base.httpRequest",
-                "typeVersion": 4.1,
-                "position": [1450, 300],
+                "typeVersion": 4.2,
+                "position": [1580, 300],
                 "id": "download-image",
-                "continueOnFail": True,
                 "onError": "continueErrorOutput"
-            },
-            {
-                "parameters": {
-                    "operation": "upload",
-                    "cloudName": cloudinary_cloud or "your-cloud-name",
-                    "binaryData": True,
-                    "binaryPropertyName": "data",
-                    "publicId": "=instagram_{{ $now.format('YYYYMMDD_HHmmss') }}",
-                    "options": {
-                        "transformation": [
-                            {
-                                "overlay": {
-                                    "text": "={{ $('Parse Claude Response').item.json.title }}",
-                                    "fontFamily": "Arial",
-                                    "fontSize": 60,
-                                    "fontWeight": "bold",
-                                    "color": "#FFFFFF"
-                                },
-                                "gravity": "south",
-                                "y": 100,
-                                "effect": "shadow:50"
-                            }
-                        ]
-                    }
-                },
-                "name": "Cloudinary - Add Title",
-                "type": "n8n-nodes-base.cloudinary",
-                "typeVersion": 1,
-                "position": [1650, 300],
-                "credentials": {
-                    "cloudinaryApi": {
-                        "id": cloudinary_creds_id or "YOUR_CLOUDINARY_CREDENTIALS_ID",
-                        "name": "Cloudinary account"
-                    }
-                },
-                "id": "cloudinary-upload",
-                "continueOnFail": True,
-                "onError": "continueErrorOutput"
-            },
-            {
-                "parameters": {
-                    "operation": "update",
-                    "sheetId": sheet_id,
-                    "range": "=B{{ $('Parse Claude Response').item.json.rowNumber }}:E{{ $('Parse Claude Response').item.json.rowNumber }}",
-                    "options": {},
-                    "dataMode": "defineBelow",
-                    "fieldsUi": {
-                        "values": [
-                            {
-                                "column": "B",
-                                "fieldValue": "={{ $('Parse Claude Response').item.json.text }}"
-                            },
-                            {
-                                "column": "C",
-                                "fieldValue": "={{ $('Cloudinary - Add Title').item.json.secure_url }}"
-                            },
-                            {
-                                "column": "D",
-                                "fieldValue": "={{ $now.format('DD.MM.YYYY HH:mm') }}"
-                            },
-                            {
-                                "column": "E",
-                                "fieldValue": "Готово к модерации"
-                            }
-                        ]
-                    }
-                },
-                "name": "Google Sheets - Update Status",
-                "type": "n8n-nodes-base.googleSheets",
-                "typeVersion": 3,
-                "position": [1850, 300],
-                "credentials": {
-                    "googleSheetsOAuth2Api": {
-                        "id": google_creds_id or "YOUR_GOOGLE_CREDENTIALS_ID",
-                        "name": "Google Sheets account"
-                    }
-                },
-                "id": "google-sheets-update"
-            },
-            {
-                "parameters": {
-                    "conditions": {
-                        "boolean": []
-                    }
-                },
-                "name": "Error Handler",
-                "type": "n8n-nodes-base.if",
-                "typeVersion": 1,
-                "position": [1250, 500],
-                "id": "error-handler"
-            },
-            {
-                "parameters": {
-                    "operation": "update",
-                    "sheetId": sheet_id,
-                    "range": "=E{{ $('Parse Claude Response').item.json.rowNumber || 2 }}",
-                    "options": {},
-                    "dataMode": "defineBelow",
-                    "fieldsUi": {
-                        "values": [
-                            {
-                                "column": "E",
-                                "fieldValue": "=ERROR: {{ $json.error || 'Unknown error' }}"
-                            }
-                        ]
-                    }
-                },
-                "name": "Log Error to Sheet",
-                "type": "n8n-nodes-base.googleSheets",
-                "typeVersion": 3,
-                "position": [1450, 500],
-                "credentials": {
-                    "googleSheetsOAuth2Api": {
-                        "id": google_creds_id or "YOUR_GOOGLE_CREDENTIALS_ID",
-                        "name": "Google Sheets account"
-                    }
-                },
-                "id": "log-error"
             }
         ],
         "connections": {
             "Schedule Trigger": {
-                "main": [
-                    [
-                        {
-                            "node": "Google Sheets - Read Ideas",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
+                "main": [[{"node": "Google Sheets - Read Ideas", "type": "main", "index": 0}]]
             },
             "Google Sheets - Read Ideas": {
-                "main": [
-                    [
-                        {
-                            "node": "Filter Empty Rows",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
+                "main": [[{"node": "Filter - Only New Ideas", "type": "main", "index": 0}]]
             },
-            "Filter Empty Rows": {
-                "main": [
-                    [
-                        {
-                            "node": "HTTP Request - Claude API",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
+            "Filter - Only New Ideas": {
+                "main": [[{"node": "Claude - Generate Text", "type": "main", "index": 0}]]
             },
-            "HTTP Request - Claude API": {
+            "Claude - Generate Text": {
                 "main": [
-                    [
-                        {
-                            "node": "Parse Claude Response",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
+                    [{"node": "Parse Claude Response", "type": "main", "index": 0}],
+                    [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
                 ]
             },
             "Parse Claude Response": {
                 "main": [
-                    [
-                        {
-                            "node": "DALL-E 3 - Generate Image",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
+                    [{"node": "DALL-E 3 - Generate Image", "type": "main", "index": 0}],
+                    [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
                 ]
             },
             "DALL-E 3 - Generate Image": {
                 "main": [
-                    [
-                        {
-                            "node": "Download Image from DALL-E",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Download Image from DALL-E": {
-                "main": [
-                    [
-                        {
-                            "node": "Cloudinary - Add Title",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Cloudinary - Add Title": {
-                "main": [
-                    [
-                        {
-                            "node": "Google Sheets - Update Status",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ],
-                    [
-                        {
-                            "node": "Error Handler",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
-                ]
-            },
-            "Error Handler": {
-                "main": [
-                    [
-                        {
-                            "node": "Log Error to Sheet",
-                            "type": "main",
-                            "index": 0
-                        }
-                    ]
+                    [{"node": "Download Generated Image", "type": "main", "index": 0}],
+                    [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
                 ]
             }
         },
         "settings": {
-            "executionOrder": "v1"
-        }
+            "executionOrder": "v1",
+            "saveManualExecutions": True,
+            "callerPolicy": "workflowsFromSameOwner",
+            "errorWorkflow": ""
+        },
+        "pinData": {},
+        "active": False
     }
+    
+    if cloudinary_cloud and cloudinary_key and cloudinary_secret:
+        workflow["nodes"].append({
+            "parameters": {
+                "method": "POST",
+                "url": f"https://api.cloudinary.com/v1_1/{cloudinary_cloud}/image/upload",
+                "sendBody": True,
+                "specifyBody": "json",
+                "jsonBody": json.dumps({
+                    "file": "={{ $json.data }}",
+                    "upload_preset": "ml_default",
+                    "api_key": cloudinary_key,
+                    "api_secret": cloudinary_secret,
+                    "transformation": "l_text:Arial_60_bold:{{ $('Parse Claude Response').item.json.title }},co_white,g_south,y_100"
+                }),
+                "options": {"timeout": 60000}
+            },
+            "name": "Cloudinary - Overlay Title",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [1800, 300],
+            "id": "cloudinary-overlay",
+            "onError": "continueErrorOutput"
+        })
+        
+        workflow["connections"]["Download Generated Image"] = {
+            "main": [
+                [{"node": "Cloudinary - Overlay Title", "type": "main", "index": 0}],
+                [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
+            ]
+        }
+        
+        image_url_expr = "={{ $('Cloudinary - Overlay Title').item.json.secure_url }}"
+        update_prev_node = "Cloudinary - Overlay Title"
+        
+        workflow["connections"]["Cloudinary - Overlay Title"] = {
+            "main": [
+                [{"node": "Google Sheets - Save Results", "type": "main", "index": 0}],
+                [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
+            ]
+        }
+    else:
+        image_url_expr = "={{ $('DALL-E 3 - Generate Image').item.json.data[0].url }}"
+        update_prev_node = "Download Generated Image"
+        
+        workflow["connections"]["Download Generated Image"] = {
+            "main": [
+                [{"node": "Google Sheets - Save Results", "type": "main", "index": 0}],
+                [{"node": "Error - Log to Sheet", "type": "main", "index": 0}]
+            ]
+        }
+    
+    workflow["nodes"].append({
+        "parameters": {
+            "operation": "update",
+            "sheetId": {"__rl": True, "value": sheet_id, "mode": "id"},
+            "range": f"=B{{{{ $json.rowIndex }}}}:E{{{{ $json.rowIndex }}}}",
+            "options": {},
+            "columns": {
+                "mappingMode": "defineBelow",
+                "value": {
+                    "B": "={{ $('Parse Claude Response').item.json.text }}",
+                    "C": image_url_expr,
+                    "D": "={{ $now.format('DD.MM.YYYY HH:mm') }}",
+                    "E": "Готово к модерации"
+                }
+            }
+        },
+        "name": "Google Sheets - Save Results",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [2020, 300],
+        "credentials": {
+            "googleSheetsOAuth2Api": {
+                "id": "CONFIGURE_IN_N8N",
+                "name": "Google Sheets account"
+            }
+        },
+        "id": "save-results"
+    })
+    
+    workflow["nodes"].append({
+        "parameters": {
+            "operation": "update",
+            "sheetId": {"__rl": True, "value": sheet_id, "mode": "id"},
+            "range": "=E2",
+            "options": {},
+            "columns": {
+                "mappingMode": "defineBelow",
+                "value": {
+                    "E": "=ОШИБКА: {{ $json.error?.message || 'Неизвестная ошибка' }}"
+                }
+            }
+        },
+        "name": "Error - Log to Sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [1400, 560],
+        "credentials": {
+            "googleSheetsOAuth2Api": {
+                "id": "CONFIGURE_IN_N8N",
+                "name": "Google Sheets account"
+            }
+        },
+        "id": "error-log"
+    })
     
     return workflow

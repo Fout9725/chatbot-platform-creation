@@ -33,6 +33,48 @@
         "error": "string"
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test get templates catalog",
+      "method": "GET",
+      "path": "/?action=templates",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test apply template with params",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "apply_template",
+        "templateId": "telegram-google-sheets",
+        "params": {
+          "telegram_bot_token": "123:ABC",
+          "google_sheet_id": "testsheet123"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "workflow": {
+          "name": "Telegram → Google Sheets"
+        }
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test apply unknown template",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "apply_template",
+        "templateId": "nonexistent",
+        "params": {}
+      },
+      "expectedStatus": 404,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }
