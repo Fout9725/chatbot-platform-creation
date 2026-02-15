@@ -1,6 +1,13 @@
 import json
 import os
+import urllib.request
+import urllib.error
 from templates import TEMPLATES
+
+CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+}
 
 def handler(event: dict, context) -> dict:
     '''Генерирует готовый n8n workflow для автоматизации Instagram-постов или возвращает готовые шаблоны'''
@@ -75,6 +82,9 @@ def handler(event: dict, context) -> dict:
         
         action = body.get('action', 'generate')
         
+        if action == 'validate_keys':
+            return validate_api_keys(body)
+        
         if action == 'apply_template':
             return apply_template(body)
         
@@ -110,6 +120,78 @@ def handler(event: dict, context) -> dict:
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'error': str(e)})
         }
+
+
+def validate_api_keys(body: dict) -> dict:
+    '''Проверяет валидность API-ключей через реальные запросы к провайдерам'''
+    results = {}
+
+    anthropic_key = body.get('anthropicApiKey', '').strip()
+    if anthropic_key:
+        results['anthropic'] = _check_anthropic(anthropic_key)
+
+    openai_key = body.get('openaiApiKey', '').strip()
+    if openai_key:
+        results['openai'] = _check_openai(openai_key)
+
+    return {
+        'statusCode': 200,
+        'headers': CORS_HEADERS,
+        'body': json.dumps({'results': results})
+    }
+
+
+def _check_anthropic(key: str) -> dict:
+    payload = json.dumps({
+        "model": "claude-3-haiku-20240307",
+        "max_tokens": 1,
+        "messages": [{"role": "user", "content": "hi"}]
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        return {"valid": True, "message": "Ключ работает"}
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode('utf-8', errors='replace')
+        if e.code == 401:
+            return {"valid": False, "message": "Неверный ключ"}
+        if e.code == 403:
+            return {"valid": False, "message": "Ключ заблокирован или нет доступа"}
+        if e.code == 429:
+            return {"valid": True, "message": "Ключ валиден (лимит запросов)"}
+        return {"valid": False, "message": f"Ошибка API ({e.code})"}
+    except Exception:
+        return {"valid": False, "message": "Не удалось подключиться к Anthropic"}
+
+
+def _check_openai(key: str) -> dict:
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/models",
+        headers={"Authorization": f"Bearer {key}"}
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        data = json.loads(resp.read().decode())
+        has_dalle = any("dall-e" in m.get("id", "") for m in data.get("data", []))
+        if has_dalle:
+            return {"valid": True, "message": "Ключ работает, DALL-E доступен"}
+        return {"valid": True, "message": "Ключ работает (DALL-E не найден в доступных моделях)"}
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return {"valid": False, "message": "Неверный ключ"}
+        if e.code == 429:
+            return {"valid": True, "message": "Ключ валиден (лимит запросов)"}
+        return {"valid": False, "message": f"Ошибка API ({e.code})"}
+    except Exception:
+        return {"valid": False, "message": "Не удалось подключиться к OpenAI"}
 
 
 def apply_template(body: dict) -> dict:

@@ -62,6 +62,21 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "Test validate_keys with invalid keys",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "validate_keys",
+        "anthropicApiKey": "sk-ant-fake",
+        "openaiApiKey": "sk-fake"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "results": {}
+      },
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "Test apply unknown template",
       "method": "POST",
       "path": "/",
