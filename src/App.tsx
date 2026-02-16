@@ -1,9 +1,11 @@
 
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import OnboardingOverlay, { STORAGE_KEY as ONBOARDING_KEY } from "@/components/onboarding/OnboardingOverlay";
 import { ActiveBotsProvider } from "./contexts/ActiveBotsContext";
 import { BotStatsProvider } from "./contexts/BotStatsContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -41,7 +43,15 @@ import TikTokAutomation from "./components/TikTokAutomation";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const done = localStorage.getItem(ONBOARDING_KEY);
+    if (!done) setShowOnboarding(true);
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ActiveBotsProvider>
@@ -49,6 +59,9 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            {showOnboarding && (
+              <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
+            )}
             <BrowserRouter>
           <SessionExpiryNotification />
         <Routes>
@@ -90,6 +103,7 @@ const App = () => (
       </ActiveBotsProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
