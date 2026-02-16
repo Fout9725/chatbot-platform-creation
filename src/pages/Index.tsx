@@ -150,6 +150,7 @@ const Index = () => {
                 <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
                   <TabsTrigger 
                     value="marketplace" 
+                    data-onboarding="marketplace"
                     className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   >
                     <Icon name="Store" size={16} className="md:w-[18px] md:h-[18px]" />
@@ -160,6 +161,7 @@ const Index = () => {
                 
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
+                  data-onboarding="constructor"
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (!isAuthenticated) {
@@ -178,6 +180,7 @@ const Index = () => {
 
                 <Button
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
+                  data-onboarding="my-bots"
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (isAuthenticated) {

@@ -59,11 +59,11 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            {showOnboarding && (
-              <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
-            )}
             <BrowserRouter>
           <SessionExpiryNotification />
+          {showOnboarding && (
+            <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
+          )}
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/bot/:id" element={<BotDetails />} />

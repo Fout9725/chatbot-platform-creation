@@ -1,116 +1,179 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import OnboardingMascot from './OnboardingMascot';
 
 const STORAGE_KEY = 'intellectpro-onboarding-done';
 
+interface HighlightRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
 interface OnboardingStep {
   title: string;
   text: string;
+  details: string[];
   mascotMood: 'waving' | 'happy' | 'thinking' | 'excited';
   icon: string;
   color: string;
-  features?: string[];
+  selector: string | null;
+  tooltipPosition: 'bottom' | 'top' | 'left' | 'right' | 'center';
 }
 
 const steps: OnboardingStep[] = [
   {
     title: 'Добро пожаловать в ИнтеллектПро!',
-    text: 'Я — ваш помощник. Покажу, как здесь всё устроено. Пройдёмся по основным возможностям платформы — это займёт меньше минуты.',
+    text: 'Я — ваш персональный помощник. Сейчас проведу быструю экскурсию по платформе. Буду подсвечивать важные элементы прямо на экране.',
+    details: [
+      'Платформа для создания ИИ-ботов и агентов',
+      'Автоматизация соцсетей без программирования',
+      'Готовые решения + конструктор',
+      'Экскурсия займёт меньше минуты',
+    ],
     mascotMood: 'waving',
     icon: 'Rocket',
     color: 'from-violet-500 to-purple-600',
-    features: [
-      'Создание ИИ-ботов и агентов',
-      'Автоматизация соцсетей',
-      'Конструктор без кода',
+    selector: null,
+    tooltipPosition: 'center',
+  },
+  {
+    title: 'Шапка сайта — навигация',
+    text: 'Вверху — главное меню. Отсюда вы попадёте в любой раздел: автоматизация, документация, юридическая информация, уведомления и ваш профиль.',
+    details: [
+      '«Автоматизация» — workflow для соцсетей',
+      '«Документация» — справка по платформе',
+      '«Войти» — регистрация и авторизация',
+      '«Уведомления» — события и обновления',
     ],
+    mascotMood: 'happy',
+    icon: 'Navigation',
+    color: 'from-blue-500 to-cyan-500',
+    selector: 'header',
+    tooltipPosition: 'bottom',
   },
   {
     title: 'Маркетплейс ботов',
-    text: 'На главной странице — каталог готовых ИИ-ботов. Можно выбрать бота, посмотреть его возможности и активировать в один клик.',
+    text: 'Это каталог готовых ИИ-ботов. Здесь можно выбрать бота под задачу — для продаж, поддержки клиентов, генерации контента. Активируйте бота в один клик.',
+    details: [
+      'Фильтры по категориям и задачам',
+      'Рейтинги и описание каждого бота',
+      'Кнопка «Активировать» запускает бота',
+      'Бот сразу появится в «Мои боты»',
+    ],
     mascotMood: 'happy',
     icon: 'Store',
-    color: 'from-blue-500 to-cyan-500',
-    features: [
-      'Готовые боты для разных задач',
-      'Рейтинги и отзывы',
-      'Активация в один клик',
-    ],
+    color: 'from-emerald-500 to-teal-500',
+    selector: '[data-onboarding="marketplace"]',
+    tooltipPosition: 'bottom',
   },
   {
-    title: 'Конструктор ботов',
-    text: 'Хотите своего бота? В конструкторе можно собрать его из блоков — без программирования. Или использовать режим с кодом для продвинутых настроек.',
+    title: 'Конструктор — создайте своего бота',
+    text: 'Кнопка «Конструктор» открывает редактор, где вы собираете бота из блоков. Есть визуальный режим (drag & drop) и режим с кодом для продвинутых.',
+    details: [
+      'Визуальный режим — перетаскивайте блоки',
+      'Режим с кодом — полный контроль логики',
+      'Шаблоны для быстрого старта',
+      'Нужна подписка — бесплатные пользователи увидят тарифы',
+    ],
     mascotMood: 'thinking',
     icon: 'Boxes',
-    color: 'from-emerald-500 to-teal-500',
-    features: [
-      'Визуальный редактор (drag & drop)',
-      'Режим с кодом для продвинутых',
-      'Шаблоны для быстрого старта',
-    ],
-  },
-  {
-    title: 'Автоматизация соцсетей',
-    text: 'Раздел «Автоматизация» — готовые workflow для Instagram, Telegram, YouTube, VK и TikTok. Генерируйте контент и публикуйте по расписанию.',
-    mascotMood: 'excited',
-    icon: 'Zap',
     color: 'from-orange-500 to-amber-500',
-    features: [
-      'Instagram — автопостинг с ИИ',
-      'Telegram — боты и каналы',
-      'YouTube, VK, TikTok — идеи и контент',
-    ],
+    selector: '[data-onboarding="constructor"]',
+    tooltipPosition: 'bottom',
   },
   {
-    title: 'Панель управления',
-    text: 'В личном кабинете — статистика ваших ботов, управление подпиской и настройки профиля. Всё в одном месте.',
+    title: 'Мои боты — ваша коллекция',
+    text: 'Все активированные и созданные боты хранятся здесь. Вы можете управлять ими, смотреть статистику и редактировать настройки.',
+    details: [
+      'Список всех ваших ботов',
+      'Статус: активен / остановлен',
+      'Статистика сообщений и взаимодействий',
+      'Настройка и редактирование каждого бота',
+    ],
     mascotMood: 'happy',
-    icon: 'LayoutDashboard',
+    icon: 'Folder',
     color: 'from-pink-500 to-rose-500',
-    features: [
-      'Статистика и аналитика',
-      'Управление подпиской',
-      'Уведомления о событиях',
-    ],
+    selector: '[data-onboarding="my-bots"]',
+    tooltipPosition: 'bottom',
   },
   {
-    title: 'Вы готовы!',
-    text: 'Отлично! Теперь вы знаете основы. Начните с маркетплейса или создайте своего первого бота в конструкторе. Удачи!',
+    title: 'Вы готовы к старту!',
+    text: 'Отлично, теперь вы знаете где что находится! Начните с маркетплейса — выберите готового бота. Или сразу создайте своего в конструкторе. Удачного полёта!',
+    details: [
+      'Маркетплейс — самый быстрый старт',
+      'Конструктор — для уникальных ботов',
+      'Автоматизация — для соцсетей',
+      'Вопросы? Напишите в поддержку',
+    ],
     mascotMood: 'excited',
     icon: 'PartyPopper',
     color: 'from-violet-500 to-blue-500',
+    selector: null,
+    tooltipPosition: 'center',
   },
 ];
 
-interface OnboardingOverlayProps {
+interface Props {
   onComplete: () => void;
 }
 
-const OnboardingOverlay = ({ onComplete }: OnboardingOverlayProps) => {
+const OnboardingOverlay = ({ onComplete }: Props) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setIsVisible(true));
-  }, []);
+  const [highlight, setHighlight] = useState<HighlightRect | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const step = steps[currentStep];
   const isLast = currentStep === steps.length - 1;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  const handleNext = () => {
-    if (isLast) {
-      handleComplete();
-    } else {
-      setCurrentStep((prev) => prev + 1);
+  const updateHighlight = useCallback(() => {
+    const sel = steps[currentStep].selector;
+    if (!sel) {
+      setHighlight(null);
+      return;
     }
+    const el = document.querySelector(sel);
+    if (!el) {
+      setHighlight(null);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    setHighlight({
+      top: rect.top - pad,
+      left: rect.left - pad,
+      width: rect.width + pad * 2,
+      height: rect.height + pad * 2,
+    });
+  }, [currentStep]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setIsVisible(true));
+  }, []);
+
+  useEffect(() => {
+    setExpanded(false);
+    updateHighlight();
+    window.addEventListener('resize', updateHighlight);
+    window.addEventListener('scroll', updateHighlight);
+    return () => {
+      window.removeEventListener('resize', updateHighlight);
+      window.removeEventListener('scroll', updateHighlight);
+    };
+  }, [currentStep, updateHighlight]);
+
+  const handleNext = () => {
+    if (isLast) return handleComplete();
+    setCurrentStep((p) => p + 1);
   };
 
   const handlePrev = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 0));
+    setCurrentStep((p) => Math.max(p - 1, 0));
   };
 
   const handleComplete = () => {
@@ -119,137 +182,207 @@ const OnboardingOverlay = ({ onComplete }: OnboardingOverlayProps) => {
     setTimeout(() => onComplete(), 400);
   };
 
+  const tooltipStyle = (): React.CSSProperties => {
+    if (!highlight || step.tooltipPosition === 'center') {
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+      };
+    }
+
+    const gap = 16;
+    const base: React.CSSProperties = { position: 'fixed' };
+
+    if (step.tooltipPosition === 'bottom') {
+      base.top = highlight.top + highlight.height + gap;
+      base.left = Math.max(16, Math.min(highlight.left, window.innerWidth - 420));
+    } else if (step.tooltipPosition === 'top') {
+      base.bottom = window.innerHeight - highlight.top + gap;
+      base.left = Math.max(16, Math.min(highlight.left, window.innerWidth - 420));
+    } else if (step.tooltipPosition === 'right') {
+      base.top = highlight.top;
+      base.left = highlight.left + highlight.width + gap;
+    } else {
+      base.top = highlight.top;
+      base.right = window.innerWidth - highlight.left + gap;
+    }
+
+    return base;
+  };
+
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-500 ${
-        isVisible && !isExiting ? 'opacity-100' : 'opacity-0'
+      className={`fixed inset-0 z-[9999] transition-opacity duration-500 ${
+        isVisible && !isExiting ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-purple-900/90 to-slate-900/95 backdrop-blur-sm" />
+      <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
+        <defs>
+          <mask id="spotlight-mask">
+            <rect width="100%" height="100%" fill="white" />
+            {highlight && (
+              <rect
+                x={highlight.left}
+                y={highlight.top}
+                width={highlight.width}
+                height={highlight.height}
+                rx="12"
+                fill="black"
+              />
+            )}
+          </mask>
+        </defs>
+        <rect
+          width="100%"
+          height="100%"
+          fill="rgba(0,0,0,0.65)"
+          mask="url(#spotlight-mask)"
+        />
+      </svg>
 
-      <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
+      {highlight && (
+        <div
+          className="absolute rounded-xl border-2 border-white/40 pointer-events-none"
+          style={{
+            top: highlight.top,
+            left: highlight.left,
+            width: highlight.width,
+            height: highlight.height,
+            boxShadow: '0 0 0 4px rgba(139,92,246,0.3), 0 0 30px rgba(139,92,246,0.2)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <div
+            className="absolute inset-0 rounded-xl border-2 border-primary/50 animate-pulse-ring"
+            style={{ pointerEvents: 'none' }}
+          />
+        </div>
+      )}
+
+      <button
+        onClick={handleComplete}
+        className="fixed top-4 right-4 z-[10000] text-white/50 hover:text-white transition-colors flex items-center gap-1.5 text-sm bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm"
+      >
+        Пропустить
+        <Icon name="X" size={16} />
+      </button>
+
+      <div className="fixed top-0 left-0 right-0 h-1 z-[10000] bg-white/10">
         <div
           className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      <button
-        onClick={handleComplete}
-        className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-10 flex items-center gap-1.5 text-sm"
-      >
-        Пропустить
-        <Icon name="X" size={18} />
-      </button>
-
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white/5"
-            style={{
-              width: Math.random() * 6 + 2 + 'px',
-              height: Math.random() * 6 + 2 + 'px',
-              left: Math.random() * 100 + '%',
-              top: Math.random() * 100 + '%',
-              animation: `float ${3 + Math.random() * 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`,
-            }}
-          />
-        ))}
-      </div>
-
       <div
-        className={`relative w-full max-w-lg mx-4 transition-all duration-500 ${
-          isVisible && !isExiting ? 'translate-y-0 scale-100' : 'translate-y-8 scale-95'
-        }`}
+        className="z-[10000] w-[400px] max-w-[calc(100vw-32px)]"
+        style={{
+          ...tooltipStyle(),
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
-        <div className="flex justify-center mb-4">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 rounded-full bg-white/5 animate-pulse-ring" />
-            </div>
-            <OnboardingMascot mood={step.mascotMood} size={130} />
-          </div>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center`}>
-              <Icon name={step.icon} size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-xs text-white/50 font-medium">
-                Шаг {currentStep + 1} из {steps.length}
-              </p>
-              <h2 className="text-xl font-bold text-white font-[Montserrat]">
-                {step.title}
-              </h2>
-            </div>
-          </div>
-
-          <p className="text-white/80 text-sm leading-relaxed mb-4">
-            {step.text}
-          </p>
-
-          {step.features && (
-            <div className="space-y-2 mb-4">
-              {step.features.map((feature, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 text-sm text-white/70"
-                  style={{ animation: `fade-in 0.3s ease-out ${i * 0.1}s both` }}
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${step.color}`} />
-                  {feature}
-                </div>
-              ))}
+        <div className="flex items-end gap-2 mb-2">
+          <OnboardingMascot mood={step.mascotMood} size={80} />
+          {step.tooltipPosition !== 'center' && highlight && (
+            <div className="text-xs text-white/50 mb-2">
+              ↑ Обратите внимание на подсвеченную область
             </div>
           )}
+        </div>
 
-          <div className="flex items-center gap-2 mb-5">
-            {steps.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentStep(i)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === currentStep
-                    ? 'w-8 bg-white'
-                    : i < currentStep
-                      ? 'w-3 bg-white/40'
-                      : 'w-3 bg-white/15'
-                }`}
-              />
-            ))}
+        <div className="bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${step.color} flex items-center justify-center flex-shrink-0`}>
+                <Icon name={step.icon} size={18} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">
+                  Шаг {currentStep + 1} из {steps.length}
+                </p>
+                <h2 className="text-base font-bold text-white font-[Montserrat] leading-tight">
+                  {step.title}
+                </h2>
+              </div>
+            </div>
+
+            <p className="text-white/75 text-sm leading-relaxed">
+              {step.text}
+            </p>
+
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="mt-2 flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              <Icon name={expanded ? 'ChevronUp' : 'ChevronDown'} size={14} />
+              {expanded ? 'Свернуть' : 'Подробнее'}
+            </button>
+
+            <div
+              className={`overflow-hidden transition-all duration-300 ${
+                expanded ? 'max-h-60 opacity-100 mt-3' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="space-y-1.5 pb-1">
+                {step.details.map((d, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-white/60">
+                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 bg-gradient-to-r ${step.color}`} />
+                    {d}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            {currentStep > 0 && (
-              <Button
-                variant="ghost"
-                onClick={handlePrev}
-                className="text-white/70 hover:text-white hover:bg-white/10"
-              >
-                <Icon name="ChevronLeft" size={18} />
-                Назад
-              </Button>
-            )}
-            <Button
-              onClick={handleNext}
-              className={`flex-1 bg-gradient-to-r ${step.color} hover:opacity-90 text-white border-0`}
-            >
-              {isLast ? (
-                <>
-                  Начать работу
-                  <Icon name="ArrowRight" size={18} className="ml-2" />
-                </>
-              ) : (
-                <>
-                  Далее
-                  <Icon name="ChevronRight" size={18} className="ml-1" />
-                </>
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-1.5 mb-3">
+              {steps.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentStep(i)}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    i === currentStep
+                      ? 'w-6 bg-white'
+                      : i < currentStep
+                        ? 'w-2.5 bg-white/40'
+                        : 'w-2.5 bg-white/15'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              {currentStep > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handlePrev}
+                  className="text-white/60 hover:text-white hover:bg-white/10 h-9"
+                >
+                  <Icon name="ChevronLeft" size={16} />
+                  Назад
+                </Button>
               )}
-            </Button>
+              <Button
+                size="sm"
+                onClick={handleNext}
+                className={`flex-1 bg-gradient-to-r ${step.color} hover:opacity-90 text-white border-0 h-9`}
+              >
+                {isLast ? (
+                  <>
+                    Начать работу
+                    <Icon name="ArrowRight" size={16} className="ml-1" />
+                  </>
+                ) : (
+                  <>
+                    Далее
+                    <Icon name="ChevronRight" size={16} className="ml-1" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
