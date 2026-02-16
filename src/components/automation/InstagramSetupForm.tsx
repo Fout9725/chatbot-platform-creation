@@ -174,6 +174,24 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
     }
   };
 
+  const clearForm = () => {
+    setFormData({
+      googleSheetId: '',
+      anthropicApiKey: '',
+      openaiApiKey: '',
+      cloudinaryCloudName: '',
+      cloudinaryApiKey: '',
+      cloudinaryApiSecret: '',
+      scheduleTime: '10:00'
+    });
+    setKeyStatus({
+      anthropic: { status: 'idle', message: '' },
+      openai: { status: 'idle', message: '' }
+    });
+    localStorage.removeItem(STORAGE_KEY);
+    toast({ title: "Форма очищена" });
+  };
+
   const allKeysValid = keyStatus.anthropic.status === 'valid' && keyStatus.openai.status === 'valid';
 
   return (
@@ -358,24 +376,35 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
           </p>
         </div>
 
-        <Button 
-          onClick={generateWorkflow} 
-          disabled={isGenerating}
-          className="w-full"
-          size="lg"
-        >
-          {isGenerating ? (
-            <>
-              <Icon name="Loader" size={18} className="mr-2 animate-spin" />
-              Генерация...
-            </>
-          ) : (
-            <>
-              <Icon name="Zap" size={18} className="mr-2" />
-              Сгенерировать n8n Workflow
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={generateWorkflow} 
+            disabled={isGenerating}
+            className="flex-1"
+            size="lg"
+          >
+            {isGenerating ? (
+              <>
+                <Icon name="Loader" size={18} className="mr-2 animate-spin" />
+                Генерация...
+              </>
+            ) : (
+              <>
+                <Icon name="Zap" size={18} className="mr-2" />
+                Сгенерировать n8n Workflow
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={clearForm}
+            disabled={isGenerating}
+            title="Очистить форму"
+          >
+            <Icon name="Trash2" size={18} />
+          </Button>
+        </div>
       </div>
     </>
   );
