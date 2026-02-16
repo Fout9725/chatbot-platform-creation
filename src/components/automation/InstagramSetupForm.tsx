@@ -51,9 +51,9 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
     }
   };
 
-  const validateKey = async (provider: 'anthropic' | 'openai') => {
+  const validateKey = async (provider: 'anthropic' | 'openai', pastedValue?: string) => {
     const keyField = provider === 'anthropic' ? 'anthropicApiKey' : 'openaiApiKey';
-    const keyValue = formData[keyField].trim();
+    const keyValue = (pastedValue ?? formData[keyField]).trim();
 
     if (!keyValue) {
       toast({ title: "Введите ключ", description: `Поле ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} пустое`, variant: "destructive" });
@@ -85,6 +85,15 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
       }
     } catch {
       setKeyStatus(prev => ({ ...prev, [provider]: { status: 'error', message: 'Ошибка сети' } }));
+    }
+  };
+
+  const handlePaste = (provider: 'anthropic' | 'openai') => (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (pasted.length >= 10) {
+      const field = provider === 'anthropic' ? 'anthropicApiKey' : 'openaiApiKey';
+      setFormData(prev => ({ ...prev, [field]: pasted }));
+      setTimeout(() => validateKey(provider, pasted), 100);
     }
   };
 
@@ -187,6 +196,7 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
                 placeholder="sk-ant-..."
                 value={formData.anthropicApiKey}
                 onChange={(e) => handleInputChange('anthropicApiKey', e.target.value)}
+                onPaste={handlePaste('anthropic')}
                 className={keyStatus.anthropic.status === 'valid' ? 'border-green-500 pr-8' : keyStatus.anthropic.status === 'error' ? 'border-red-500 pr-8' : ''}
               />
               {keyStatus.anthropic.status !== 'idle' && (
@@ -230,6 +240,7 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
                 placeholder="sk-..."
                 value={formData.openaiApiKey}
                 onChange={(e) => handleInputChange('openaiApiKey', e.target.value)}
+                onPaste={handlePaste('openai')}
                 className={keyStatus.openai.status === 'valid' ? 'border-green-500 pr-8' : keyStatus.openai.status === 'error' ? 'border-red-500 pr-8' : ''}
               />
               {keyStatus.openai.status !== 'idle' && (
