@@ -10,6 +10,7 @@ import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { STORAGE_KEY as ONBOARDING_KEY } from '@/components/onboarding/OnboardingOverlay';
 const Index = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -93,6 +94,10 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => { localStorage.removeItem(ONBOARDING_KEY); window.location.reload(); }}>
+                <Icon name="GraduationCap" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Экскурсия</span>
+              </Button>
               <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/automation-hub')}>
                 <Icon name="Zap" size={18} className="mr-2" />
                 <span className="hidden lg:inline">Автоматизация</span>
