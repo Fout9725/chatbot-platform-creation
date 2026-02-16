@@ -46,7 +46,7 @@ const MyBotsPage = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList data-tour="mybots-tabs" className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="bots" className="flex items-center gap-2">
               <Icon name="Bot" size={16} />
               Мои боты

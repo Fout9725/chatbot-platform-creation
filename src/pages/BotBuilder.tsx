@@ -267,7 +267,7 @@ const BotBuilder = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList data-tour="builder-tabs" className="grid w-full grid-cols-3">
             <TabsTrigger value="visual">
               <Icon name="Boxes" size={16} className="mr-2" />
               Визуальный конструктор

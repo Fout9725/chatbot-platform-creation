@@ -150,7 +150,7 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
+        <div data-tour="dashboard-stats" className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Всего ИИ-агентов</CardDescription>
@@ -214,7 +214,7 @@ const Dashboard = () => {
         </div>
 
         <Tabs defaultValue="actions" className="space-y-6">
-          <TabsList>
+          <TabsList data-tour="dashboard-tabs">
             <TabsTrigger value="actions">Быстрые действия</TabsTrigger>
             <TabsTrigger value="bots">Мои боты</TabsTrigger>
             <TabsTrigger value="market">Маркетплейс</TabsTrigger>

@@ -152,7 +152,7 @@ export default function TelegramAutomation() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="setup" className="space-y-4">
+            <TabsContent value="setup" data-tour="tg-setup" className="space-y-4">
               <Alert>
                 <Icon name="Info" size={16} />
                 <AlertDescription>

@@ -149,7 +149,7 @@ export default function AutomationHub() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div data-tour="automation-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {automations.map((automation) => (
             <Card
               key={automation.id}
@@ -197,7 +197,7 @@ export default function AutomationHub() {
           ))}
         </div>
 
-        <Card className="mt-8 border-2 border-primary/20">
+        <Card data-tour="how-it-works" className="mt-8 border-2 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Icon name="Info" size={20} />

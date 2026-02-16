@@ -88,7 +88,7 @@ const Constructor = () => {
               </Card>
 
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList data-tour="constructor-tabs" className="grid w-full grid-cols-2">
                   <TabsTrigger value="ai">
                     <Icon name="Sparkles" size={16} className="mr-2" />
                     ИИ-Агент

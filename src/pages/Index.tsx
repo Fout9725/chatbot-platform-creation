@@ -10,7 +10,7 @@ import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { STORAGE_KEY as ONBOARDING_KEY } from '@/components/onboarding/OnboardingOverlay';
+import { FIRST_VISIT_KEY } from '@/components/onboarding/TourManager';
 const Index = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -94,7 +94,7 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => { localStorage.removeItem(ONBOARDING_KEY); window.location.reload(); }}>
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => { localStorage.removeItem(FIRST_VISIT_KEY); localStorage.removeItem('tour-seen-/'); window.location.reload(); }}>
                 <Icon name="GraduationCap" size={18} className="mr-2" />
                 <span className="hidden lg:inline">Экскурсия</span>
               </Button>
@@ -155,7 +155,7 @@ const Index = () => {
                 <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
                   <TabsTrigger 
                     value="marketplace" 
-                    data-onboarding="marketplace"
+                    data-tour="marketplace"
                     className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   >
                     <Icon name="Store" size={16} className="md:w-[18px] md:h-[18px]" />
@@ -166,7 +166,7 @@ const Index = () => {
                 
                 <Button
                   variant={activeTab === 'constructor' ? 'default' : 'outline'}
-                  data-onboarding="constructor"
+                  data-tour="constructor"
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (!isAuthenticated) {
@@ -185,7 +185,7 @@ const Index = () => {
 
                 <Button
                   variant={activeTab === 'my-bots' ? 'default' : 'outline'}
-                  data-onboarding="my-bots"
+                  data-tour="my-bots"
                   className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
                   onClick={() => {
                     if (isAuthenticated) {

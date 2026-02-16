@@ -43,19 +43,19 @@ const InstagramAutomation = () => {
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="templates">
+              <TabsTrigger value="templates" data-tour="tab-templates">
                 <Icon name="LayoutGrid" size={16} className="mr-2" />
                 Шаблоны
               </TabsTrigger>
-              <TabsTrigger value="instagram">
+              <TabsTrigger value="instagram" data-tour="tab-instagram">
                 <Icon name="Instagram" size={16} className="mr-2" />
                 Instagram
               </TabsTrigger>
-              <TabsTrigger value="workflow">
+              <TabsTrigger value="workflow" data-tour="tab-workflow">
                 <Icon name="Code" size={16} className="mr-2" />
                 Workflow
               </TabsTrigger>
-              <TabsTrigger value="instructions">
+              <TabsTrigger value="instructions" data-tour="tab-instructions">
                 <Icon name="BookOpen" size={16} className="mr-2" />
                 Инструкция
               </TabsTrigger>

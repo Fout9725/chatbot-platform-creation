@@ -121,25 +121,29 @@ const Profile = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <ProfileSidebar
-            name={name}
-            email={email}
-            avatar={user?.avatar}
-            onChangeAvatar={() => setIsAvatarDialogOpen(true)}
-            onLogout={handleLogout}
-          />
+          <div data-tour="profile-sidebar">
+            <ProfileSidebar
+              name={name}
+              email={email}
+              avatar={user?.avatar}
+              onChangeAvatar={() => setIsAvatarDialogOpen(true)}
+              onLogout={handleLogout}
+            />
+          </div>
 
-          <ProfileTabs
-            user={user}
-            name={name}
-            email={email}
-            company={company}
-            onNameChange={setName}
-            onEmailChange={setEmail}
-            onCompanyChange={setCompany}
-            onSave={handleSave}
-            paymentHistory={paymentHistory}
-          />
+          <div data-tour="profile-tabs" className="md:col-span-2">
+            <ProfileTabs
+              user={user}
+              name={name}
+              email={email}
+              company={company}
+              onNameChange={setName}
+              onEmailChange={setEmail}
+              onCompanyChange={setCompany}
+              onSave={handleSave}
+              paymentHistory={paymentHistory}
+            />
+          </div>
         </div>
 
         <ProfileStats

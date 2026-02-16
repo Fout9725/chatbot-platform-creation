@@ -126,7 +126,7 @@ const Pricing = () => {
             Выберите подходящий план для вашего бизнеса. Начните бесплатно, обновляйтесь по мере роста.
           </p>
 
-          <div className="flex items-center justify-center gap-3">
+          <div data-tour="pricing-toggle" className="flex items-center justify-center gap-3">
             <Label htmlFor="billing-toggle" className={!isYearly ? 'font-semibold' : ''}>
               Ежемесячно
             </Label>
@@ -144,7 +144,7 @@ const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
+        <div data-tour="pricing-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
           {plans.map((plan, index) => (
             <Card
               key={plan.name}
