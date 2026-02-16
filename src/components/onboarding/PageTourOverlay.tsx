@@ -27,7 +27,7 @@ const PageTourOverlay = ({ steps, onComplete }: PageTourOverlayProps) => {
   const isLast = currentStep === steps.length - 1;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  const updateHighlight = useCallback(() => {
+  const updateHighlight = useCallback((shouldScroll = false) => {
     const sel = steps[currentStep]?.selector;
     if (!sel) {
       setHighlight(null);
@@ -36,6 +36,20 @@ const PageTourOverlay = ({ steps, onComplete }: PageTourOverlayProps) => {
     const el = document.querySelector(sel);
     if (!el) {
       setHighlight(null);
+      return;
+    }
+    if (shouldScroll) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        const pad = 8;
+        setHighlight({
+          top: rect.top - pad,
+          left: rect.left - pad,
+          width: rect.width + pad * 2,
+          height: rect.height + pad * 2,
+        });
+      }, 400);
       return;
     }
     const rect = el.getBoundingClientRect();
@@ -54,13 +68,14 @@ const PageTourOverlay = ({ steps, onComplete }: PageTourOverlayProps) => {
 
   useEffect(() => {
     setExpanded(false);
-    const timer = setTimeout(updateHighlight, 100);
-    window.addEventListener('resize', updateHighlight);
-    window.addEventListener('scroll', updateHighlight);
+    const timer = setTimeout(() => updateHighlight(true), 100);
+    const onScrollResize = () => updateHighlight(false);
+    window.addEventListener('resize', onScrollResize);
+    window.addEventListener('scroll', onScrollResize);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('resize', updateHighlight);
-      window.removeEventListener('scroll', updateHighlight);
+      window.removeEventListener('resize', onScrollResize);
+      window.removeEventListener('scroll', onScrollResize);
     };
   }, [currentStep, updateHighlight]);
 
@@ -83,18 +98,25 @@ const PageTourOverlay = ({ steps, onComplete }: PageTourOverlayProps) => {
     const gap = 16;
     const base: React.CSSProperties = { position: 'fixed' };
     const maxLeft = window.innerWidth - 420;
+    const tooltipH = 300;
+    const maxTop = window.innerHeight - tooltipH - 16;
 
     if (step.position === 'bottom') {
-      base.top = highlight.top + highlight.height + gap;
+      const desiredTop = highlight.top + highlight.height + gap;
+      if (desiredTop > maxTop) {
+        base.bottom = window.innerHeight - highlight.top + gap;
+      } else {
+        base.top = desiredTop;
+      }
       base.left = Math.max(16, Math.min(highlight.left, maxLeft));
     } else if (step.position === 'top') {
       base.bottom = window.innerHeight - highlight.top + gap;
       base.left = Math.max(16, Math.min(highlight.left, maxLeft));
     } else if (step.position === 'right') {
-      base.top = Math.max(16, highlight.top);
+      base.top = Math.max(16, Math.min(highlight.top, maxTop));
       base.left = highlight.left + highlight.width + gap;
     } else {
-      base.top = Math.max(16, highlight.top);
+      base.top = Math.max(16, Math.min(highlight.top, maxTop));
       base.right = window.innerWidth - highlight.left + gap;
     }
     return base;
