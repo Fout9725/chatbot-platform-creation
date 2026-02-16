@@ -175,6 +175,7 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
   };
 
   const clearForm = () => {
+    if (!window.confirm('Очистить все поля формы? Данные будут удалены.')) return;
     setFormData({
       googleSheetId: '',
       anthropicApiKey: '',
