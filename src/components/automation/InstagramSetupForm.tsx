@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const API_URL = 'https://functions.poehali.dev/a0badc6a-7e0c-48cd-8b5e-a5985f0d8b92';
+const STORAGE_KEY = 'instagram-setup-form';
 
 interface InstagramSetupFormProps {
   onWorkflowGenerated: (json: string) => void;
@@ -23,15 +24,27 @@ const InstagramSetupForm = ({ onWorkflowGenerated }: InstagramSetupFormProps) =>
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const [formData, setFormData] = useState({
-    googleSheetId: '',
-    anthropicApiKey: '',
-    openaiApiKey: '',
-    cloudinaryCloudName: '',
-    cloudinaryApiKey: '',
-    cloudinaryApiSecret: '',
-    scheduleTime: '10:00'
+  const [formData, setFormData] = useState(() => {
+    const defaults = {
+      googleSheetId: '',
+      anthropicApiKey: '',
+      openaiApiKey: '',
+      cloudinaryCloudName: '',
+      cloudinaryApiKey: '',
+      cloudinaryApiSecret: '',
+      scheduleTime: '10:00'
+    };
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
   });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+  }, [formData]);
 
   const [keyStatus, setKeyStatus] = useState<{
     anthropic: KeyValidation;
