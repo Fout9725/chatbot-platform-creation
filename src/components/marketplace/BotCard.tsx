@@ -25,7 +25,7 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
             </div>
             <div className="min-w-0 flex-1">
               <CardTitle className="text-base md:text-lg line-clamp-1">{bot.name}</CardTitle>
-              <CardDescription className="text-xs md:text-sm line-clamp-2 mt-1">
+              <CardDescription className="text-xs md:text-sm mt-1 h-10 overflow-y-auto pr-1 scrollbar-thin">
                 {bot.description}
               </CardDescription>
             </div>
