@@ -128,10 +128,10 @@ const BotMarketplace = () => {
   const selectedBot = mockBots.find(bot => bot.id === paymentModal.botId);
 
   return (
-    <div className="space-y-6 animate-fade-in relative z-[1]">
+    <div className="space-y-4 md:space-y-6 animate-fade-in relative z-[1] px-1 md:px-0">
       <div>
-        <h2 className="text-xl md:text-2xl font-bold mb-2">Маркетплейс готовых решений</h2>
-        <p className="text-sm md:text-base text-muted-foreground">
+        <h2 className="text-lg md:text-2xl font-bold mb-1 md:mb-2">Маркетплейс готовых решений</h2>
+        <p className="text-xs md:text-base text-muted-foreground">
           Выберите готового ИИ-агента или создайте своего с нуля
         </p>
       </div>
@@ -143,9 +143,9 @@ const BotMarketplace = () => {
         onCategoryChange={handleCategoryChange} 
       />
 
-      <div className="space-y-3">
+      <div className="space-y-2 md:space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs md:text-sm text-muted-foreground">
             Найдено ботов: {filteredBots.length}
           </p>
           {(searchQuery || selectedCategory !== 'Все' || priceRange[0] !== 0 || priceRange[1] !== maxPrice || minRating !== 0) && (
@@ -163,7 +163,7 @@ const BotMarketplace = () => {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
           <PriceFilter 
             maxPrice={maxPrice}
             priceRange={priceRange}
@@ -176,7 +176,7 @@ const BotMarketplace = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4 lg:gap-6">
         {filteredBots.map((bot) => (
           <BotCard 
             key={bot.id} 

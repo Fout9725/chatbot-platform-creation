@@ -13,13 +13,13 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6 relative z-50" style={{ pointerEvents: 'auto' }}>
+    <div className="flex gap-2 mb-6 relative z-50 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin" style={{ pointerEvents: 'auto' }}>
       {categories.map((category) => {
         const count = getCategoryCount(category);
         return (
           <button
             key={category}
-            className={`min-h-[60px] px-6 text-lg font-bold rounded-md border-2 transition-all cursor-pointer ${
+            className={`min-h-[40px] md:min-h-[52px] px-3 md:px-5 text-sm md:text-base font-semibold rounded-md border-2 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 ${
               selectedCategory === category
                 ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md text-white border-transparent'
                 : 'hover:bg-accent hover:border-primary/50 border-border bg-background'
@@ -32,7 +32,7 @@ export default function CategoryFilter({ categories, selectedCategory, onCategor
             type="button"
             style={{ pointerEvents: 'auto' }}
           >
-            {category} <span className="ml-1.5 opacity-70">({count})</span>
+            {category} <span className="ml-1 opacity-70">({count})</span>
           </button>
         );
       })}
