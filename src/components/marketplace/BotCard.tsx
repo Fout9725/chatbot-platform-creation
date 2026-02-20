@@ -14,10 +14,10 @@ interface BotCardProps {
 
 export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCardProps) {
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 hover:border-primary/50 overflow-hidden relative">
+    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 hover:border-primary/50 overflow-hidden relative flex flex-col h-full">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       
-      <CardHeader className="relative">
+      <CardHeader className="relative flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="bg-gradient-to-br from-primary/20 to-secondary/20 p-3 rounded-xl group-hover:scale-110 transition-transform flex-shrink-0">
@@ -31,11 +31,11 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
         </div>
       </CardHeader>
 
-      <CardContent className="relative space-y-3">
-        <p className="text-xs md:text-sm text-muted-foreground h-[3.75rem] overflow-y-auto pr-1 scrollbar-thin leading-snug">
+      <CardContent className="relative space-y-3 flex-1 flex flex-col">
+        <p className="text-xs md:text-sm text-muted-foreground h-[3.75rem] overflow-y-auto pr-1 scrollbar-thin leading-snug flex-shrink-0">
           {bot.description}
         </p>
-        <div className="flex items-center justify-between text-xs md:text-sm">
+        <div className="flex items-center justify-between text-xs md:text-sm flex-shrink-0">
           <div className="flex items-center gap-1">
             <Icon name="Star" size={16} className="text-yellow-500 fill-yellow-500" />
             <span className="font-semibold">{bot.rating}</span>
@@ -46,15 +46,15 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 h-[3.5rem] overflow-hidden content-start flex-shrink-0">
           {bot.features.slice(0, 3).map((feature, index) => (
-            <Badge key={index} variant="outline" className="text-xs">
+            <Badge key={index} variant="outline" className="text-xs h-fit">
               {feature}
             </Badge>
           ))}
         </div>
 
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t mt-auto">
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xs text-muted-foreground">Покупка</p>
@@ -72,7 +72,7 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
         </div>
       </CardContent>
 
-      <CardFooter className="relative gap-2 flex-col">
+      <CardFooter className="relative gap-2 flex-col flex-shrink-0">
         <div className="flex gap-2 w-full">
           <Button
             type="button"
