@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
@@ -25,9 +25,6 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
             </div>
             <div className="min-w-0 flex-1">
               <CardTitle className="text-base md:text-lg line-clamp-1">{bot.name}</CardTitle>
-              <CardDescription className="text-xs md:text-sm mt-1 h-10 overflow-y-auto pr-1 scrollbar-thin">
-                {bot.description}
-              </CardDescription>
             </div>
           </div>
           <Badge variant="secondary" className="text-xs flex-shrink-0">{bot.category}</Badge>
@@ -35,6 +32,9 @@ export default function BotCard({ bot, onBuy, onRent, onDetails, onTest }: BotCa
       </CardHeader>
 
       <CardContent className="relative space-y-3">
+        <p className="text-xs md:text-sm text-muted-foreground h-[3.75rem] overflow-y-auto pr-1 scrollbar-thin leading-snug">
+          {bot.description}
+        </p>
         <div className="flex items-center justify-between text-xs md:text-sm">
           <div className="flex items-center gap-1">
             <Icon name="Star" size={16} className="text-yellow-500 fill-yellow-500" />
