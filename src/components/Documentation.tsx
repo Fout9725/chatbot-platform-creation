@@ -29,29 +29,21 @@ export default function Documentation() {
         </div>
 
         <Tabs defaultValue="quickstart" className="w-full">
-          <TabsList className="flex flex-wrap gap-1 h-auto">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2">
             <TabsTrigger value="quickstart" className="text-xs md:text-sm">
-              <Icon name="Rocket" size={16} className="mr-1" />
+              <Icon name="Rocket" size={16} className="mr-2" />
               Быстрый старт
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="text-xs md:text-sm">
-              <Icon name="BookOpen" size={16} className="mr-1" />
-              База знаний
-            </TabsTrigger>
-            <TabsTrigger value="models" className="text-xs md:text-sm">
-              <Icon name="Cpu" size={16} className="mr-1" />
-              Модели
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="text-xs md:text-sm">
-              <Icon name="Plug" size={16} className="mr-1" />
-              Интеграции
-            </TabsTrigger>
             <TabsTrigger value="security" className="text-xs md:text-sm">
-              <Icon name="Shield" size={16} className="mr-1" />
+              <Icon name="Shield" size={16} className="mr-2" />
               Безопасность
             </TabsTrigger>
+            <TabsTrigger value="api" className="text-xs md:text-sm">
+              <Icon name="Code" size={16} className="mr-2" />
+              API Reference
+            </TabsTrigger>
             <TabsTrigger value="faq" className="text-xs md:text-sm">
-              <Icon name="HelpCircle" size={16} className="mr-1" />
+              <Icon name="HelpCircle" size={16} className="mr-2" />
               FAQ
             </TabsTrigger>
           </TabsList>
@@ -108,162 +100,6 @@ export default function Documentation() {
                   <AlertDescription>
                     <strong>Совет:</strong> Начните с 10-15 часто задаваемых вопросов. 
                     Бот автоматически обучится на реальных диалогах.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="knowledge" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon name="BookOpen" size={24} className="text-green-500" />
-                  База знаний бота
-                </CardTitle>
-                <CardDescription>Как наполнить бота информацией для ответов</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 text-sm font-bold">1</span>
-                    Добавление сайта (URL)
-                  </h3>
-                  <p className="text-muted-foreground ml-10">
-                    Откройте настройки бота &rarr; вкладка &laquo;База знаний&raquo; &rarr; блок &laquo;Добавить сайт&raquo;. 
-                    Вставьте URL страницы и нажмите &laquo;Добавить&raquo;. Система автоматически извлечёт текст со страницы 
-                    и добавит его в базу знаний бота. Бот сможет отвечать на вопросы по содержимому этой страницы.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 text-sm font-bold">2</span>
-                    Загрузка файлов
-                  </h3>
-                  <p className="text-muted-foreground ml-10">
-                    Поддерживаемые форматы: <strong>PDF, DOCX, TXT, CSV</strong> (до 10 МБ). 
-                    Нажмите на зону загрузки, выберите файл — текст будет извлечён автоматически. 
-                    Для PDF: лучше всего работает с текстовыми PDF (не сканы). 
-                    Для сканов рекомендуем сначала распознать текст и загрузить TXT.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 text-sm font-bold">3</span>
-                    Ручной ввод текста
-                  </h3>
-                  <p className="text-muted-foreground ml-10">
-                    Вставьте текст напрямую: FAQ, инструкции, описания товаров, правила компании. 
-                    Можно добавлять несколько записей — каждая будет отдельным источником знаний.
-                  </p>
-                </div>
-
-                <Alert>
-                  <Icon name="Lightbulb" size={18} />
-                  <AlertDescription>
-                    <strong>Совет:</strong> Комбинируйте источники. Загрузите документацию из файла, 
-                    добавьте URL с актуальным прайсом, и вручную введите ответы на нестандартные вопросы.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="models" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon name="Cpu" size={24} className="text-purple-500" />
-                  Выбор модели нейросети
-                </CardTitle>
-                <CardDescription>Какую AI-модель выбрать для вашего бота</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Бесплатные модели</h3>
-                  <div className="space-y-3">
-                    <div className="border rounded-lg p-3">
-                      <p className="font-medium">Gemini 2.0 Flash <span className="text-xs text-green-600 ml-1">(рекомендуем)</span></p>
-                      <p className="text-sm text-muted-foreground">Быстрая, хорошо понимает русский. Лучший выбор для консультаций и FAQ.</p>
-                    </div>
-                    <div className="border rounded-lg p-3">
-                      <p className="font-medium">DeepSeek Chat V3</p>
-                      <p className="text-sm text-muted-foreground">Отлично подходит для диалогов. Хорошо рассуждает и отвечает развёрнуто.</p>
-                    </div>
-                    <div className="border rounded-lg p-3">
-                      <p className="font-medium">Qwen3 235B</p>
-                      <p className="text-sm text-muted-foreground">Мощная модель для сложных задач. Поддерживает много языков.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Премиум модели</h3>
-                  <div className="space-y-3">
-                    <div className="border rounded-lg p-3">
-                      <p className="font-medium">GPT-4o</p>
-                      <p className="text-sm text-muted-foreground">Топовая модель OpenAI. Максимальное качество ответов.</p>
-                    </div>
-                    <div className="border rounded-lg p-3">
-                      <p className="font-medium">Claude 3.5 Sonnet</p>
-                      <p className="text-sm text-muted-foreground">Отлично следует инструкциям, безопасная. Идеальна для бизнеса.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">Как выбрать?</h3>
-                  <p className="text-muted-foreground">
-                    Настройки бота &rarr; вкладка &laquo;Модель&raquo; &rarr; выберите из списка. 
-                    Для начала рекомендуем бесплатные модели — они покрывают 90% задач.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="integrations" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon name="Plug" size={24} className="text-blue-500" />
-                  Подключение интеграций
-                </CardTitle>
-                <CardDescription>Как подключить бота к мессенджерам и сервисам</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <Icon name="Send" size={20} className="text-blue-500" />
-                    Telegram
-                  </h3>
-                  <ol className="list-decimal list-inside space-y-2 ml-4 text-muted-foreground">
-                    <li>Откройте @BotFather в Telegram и создайте нового бота (<code className="px-2 py-1 bg-muted rounded">/newbot</code>)</li>
-                    <li>Скопируйте токен бота (формат: <code className="px-2 py-1 bg-muted rounded">123456:ABC-DEF...</code>)</li>
-                    <li>Откройте настройки бота &rarr; вкладка &laquo;Интеграции&raquo;</li>
-                    <li>Вставьте токен и нажмите &laquo;Подключить Telegram&raquo;</li>
-                    <li>Если всё верно — появится имя бота и статус &laquo;Подключён&raquo;</li>
-                  </ol>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <Icon name="MessageCircle" size={20} className="text-green-500" />
-                    WhatsApp, VK, Instagram
-                  </h3>
-                  <p className="text-muted-foreground ml-4">
-                    Эти интеграции находятся в разработке и скоро будут доступны. 
-                    Следите за обновлениями в нашем Telegram-канале.
-                  </p>
-                </div>
-
-                <Alert>
-                  <Icon name="Info" size={18} />
-                  <AlertDescription>
-                    После подключения Telegram бот сразу начнёт принимать сообщения. 
-                    Убедитесь, что база знаний заполнена перед запуском.
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -331,7 +167,7 @@ export default function Documentation() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="api" className="mt-6 space-y-6 hidden">
+          <TabsContent value="api" className="mt-6 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -522,13 +358,22 @@ Response:
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <a 
-                    href="https://t.me/+QgiLIa1gFRY4Y2Iy" 
+                    href="https://t.me/your_support_bot" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     <Icon name="MessageCircle" size={18} />
-                    Наше сообщество в Telegram
+                    Написать в поддержку
+                  </a>
+                  <a 
+                    href="https://github.com/your-repo/issues" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <Icon name="Github" size={18} />
+                    Сообщить об ошибке
                   </a>
                 </div>
               </CardContent>
