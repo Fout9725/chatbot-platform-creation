@@ -86,7 +86,7 @@ const BotMarketplace = () => {
     
     const userPlan = user?.plan || 'free';
     const maxBots = PLAN_LIMITS[userPlan];
-    const currentBots = JSON.parse(localStorage.getItem('activeBots') || '[]');
+    const currentBots: Array<{ botId: number; name: string }> = JSON.parse(localStorage.getItem('activeBots') || '[]');
     
     if (currentBots.length >= maxBots) {
       toast({
@@ -99,7 +99,7 @@ const BotMarketplace = () => {
     
     const bot = mockBots.find(b => b.id === id);
     if (bot) {
-      const existingBot = currentBots.find((b: any) => b.botId === id);
+      const existingBot = currentBots.find(b => b.botId === id);
       
       if (existingBot) {
         toast({
