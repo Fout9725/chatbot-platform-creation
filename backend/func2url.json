@@ -3,10 +3,10 @@
   "admin-auth": "https://functions.poehali.dev/715c66ff-a69d-45f5-aedd-57906976f30b",
   "instagram-workflow": "https://functions.poehali.dev/a0badc6a-7e0c-48cd-8b5e-a5985f0d8b92",
   "bot-builder": "https://functions.poehali.dev/f74c949b-7d94-4880-aedd-ac4442889227",
-  "neurophoto-bot": "https://functions.poehali.dev/861d11a4-4516-4868-97c9-4f90b87d454b",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
-  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e"
+  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e",
+  "bots-api": "https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2"
 }

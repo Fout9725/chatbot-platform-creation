@@ -1,0 +1,1 @@
+UPDATE t_p60354232_chatbot_platform_cre.bots SET ai_model = 'google/gemini-2.0-flash-exp:free' WHERE ai_model = 'groq' OR ai_model IS NULL;

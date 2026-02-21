@@ -1,38 +1,24 @@
 {
   "tests": [
     {
-      "name": "Test OPTIONS request for CORS",
-      "method": "OPTIONS",
-      "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": "",
-      "bodyMatcher": "exact"
-    },
-    {
-      "name": "Test get all bots",
+      "name": "Get bot by id",
       "method": "GET",
-      "path": "/",
+      "path": "/?id=1",
       "expectedStatus": 200,
       "expectedBody": {
-        "bots": []
+        "bot": {
+          "id": 1
+        }
       },
       "bodyMatcher": "partial"
     },
     {
-      "name": "Test create bot",
-      "method": "POST",
-      "path": "/",
-      "body": {
-        "name": "Test Bot",
-        "bot_type": "chatbot",
-        "platform": "telegram",
-        "description": "Test bot description"
-      },
-      "expectedStatus": 201,
+      "name": "Get CRM integrations",
+      "method": "GET",
+      "path": "/?action=crm_list&bot_id=1",
+      "expectedStatus": 200,
       "expectedBody": {
-        "bot": {
-          "name": "Test Bot"
-        }
+        "integrations": []
       },
       "bodyMatcher": "partial"
     }

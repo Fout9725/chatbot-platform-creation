@@ -27,14 +27,13 @@ interface BotSettingsConfigTabsProps {
   botSettings: BotSettings;
   setBotSettings: (v: BotSettings) => void;
   freeModels: AIModel[];
-  paidModels: AIModel[];
+  paidModels?: AIModel[];
 }
 
 export default function BotSettingsConfigTabs({
   botSettings,
   setBotSettings,
   freeModels,
-  paidModels,
 }: BotSettingsConfigTabsProps) {
   return (
     <>
@@ -91,21 +90,12 @@ export default function BotSettingsConfigTabs({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Бесплатные модели</div>
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Бесплатные модели OpenRouter</div>
               {freeModels.map(m => (
                 <SelectItem key={m.id} value={m.id}>
                   <div className="flex items-center gap-2">
                     <span>{m.name}</span>
                     <Badge variant="secondary" className="text-[10px] px-1 py-0">Free</Badge>
-                  </div>
-                </SelectItem>
-              ))}
-              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-1">Премиум модели</div>
-              {paidModels.map(m => (
-                <SelectItem key={m.id} value={m.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{m.name}</span>
-                    <Badge variant="default" className="text-[10px] px-1 py-0">Pro</Badge>
                   </div>
                 </SelectItem>
               ))}

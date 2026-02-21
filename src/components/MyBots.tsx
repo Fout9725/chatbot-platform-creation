@@ -212,7 +212,7 @@ const MyBots = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div className="bg-gradient-to-br from-primary/10 to-secondary/10 p-3 rounded-xl">
-                    <Icon name={getPlatformIcon(bot.platform) as any} size={24} className="text-primary" />
+                    <Icon name={getPlatformIcon(bot.platform)} size={24} className="text-primary" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">{bot.name}</CardTitle>
@@ -327,6 +327,7 @@ const MyBots = () => {
         isOpen={settingsModal.isOpen}
         onClose={() => setSettingsModal({ isOpen: false, botId: 0, botName: '' })}
         botName={settingsModal.botName}
+        botId={settingsModal.botId}
       />
     </div>
   );

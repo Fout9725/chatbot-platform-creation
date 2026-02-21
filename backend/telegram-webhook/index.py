@@ -51,6 +51,47 @@ def call_ml_chat(bot_id, message, ml_chat_url):
         return None
 
 
+def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bot_token_for_key):
+    """Вызывает OpenRouter API для генерации ответа через выбранную AI модель"""
+    api_key = os.environ.get('OPENROUTER_API_KEY', '')
+    if not api_key:
+        return None
+
+    try:
+        system_content = system_prompt or 'You are a helpful assistant.'
+        if knowledge_context:
+            system_content += f'\n\nRelevant knowledge base context:\n{knowledge_context}'
+
+        messages = [
+            {'role': 'system', 'content': system_content},
+            {'role': 'user', 'content': message_text}
+        ]
+
+        payload = json.dumps({
+            'model': model_id,
+            'messages': messages
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            'https://openrouter.ai/api/v1/chat/completions',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            },
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+            choices = result.get('choices', [])
+            if choices and choices[0].get('message', {}).get('content'):
+                return choices[0]['message']['content']
+        return None
+    except Exception:
+        return None
+
+
 def get_knowledge_response(bot_id, message_text, conn):
     try:
         cur = conn.cursor()
@@ -254,6 +295,8 @@ def handle_webhook(event):
             return OK_RESPONSE
 
         bot_id = bot['id']
+        ai_model = bot.get('ai_model') or ''
+        ai_prompt = bot.get('ai_prompt') or ''
 
         try:
             cur.execute(
@@ -264,9 +307,17 @@ def handle_webhook(event):
             pass
 
         response_text = None
-        kb_response = get_knowledge_response(bot_id, message_text, conn)
-        if kb_response:
-            response_text = kb_response
+
+        # If bot has a real AI model set (not legacy 'groq' default), use OpenRouter
+        if ai_model and ai_model != 'groq':
+            kb_context = get_knowledge_response(bot_id, message_text, conn)
+            response_text = call_openrouter(ai_model, message_text, ai_prompt, kb_context, bot_token)
+
+        # Fallback chain: knowledge base -> ml-chat -> static fallback
+        if not response_text:
+            kb_response = get_knowledge_response(bot_id, message_text, conn)
+            if kb_response:
+                response_text = kb_response
 
         if not response_text:
             ml_chat_url = 'https://functions.poehali.dev/23f5dcaf-616d-4957-922d-ef9968ec1662'
