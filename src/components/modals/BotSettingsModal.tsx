@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-import { AI_MODELS, getFreeModels, getPaidModels } from '@/config/aiModels';
-import funcUrls from '../../backend/func2url.json';
+import { getFreeModels, getPaidModels } from '@/config/aiModels';
+import funcUrls from '../../../backend/func2url.json';
+import BotSettingsConfigTabs from './bot-settings/BotSettingsConfigTabs';
+import BotSettingsKnowledgeTab from './bot-settings/BotSettingsKnowledgeTab';
+import BotSettingsIntegrationsTab from './bot-settings/BotSettingsIntegrationsTab';
 
 const KB_API = funcUrls['knowledge-base'] || '';
 
@@ -242,326 +239,36 @@ export default function BotSettingsModal({ isOpen, onClose, botName, botId }: Bo
             <TabsTrigger value="schedule">Расписание</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="bot-name">Название бота</Label>
-              <Input
-                id="bot-name"
-                value={botSettings.name}
-                onChange={(e) => setBotSettings({ ...botSettings, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="welcome">Приветственное сообщение</Label>
-              <Textarea
-                id="welcome"
-                value={botSettings.welcomeMessage}
-                onChange={(e) => setBotSettings({ ...botSettings, welcomeMessage: e.target.value })}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Язык</Label>
-              <Select value={botSettings.language} onValueChange={(value) => setBotSettings({ ...botSettings, language: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ru">Русский</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                  <SelectItem value="de">Deutsch</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Часовой пояс</Label>
-              <Select value={botSettings.timezone} onValueChange={(value) => setBotSettings({ ...botSettings, timezone: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Europe/Moscow">Москва (UTC+3)</SelectItem>
-                  <SelectItem value="Europe/London">Лондон (UTC+0)</SelectItem>
-                  <SelectItem value="America/New_York">Нью-Йорк (UTC-5)</SelectItem>
-                  <SelectItem value="Asia/Tokyo">Токио (UTC+9)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </TabsContent>
+          <BotSettingsConfigTabs
+            botSettings={botSettings}
+            setBotSettings={setBotSettings}
+            freeModels={freeModels}
+            paidModels={paidModels}
+          />
 
-          <TabsContent value="model" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>Модель нейросети</Label>
-              <p className="text-sm text-muted-foreground">Выберите AI-модель, которая будет отвечать на сообщения</p>
-              <Select value={botSettings.aiModel} onValueChange={(value) => setBotSettings({ ...botSettings, aiModel: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Бесплатные модели</div>
-                  {freeModels.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{m.name}</span>
-                        <Badge variant="secondary" className="text-[10px] px-1 py-0">Free</Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-1">Премиум модели</div>
-                  {paidModels.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{m.name}</span>
-                        <Badge variant="default" className="text-[10px] px-1 py-0">Pro</Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {(() => {
-              const selected = AI_MODELS.find(m => m.id === botSettings.aiModel);
-              if (!selected) return null;
-              return (
-                <div className="border rounded-lg p-4 bg-muted/30 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Icon name="Cpu" size={18} />
-                    <span className="font-medium">{selected.name}</span>
-                    <Badge variant={selected.free ? 'secondary' : 'default'}>{selected.free ? 'Бесплатная' : 'Премиум'}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{selected.description}</p>
-                  <p className="text-xs text-muted-foreground">Провайдер: {selected.provider} | Тип: {selected.type}</p>
-                </div>
-              );
-            })()}
-          </TabsContent>
+          <BotSettingsKnowledgeTab
+            fileInputRef={fileInputRef}
+            loading={loading}
+            websiteUrl={websiteUrl}
+            setWebsiteUrl={setWebsiteUrl}
+            textInput={textInput}
+            setTextInput={setTextInput}
+            sources={sources}
+            handleFileUpload={handleFileUpload}
+            handleAddUrl={handleAddUrl}
+            handleAddText={handleAddText}
+            handleDeleteSource={handleDeleteSource}
+          />
 
-          <TabsContent value="knowledge" className="space-y-4 mt-4">
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Icon name="Upload" size={18} />
-                Загрузить файл
-              </h4>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer"
-              >
-                {loading === 'file' ? (
-                  <>
-                    <Icon name="Loader2" size={32} className="mx-auto mb-2 text-primary animate-spin" />
-                    <p className="text-sm font-medium">Обработка файла...</p>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="Upload" size={32} className="mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Нажмите для загрузки</p>
-                    <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, TXT, CSV (макс. 10 МБ)</p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Icon name="Globe" size={18} />
-                Добавить сайт
-              </h4>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://example.com"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                />
-                <Button size="sm" onClick={handleAddUrl} disabled={loading === 'url'}>
-                  {loading === 'url' ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Link" size={16} className="mr-1" />}
-                  {loading === 'url' ? '' : 'Добавить'}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Бот извлечёт текст со страницы и добавит в базу знаний</p>
-            </div>
-
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Icon name="FileText" size={18} />
-                Добавить текст
-              </h4>
-              <Textarea
-                placeholder="Вставьте текст, FAQ, инструкции..."
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                rows={4}
-              />
-              <Button size="sm" onClick={handleAddText} disabled={loading === 'text'}>
-                {loading === 'text' ? <Icon name="Loader2" size={16} className="animate-spin mr-1" /> : <Icon name="Plus" size={16} className="mr-1" />}
-                Добавить в базу
-              </Button>
-            </div>
-
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <h4 className="font-semibold mb-3">Загруженные источники ({sources.length})</h4>
-              {sources.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Источники знаний пока не добавлены</p>
-              ) : (
-                <div className="space-y-2">
-                  {sources.map(s => (
-                    <div key={s.id} className="flex items-center justify-between bg-background rounded-lg p-3 border">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Icon
-                          name={s.source_type === 'url' ? 'Globe' : s.source_type === 'file' ? 'File' : 'FileText'}
-                          size={16}
-                          className="shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{s.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {s.source_type === 'url' ? s.url : s.file_type?.toUpperCase() || 'Текст'}
-                            {' '}&middot;{' '}
-                            <Badge variant={s.status === 'ready' ? 'secondary' : 'destructive'} className="text-[10px]">
-                              {s.status === 'ready' ? 'Готово' : 'Ошибка'}
-                            </Badge>
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="shrink-0" onClick={() => handleDeleteSource(s.id)}>
-                        <Icon name="Trash2" size={14} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="integrations" className="space-y-4 mt-4">
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <Icon name="Send" size={24} className="text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold">Telegram</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {telegramStatus === 'connected' ? `Подключён: @${telegramBotName}` : 'Подключите бота к Telegram'}
-                  </p>
-                </div>
-                {telegramStatus === 'connected' && (
-                  <Badge className="bg-green-100 text-green-700">Подключён</Badge>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Bot Token</Label>
-                <Input
-                  placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                  value={telegramToken}
-                  onChange={(e) => setTelegramToken(e.target.value)}
-                  disabled={telegramStatus === 'connected'}
-                />
-                <p className="text-xs text-muted-foreground">Получите токен у @BotFather в Telegram</p>
-              </div>
-              {telegramStatus === 'connected' ? (
-                <Button variant="outline" className="w-full" onClick={() => { setTelegramStatus('idle'); setTelegramToken(''); setTelegramBotName(''); }}>
-                  <Icon name="Unplug" size={16} className="mr-2" />
-                  Отключить
-                </Button>
-              ) : (
-                <Button className="w-full" onClick={handleConnectTelegram} disabled={telegramStatus === 'connecting'}>
-                  {telegramStatus === 'connecting' ? (
-                    <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                  ) : (
-                    <Icon name="Link" size={16} className="mr-2" />
-                  )}
-                  {telegramStatus === 'connecting' ? 'Подключение...' : 'Подключить Telegram'}
-                </Button>
-              )}
-              {telegramStatus === 'error' && (
-                <p className="text-xs text-destructive">Не удалось подключить. Проверьте токен.</p>
-              )}
-            </div>
-
-            <div className="border rounded-lg p-4 space-y-3 opacity-60">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <Icon name="MessageCircle" size={24} className="text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold">WhatsApp</h4>
-                  <p className="text-sm text-muted-foreground">Скоро</p>
-                </div>
-                <Badge variant="outline">Скоро</Badge>
-              </div>
-            </div>
-
-            <div className="border rounded-lg p-4 space-y-3 opacity-60">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <Icon name="Users" size={24} className="text-blue-700" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold">VKontakte</h4>
-                  <p className="text-sm text-muted-foreground">Скоро</p>
-                </div>
-                <Badge variant="outline">Скоро</Badge>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="behavior" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Автоответы</Label>
-                <p className="text-sm text-muted-foreground">Автоматически отвечать на сообщения</p>
-              </div>
-              <Switch checked={botSettings.autoReply} onCheckedChange={(checked) => setBotSettings({ ...botSettings, autoReply: checked })} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Уведомления</Label>
-                <p className="text-sm text-muted-foreground">Отправлять уведомления о новых сообщениях</p>
-              </div>
-              <Switch checked={botSettings.notifications} onCheckedChange={(checked) => setBotSettings({ ...botSettings, notifications: checked })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Задержка ответа (секунды)</Label>
-              <Input type="number" min="0" max="60" value={botSettings.responseDelay} onChange={(e) => setBotSettings({ ...botSettings, responseDelay: parseInt(e.target.value) })} />
-              <p className="text-xs text-muted-foreground">Имитация печати для естественности</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Максимум сообщений в день</Label>
-              <Input type="number" min="100" max="10000" value={botSettings.maxMessagesPerDay} onChange={(e) => setBotSettings({ ...botSettings, maxMessagesPerDay: parseInt(e.target.value) })} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="schedule" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Рабочие часы</Label>
-                <p className="text-sm text-muted-foreground">Работать только в указанное время</p>
-              </div>
-              <Switch checked={botSettings.workingHours} onCheckedChange={(checked) => setBotSettings({ ...botSettings, workingHours: checked })} />
-            </div>
-            {botSettings.workingHours && (
-              <>
-                <div className="space-y-2">
-                  <Label>Начало работы</Label>
-                  <Input type="time" value={botSettings.startTime} onChange={(e) => setBotSettings({ ...botSettings, startTime: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Конец работы</Label>
-                  <Input type="time" value={botSettings.endTime} onChange={(e) => setBotSettings({ ...botSettings, endTime: e.target.value })} />
-                </div>
-              </>
-            )}
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm">
-                <Icon name="Info" size={16} className="inline mr-2" />
-                Вне рабочих часов бот будет отправлять автосообщение о времени работы
-              </p>
-            </div>
-          </TabsContent>
+          <BotSettingsIntegrationsTab
+            telegramToken={telegramToken}
+            setTelegramToken={setTelegramToken}
+            telegramStatus={telegramStatus}
+            setTelegramStatus={setTelegramStatus}
+            telegramBotName={telegramBotName}
+            setTelegramBotName={setTelegramBotName}
+            handleConnectTelegram={handleConnectTelegram}
+          />
         </Tabs>
 
         <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
