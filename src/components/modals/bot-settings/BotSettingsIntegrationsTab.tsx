@@ -9,20 +9,18 @@ interface BotSettingsIntegrationsTabProps {
   telegramToken: string;
   setTelegramToken: (v: string) => void;
   telegramStatus: 'idle' | 'connecting' | 'connected' | 'error';
-  setTelegramStatus: (v: 'idle' | 'connecting' | 'connected' | 'error') => void;
   telegramBotName: string;
-  setTelegramBotName: (v: string) => void;
   handleConnectTelegram: () => void;
+  handleDisconnectTelegram: () => void;
 }
 
 export default function BotSettingsIntegrationsTab({
   telegramToken,
   setTelegramToken,
   telegramStatus,
-  setTelegramStatus,
   telegramBotName,
-  setTelegramBotName,
   handleConnectTelegram,
+  handleDisconnectTelegram,
 }: BotSettingsIntegrationsTabProps) {
   return (
     <TabsContent value="integrations" className="space-y-4 mt-4">
@@ -52,7 +50,7 @@ export default function BotSettingsIntegrationsTab({
           <p className="text-xs text-muted-foreground">Получите токен у @BotFather в Telegram</p>
         </div>
         {telegramStatus === 'connected' ? (
-          <Button variant="outline" className="w-full" onClick={() => { setTelegramStatus('idle'); setTelegramToken(''); setTelegramBotName(''); }}>
+          <Button variant="outline" className="w-full" onClick={handleDisconnectTelegram}>
             <Icon name="Unplug" size={16} className="mr-2" />
             Отключить
           </Button>

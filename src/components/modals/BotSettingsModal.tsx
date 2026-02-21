@@ -11,6 +11,7 @@ import BotSettingsKnowledgeTab from './bot-settings/BotSettingsKnowledgeTab';
 import BotSettingsIntegrationsTab from './bot-settings/BotSettingsIntegrationsTab';
 
 const KB_API = funcUrls['knowledge-base'] || '';
+const TG_API = funcUrls['telegram-webhook'] || '';
 
 interface KnowledgeSource {
   id: number;
@@ -195,20 +196,41 @@ export default function BotSettingsModal({ isOpen, onClose, botName, botId }: Bo
     }
     setTelegramStatus('connecting');
     try {
-      const res = await fetch(`https://api.telegram.org/bot${telegramToken}/getMe`);
+      const res = await fetch(TG_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'connect', token: telegramToken, bot_id: currentBotId })
+      });
       const data = await res.json();
       if (data.ok) {
-        setTelegramBotName(data.result.username);
+        setTelegramBotName(data.username || '');
         setTelegramStatus('connected');
-        toast({ title: 'Telegram подключён', description: `@${data.result.username}` });
+        const webhookMsg = data.webhook_set ? ' Webhook установлен.' : ' Webhook не установлен — добавьте секрет WEBHOOK_SELF_URL.';
+        toast({ title: 'Telegram подключён', description: `@${data.username}${webhookMsg}` });
       } else {
         setTelegramStatus('error');
-        toast({ title: 'Неверный токен', description: 'Проверьте токен и попробуйте снова', variant: 'destructive' });
+        toast({ title: 'Ошибка', description: data.error || 'Не удалось подключить', variant: 'destructive' });
       }
     } catch (e) {
       setTelegramStatus('error');
       toast({ title: 'Ошибка подключения', variant: 'destructive' });
     }
+  };
+
+  const handleDisconnectTelegram = async () => {
+    try {
+      await fetch(TG_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'disconnect', token: telegramToken, bot_id: currentBotId })
+      });
+    } catch (e) {
+      console.error('Disconnect error:', e);
+    }
+    setTelegramStatus('idle');
+    setTelegramToken('');
+    setTelegramBotName('');
+    toast({ title: 'Telegram отключён' });
   };
 
   const handleSave = () => {
@@ -264,10 +286,9 @@ export default function BotSettingsModal({ isOpen, onClose, botName, botId }: Bo
             telegramToken={telegramToken}
             setTelegramToken={setTelegramToken}
             telegramStatus={telegramStatus}
-            setTelegramStatus={setTelegramStatus}
             telegramBotName={telegramBotName}
-            setTelegramBotName={setTelegramBotName}
             handleConnectTelegram={handleConnectTelegram}
+            handleDisconnectTelegram={handleDisconnectTelegram}
           />
         </Tabs>
 

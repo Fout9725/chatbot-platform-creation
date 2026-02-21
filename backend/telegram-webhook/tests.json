@@ -1,12 +1,13 @@
 {
   "tests": [
     {
-      "name": "Test OPTIONS for CORS",
-      "method": "OPTIONS",
+      "name": "Connect with invalid token",
+      "method": "POST",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": "",
-      "bodyMatcher": "exact"
+      "body": {"action": "connect", "token": "invalid"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
     },
     {
       "name": "Test webhook POST",

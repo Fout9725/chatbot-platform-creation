@@ -7,5 +7,6 @@
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
-  "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec"
+  "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
+  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e"
 }
