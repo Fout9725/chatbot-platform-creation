@@ -17,8 +17,9 @@ import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminBotBuilderTab from '@/components/admin/AdminBotBuilderTab';
+import funcUrls from '../../backend/func2url.json';
 
-const ADMIN_PASSWORD = 'neuro2024';
+const ADMIN_AUTH_API = funcUrls['admin-auth'] || '';
 
 const AdminNew = () => {
   const navigate = useNavigate();
@@ -28,36 +29,72 @@ const AdminNew = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [adminToken, setAdminToken] = useState('');
 
   useEffect(() => {
-    sessionStorage.removeItem('adminAuthenticated');
-    localStorage.removeItem('adminAuthenticated');
+    const saved = sessionStorage.getItem('adminToken');
+    if (saved && ADMIN_AUTH_API) {
+      fetch(ADMIN_AUTH_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', token: saved })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.valid) {
+            setIsAuthenticated(true);
+            setAdminToken(saved);
+          } else {
+            sessionStorage.removeItem('adminToken');
+          }
+        })
+        .catch(() => sessionStorage.removeItem('adminToken'));
+    }
   }, []);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      toast({
-        title: 'Доступ разрешён',
-        description: 'Добро пожаловать в административную панель'
+    setIsLoading(true);
+    try {
+      const res = await fetch(ADMIN_AUTH_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', password })
       });
-    } else {
-      toast({
-        title: 'Неверный пароль',
-        description: 'Попробуйте ещё раз',
-        variant: 'destructive'
-      });
-      setPassword('');
+      const data = await res.json();
+      if (data.ok && data.token) {
+        setIsAuthenticated(true);
+        setAdminToken(data.token);
+        sessionStorage.setItem('adminToken', data.token);
+        toast({ title: 'Доступ разрешён', description: 'Добро пожаловать в административную панель' });
+      } else {
+        toast({ title: 'Неверный пароль', description: 'Попробуйте ещё раз', variant: 'destructive' });
+        setPassword('');
+      }
+    } catch {
+      toast({ title: 'Ошибка сервера', description: 'Попробуйте позже', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (adminToken && ADMIN_AUTH_API) {
+      try {
+        await fetch(ADMIN_AUTH_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'logout', token: adminToken })
+        });
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+    }
+    sessionStorage.removeItem('adminToken');
     setIsAuthenticated(false);
-    toast({
-      title: 'Выход выполнен',
-      description: 'Вы вышли из административной панели'
-    });
+    setAdminToken('');
+    toast({ title: 'Выход выполнен', description: 'Вы вышли из административной панели' });
     navigate('/');
   };
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -110,9 +147,9 @@ const AdminNew = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
-                  <Icon name="LogIn" size={18} className="mr-2" />
-                  Войти
+                <Button type="submit" className="flex-1" disabled={isLoading}>
+                  {isLoading ? <Icon name="Loader2" size={18} className="mr-2 animate-spin" /> : <Icon name="LogIn" size={18} className="mr-2" />}
+                  {isLoading ? 'Проверка...' : 'Войти'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => navigate('/')}>
                   <Icon name="ArrowLeft" size={18} />

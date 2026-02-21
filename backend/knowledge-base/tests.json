@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Get knowledge sources for bot",
+      "method": "GET",
+      "path": "/?bot_id=1",
+      "expectedStatus": 200,
+      "expectedBody": {},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Add text to knowledge base",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "add_text", "bot_id": 1, "title": "Test", "text": "Test knowledge text content"},
+      "expectedStatus": 200,
+      "expectedBody": {"status": "ready"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Missing bot_id returns error",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

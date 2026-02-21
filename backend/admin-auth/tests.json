@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Login with correct password",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "password": "neuro2024"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true, "token": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "password": "wrongpass"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Verify invalid token",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "verify", "token": "invalid-token"},
+      "expectedStatus": 401,
+      "expectedBody": {"valid": false},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

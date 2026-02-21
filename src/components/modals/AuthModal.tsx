@@ -46,16 +46,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     await login(email, password);
     
-    if (email === 'A/V admin' && password === 'vovan.ru97') {
-      toast({
-        title: 'Добро пожаловать, администратор! 🛡️',
-        description: 'Вы вошли с правами администратора',
-      });
-      onClose();
-      navigate('/admin');
-      return;
-    }
-    
     const savedUser = localStorage.getItem('user');
     const userData = savedUser ? JSON.parse(savedUser) : null;
     
