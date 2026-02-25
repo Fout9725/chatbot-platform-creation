@@ -446,15 +446,25 @@ def openrouter_make_prompt(model_key, user_description):
     except Exception as e:
         return None, f'Ошибка AI: {str(e)[:100]}'
 
+    print(f'OpenRouter full response: {json.dumps(result)[:800]}')
+
     choices = result.get('choices', [])
     if not choices:
-        print(f'OpenRouter no choices, full response: {json.dumps(result)[:500]}')
         err_msg = result.get('error', {}).get('message', '')
         if err_msg:
             return None, f'AI ошибка: {err_msg[:200]}'
         return None, 'AI не вернул промпт. Попробуйте ещё раз.'
 
-    content = choices[0].get('message', {}).get('content', '').strip()
+    choice = choices[0]
+    print(f'OpenRouter choice: {json.dumps(choice)[:500]}')
+
+    content = choice.get('message', {}).get('content')
+    if content is None:
+        content = choice.get('text', '')
+    if isinstance(content, list):
+        content = ' '.join(str(c) for c in content)
+    content = str(content).strip()
+
     if not content:
         return None, 'Пустой ответ от AI. Попробуйте ещё раз.'
 
