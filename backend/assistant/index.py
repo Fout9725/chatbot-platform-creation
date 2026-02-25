@@ -165,10 +165,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             messages.append({'role': 'user', 'content': user_message})
         
         request_data = {
-            'model': 'xiaomi/mimo-v2-flash:free',
+            'model': 'nvidia/nemotron-3-nano-30b-a3b:free',
             'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 500
+            'max_tokens': 4000
         }
         api_url = 'https://openrouter.ai/api/v1/chat/completions'
         
@@ -177,7 +177,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         for attempt in range(max_retries):
             try:
-                print(f'Making request to OpenRouter API (attempt {attempt + 1}/{max_retries}) with model: xiaomi/mimo-v2-flash:free')
+                print(f'Making request to OpenRouter API (attempt {attempt + 1}/{max_retries}) with model: nvidia/nemotron-3-nano-30b-a3b:free')
                 req = urllib.request.Request(
                     api_url,
                     data=json.dumps(request_data).encode('utf-8'),
@@ -190,13 +190,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     method='POST'
                 )
                 
-                response = urllib.request.urlopen(req, timeout=29)
+                response = urllib.request.urlopen(req, timeout=55)
                 response_data = json.loads(response.read().decode('utf-8'))
                 
                 print(f'OpenRouter response received')
                 
-                full_response = response_data['choices'][0]['message']['content']
-                print(f'Raw response (first 200 chars): {full_response[:200]}')
+                msg = response_data['choices'][0]['message']
+                full_response = (msg.get('content') or '').strip()
+                reasoning = (msg.get('reasoning') or '').strip()
+                print(f'Raw content (first 200 chars): {full_response[:200]}')
+                print(f'Raw reasoning (first 200 chars): {reasoning[:200]}')
+                if not full_response and reasoning:
+                    full_response = reasoning
                 
                 # Убираем размышления модели
                 import re
