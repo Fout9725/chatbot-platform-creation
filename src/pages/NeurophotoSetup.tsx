@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import funcUrls from '../../backend/func2url.json';
+
+const WEBHOOK_URL = funcUrls['neurophoto-bot'];
+const BOT_TOKEN = '8257588939:AAEYZYndyra3FLca5VpIFRkk8gHH1GGd48w';
 
 const NeurophotoSetup = () => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -16,13 +20,8 @@ const NeurophotoSetup = () => {
   const setupBot = async () => {
     setStatus('loading');
     setLogs([]);
-    
-    const BOT_TOKEN = '8346998195:AAFZBCS2xPHCT-_AY191Fqr3TGpZ59HUKWg';
-    const WEBHOOK_URL = 'https://functions.poehali.dev/deae2fef-4b07-485f-85ae-56450c446d2f';
-    const BOTS_API = 'https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2';
 
     try {
-      // Шаг 1: Проверка бота в Telegram
       addLog('Проверка бота в Telegram...', 'info');
       const telegramCheck = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
       const telegramData = await telegramCheck.json();
@@ -35,21 +34,16 @@ const NeurophotoSetup = () => {
         return;
       }
 
-      // Шаг 2: Проверка базы данных
-      addLog('Проверка базы данных...', 'info');
-      addLog('✓ Найдено пользователей: 9', 'info');
-      addLog('✓ Сгенерировано изображений: 49', 'info');
-      addLog('✓ Бот уже работал ранее', 'success');
-
-      // Шаг 3: Настройка webhook
       addLog('Настройка webhook...', 'info');
+      addLog(`URL: ${WEBHOOK_URL}`, 'info');
+
       const webhookResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: WEBHOOK_URL,
           drop_pending_updates: false,
-          allowed_updates: ['message']
+          allowed_updates: ['message', 'callback_query']
         })
       });
 
@@ -62,7 +56,6 @@ const NeurophotoSetup = () => {
         return;
       }
 
-      // Шаг 4: Проверка webhook
       addLog('Проверка webhook...', 'info');
       const checkResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo`);
       const checkData = await checkResponse.json();
@@ -73,19 +66,12 @@ const NeurophotoSetup = () => {
       }
 
       setStatus('success');
-      toast({
-        title: 'Готово!',
-        description: 'Бот Нейрофотосессия настроен и готов к работе',
-      });
+      toast({ title: 'Готово!', description: 'Бот Нейрофотосессия настроен и готов к работе' });
 
     } catch (error) {
       addLog(`Критическая ошибка: ${error}`, 'error');
       setStatus('error');
-      toast({
-        title: 'Ошибка',
-        description: 'Не удалось настроить бота',
-        variant: 'destructive'
-      });
+      toast({ title: 'Ошибка', description: 'Не удалось настроить бота', variant: 'destructive' });
     }
   };
 
@@ -113,15 +99,11 @@ const NeurophotoSetup = () => {
                 </li>
                 <li className="flex items-center gap-2">
                   <Icon name="Check" size={16} className="text-blue-600" />
-                  Регистрация в базе данных
+                  Настройка webhook на новый обработчик
                 </li>
                 <li className="flex items-center gap-2">
                   <Icon name="Check" size={16} className="text-blue-600" />
-                  Настройка webhook для приема сообщений
-                </li>
-                <li className="flex items-center gap-2">
-                  <Icon name="Check" size={16} className="text-blue-600" />
-                  Активация генерации изображений
+                  Активация генерации изображений (Gemini AI)
                 </li>
               </ul>
             </div>
@@ -152,8 +134,8 @@ const NeurophotoSetup = () => {
                 Бот готов к работе. Найдите его в Telegram и отправьте /start
               </p>
               <div className="bg-white rounded p-3 text-sm">
-                <p className="font-semibold mb-1">Пример запроса:</p>
-                <code className="text-purple-600">Портрет девушки с голубыми глазами</code>
+                <p className="font-semibold mb-1">Как использовать:</p>
+                <p className="text-purple-600">Отправьте фото + описание или просто текст</p>
               </div>
             </div>
           )}
