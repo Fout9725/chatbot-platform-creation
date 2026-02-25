@@ -1,4 +1,4 @@
-"""Бот Нейрофотосессия PRO — генерация и редактирование фото через 7 AI моделей"""
+"""Бот Нейрофотосессия PRO — генерация и редактирование фото через 7 AI моделей + AI-промтер"""
 
 import json
 import os
@@ -15,6 +15,7 @@ SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 'public')
 BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
+OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -28,47 +29,162 @@ MODELS = {
         'name': '🟢 Gemini Flash (Google)',
         'api_id': 'gemini-2.5-flash-image',
         'provider': 'gemini',
-        'desc': 'Быстрая, хорошее качество'
+        'desc': 'Быстрая, хорошее качество',
+        'prompt_tips': 'Понимает русский и английский. Детальные описания, стиль, настроение. Пример: "Портрет девушки в осеннем парке, мягкий свет, тёплые тона"'
     },
     'nano-banana': {
         'name': '🍌 Nano Banana Pro Edit',
         'api_id': 'img2img-google/nano-banana-pro-edit-multi',
         'provider': 'vsegpt',
-        'desc': 'Google, мульти-редактирование'
+        'desc': 'Google, мульти-редактирование',
+        'prompt_tips': 'Английские промпты. Несколько инструкций через запятую. Пример: "change background to sunset, add sunglasses, make hair blonde"'
     },
     'flux-klein': {
         'name': '⚡ FLUX 2 Klein 4B',
         'api_id': 'img2img-flux/flux-2-klein-4b',
         'provider': 'vsegpt',
-        'desc': 'Компактная FLUX модель'
+        'desc': 'Компактная FLUX модель',
+        'prompt_tips': 'Английские промпты. Фотореализм. Пример: "a portrait of woman in autumn park, golden leaves, soft lighting, 4k, photorealistic"'
     },
     'seedream': {
         'name': '🌱 Seedream v4.5 Edit',
         'api_id': 'img2img-bytedance/seedream-v4.5-edit-multi',
         'provider': 'vsegpt',
-        'desc': 'ByteDance, мульти-редактирование'
+        'desc': 'ByteDance, мульти-редактирование',
+        'prompt_tips': 'Английские промпты. Сильна в стилизации. Пример: "convert to watercolor painting", "make it look like anime"'
     },
     'reve': {
         'name': '✨ Reve Fast Edit',
         'api_id': 'img2img-reve-fast-edit-multi',
         'provider': 'vsegpt',
-        'desc': 'Быстрое редактирование'
+        'desc': 'Быстрое редактирование',
+        'prompt_tips': 'Короткие чёткие промпты на английском. Одно изменение. Пример: "change background to blue sky", "add red hat"'
     },
     'chrono': {
         'name': '🧠 Chrono Edit Thinking',
         'api_id': 'img2img-nvidia/chrono-edit-thinking',
         'provider': 'vsegpt',
-        'desc': 'NVIDIA, думающая модель'
+        'desc': 'NVIDIA, думающая модель',
+        'prompt_tips': 'Подробные промпты на английском. Пример: "carefully replace the sky with dramatic storm clouds while preserving lighting"'
     },
     'flash-25': {
         'name': '💎 Flash 2.5 Edit (Google)',
         'api_id': 'img2img-google/flash-25-edit-multi',
         'provider': 'vsegpt',
-        'desc': 'Google Flash, мульти-редактирование'
+        'desc': 'Google Flash, мульти-редактирование',
+        'prompt_tips': 'Английские промпты. Сложные мульти-инструкции. Пример: "change hair to platinum blonde, add studio lighting, smooth skin"'
     }
 }
 
 DEFAULT_MODEL = 'gemini'
+
+MODEL_INSTRUCTIONS = {
+    'gemini': (
+        '🟢 <b>Gemini Flash (Google)</b>\n\n'
+        '<b>Тип:</b> Генерация + редактирование\n'
+        '<b>Язык:</b> Русский и английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Создавать изображения с нуля\n'
+        '• Редактировать загруженные фото\n'
+        '• Менять фон, стиль, добавлять элементы\n\n'
+        '<b>Лучше всего для:</b> Первого знакомства, простых задач, русскоязычных промптов\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Сделай фон осенним парком\n'
+        '• Преврати в акварельную картину\n'
+        '• Нарисуй кота в космосе</i>'
+    ),
+    'nano-banana': (
+        '🍌 <b>Nano Banana Pro Edit</b>\n\n'
+        '<b>Тип:</b> Мульти-редактирование\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Менять несколько элементов сразу\n'
+        '• Работа с портретами и пейзажами\n'
+        '• Точечные правки на фото\n\n'
+        '<b>Лучше всего для:</b> Комплексного редактирования, нескольких изменений сразу\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Change background to sunset, add sunglasses\n'
+        '• Make hair blonde, add professional lighting\n'
+        '• Remove text, improve quality</i>'
+    ),
+    'flux-klein': (
+        '⚡ <b>FLUX 2 Klein 4B</b>\n\n'
+        '<b>Тип:</b> Генерация изображений\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Фотореалистичные изображения\n'
+        '• Портреты, пейзажи, предметы\n'
+        '• Хорошая детализация\n\n'
+        '<b>Лучше всего для:</b> Реалистичных изображений по описанию\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• A portrait in autumn park, golden leaves, soft light\n'
+        '• Modern kitchen interior, minimalist, 4k\n'
+        '• Cat wearing a tiny hat, studio photo</i>'
+    ),
+    'seedream': (
+        '🌱 <b>Seedream v4.5 Edit (ByteDance)</b>\n\n'
+        '<b>Тип:</b> Мульти-редактирование + стилизация\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (20-40 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Художественная стилизация\n'
+        '• Мульти-редактирование\n'
+        '• Понимание стилей (акварель, аниме, масло)\n\n'
+        '<b>Лучше всего для:</b> Стилизации под арт, аниме, живопись\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Convert to watercolor painting\n'
+        '• Make it look like anime character\n'
+        '• Oil painting style, renaissance</i>'
+    ),
+    'reve': (
+        '✨ <b>Reve Fast Edit</b>\n\n'
+        '<b>Тип:</b> Быстрое редактирование\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Очень быстрая (5-15 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Простые быстрые правки\n'
+        '• Смена цветов и фона\n'
+        '• Добавление/удаление элементов\n\n'
+        '<b>Лучше всего для:</b> Быстрых простых правок\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Change background to blue sky\n'
+        '• Add red hat\n'
+        '• Remove glasses</i>'
+    ),
+    'chrono': (
+        '🧠 <b>Chrono Edit Thinking (NVIDIA)</b>\n\n'
+        '<b>Тип:</b> Интеллектуальное редактирование\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Медленная (30-60 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Анализирует фото перед редактированием\n'
+        '• Сложные комплексные правки\n'
+        '• Сохранение деталей\n\n'
+        '<b>Лучше всего для:</b> Сложных задач, где важна точность\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Carefully replace sky with dramatic storm clouds\n'
+        '• Transform into professional headshot\n'
+        '• Age the person by 20 years realistically</i>'
+    ),
+    'flash-25': (
+        '💎 <b>Flash 2.5 Edit (Google)</b>\n\n'
+        '<b>Тип:</b> Продвинутое мульти-редактирование\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Сложные мульти-инструкции\n'
+        '• Высокое качество обработки\n'
+        '• Сохранение идентичности лица\n\n'
+        '<b>Лучше всего для:</b> Профессиональной обработки портретов\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Change hair to platinum blonde, add studio lighting\n'
+        '• Professional retouching, smooth skin, subtle makeup\n'
+        '• Place person in Paris with Eiffel Tower</i>'
+    )
+}
 
 
 def ok(data=None):
@@ -280,6 +396,67 @@ def generate_image(model_key, prompt, photo_bytes=None):
         return vsegpt_generate(model_key, prompt, photo_bytes)
 
 
+def openrouter_make_prompt(model_key, user_description):
+    if not OPENROUTER_KEY:
+        return None, 'OPENROUTER_API_KEY не настроен'
+
+    model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
+    tips = model_info.get('prompt_tips', '')
+
+    system_prompt = (
+        'You are an expert AI image generation prompt engineer. '
+        'The user gives you a description in any language. '
+        f'Create an optimal prompt for the image generation model "{model_info["name"]}".\n\n'
+        f'Model tips: {tips}\n\n'
+        'Rules:\n'
+        '1. Output ONLY the final prompt, no explanations\n'
+        '2. Make it detailed: style, lighting, quality, composition\n'
+        '3. For Gemini model — write in Russian if user wrote in Russian\n'
+        '4. For all other models — write in English\n'
+        '5. Keep under 250 characters\n'
+        '6. No quotes around the prompt'
+    )
+
+    payload = json.dumps({
+        'model': 'nvidia/nemotron-3-nano-30b-a3b:free',
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_description}
+        ],
+        'max_tokens': 400,
+        'temperature': 0.7
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        'https://openrouter.ai/api/v1/chat/completions',
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {OPENROUTER_KEY}'
+        },
+        method='POST'
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8') if e.fp else ''
+        return None, f'AI error {e.code}: {err_body[:200]}'
+    except Exception as e:
+        return None, f'Ошибка AI: {str(e)[:100]}'
+
+    choices = result.get('choices', [])
+    if not choices:
+        return None, 'AI не вернул промпт. Попробуйте ещё раз.'
+
+    content = choices[0].get('message', {}).get('content', '').strip()
+    if not content:
+        return None, 'Пустой ответ от AI.'
+
+    return content, None
+
+
 def get_user(conn, tid, uname, fname):
     cur = conn.cursor()
     cur.execute(
@@ -350,9 +527,45 @@ def model_keyboard():
     return {'inline_keyboard': buttons}
 
 
+def info_keyboard():
+    buttons = []
+    row = []
+    for key, info in MODELS.items():
+        row.append({'text': info['name'], 'callback_data': f'info:{key}'})
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
+def prompt_keyboard():
+    buttons = []
+    row = []
+    for key, info in MODELS.items():
+        row.append({'text': info['name'], 'callback_data': f'promptfor:{key}'})
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
 def current_model_text(model_key):
     info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
     return f"{info['name']}"
+
+
+def start_keyboard():
+    return {'inline_keyboard': [
+        [{'text': '🤖 Выбрать модель', 'callback_data': 'show_models'}],
+        [{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}],
+        [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}]
+    ]}
 
 
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
@@ -383,7 +596,7 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
 
 
 def handler(event, context):
-    """Обработчик вебхука Telegram бота Нейрофотосессия PRO — генерация и редактирование изображений через 7 AI моделей"""
+    """Обработчик вебхука Telegram бота Нейрофотосессия PRO — генерация и редактирование через 7 AI + AI-промтер"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
 
@@ -419,18 +632,9 @@ def handler(event, context):
                 f'<b>🚀 Как пользоваться:</b>\n'
                 f'📸 Отправьте фото — я спрошу, что изменить\n'
                 f'✍️ Напишите текст — создам картинку с нуля\n\n'
-                f'<b>🤖 Доступные нейросети:</b>\n'
-                f'🟢 <b>Gemini Flash</b> — Google, быстрая и качественная\n'
-                f'🍌 <b>Nano Banana</b> — Google, мульти-редактирование\n'
-                f'⚡ <b>FLUX Klein</b> — компактная FLUX модель\n'
-                f'🌱 <b>Seedream</b> — ByteDance, мульти-редактирование\n'
-                f'✨ <b>Reve Fast</b> — быстрое редактирование\n'
-                f'🧠 <b>Chrono Thinking</b> — NVIDIA, думающая модель\n'
-                f'💎 <b>Flash 2.5</b> — Google Flash мульти\n\n'
-                f'Сейчас выбрана: {model_name}\n'
-                f'💎 Генераций: <b>{remaining(user)}</b>\n\n'
-                f'/balance — баланс',
-                reply_markup={'inline_keyboard': [[{'text': '🤖 Выбрать модель', 'callback_data': 'show_models'}]]}
+                f'🤖 Модель: {model_name}\n'
+                f'💎 Генераций: <b>{remaining(user)}</b>',
+                reply_markup=start_keyboard()
             )
             return ok()
 
@@ -439,31 +643,32 @@ def handler(event, context):
                 '📖 <b>Как пользоваться:</b>\n\n'
                 '1️⃣ Отправьте фото → бот спросит, что изменить\n'
                 '2️⃣ Напишите описание → бот отредактирует\n'
-                '3️⃣ Или просто текст → бот создаст картинку с нуля\n\n'
+                '3️⃣ Или просто текст → создам картинку с нуля\n\n'
                 '<b>Команды:</b>\n'
+                '/start — главное меню\n'
                 '/model — выбрать AI модель\n'
-                '/balance — проверить баланс\n\n'
-                '<b>7 моделей:</b>\n'
-                '🟢 Gemini Flash — быстрая, от Google\n'
-                '🍌 Nano Banana — мульти-редактирование\n'
-                '⚡ FLUX Klein — компактная FLUX\n'
-                '🌱 Seedream — от ByteDance\n'
-                '✨ Reve Fast — быстрое редактирование\n'
-                '🧠 Chrono Thinking — NVIDIA, думает\n'
-                '💎 Flash 2.5 — Google Flash мульти\n\n'
-                '<b>Примеры промптов:</b>\n'
-                '• Сделай фон осенним\n'
-                '• Преврати в акварель\n'
-                '• Портрет в стиле аниме\n'
-                '• Закат на берегу океана'
+                '/prompt — AI составит промпт\n'
+                '/balance — проверить баланс',
+                reply_markup=start_keyboard()
             )
             return ok()
 
         if text == '/model':
             model_name = current_model_text(user['model'])
+            kb = model_keyboard()
+            kb['inline_keyboard'].append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
             send_msg(chat_id,
                 f'🤖 Текущая модель: {model_name}\n\nВыберите модель:',
-                reply_markup=model_keyboard()
+                reply_markup=kb
+            )
+            return ok()
+
+        if text == '/prompt':
+            send_msg(chat_id,
+                '✨ <b>AI-промтер</b>\n\n'
+                'AI составит оптимальный промпт для выбранной модели.\n\n'
+                'Выберите модель:',
+                reply_markup=prompt_keyboard()
             )
             return ok()
 
@@ -506,11 +711,39 @@ def handler(event, context):
             return ok()
 
         if text and not text.startswith('/'):
+            state = user.get('state') or ''
+
+            if state.startswith('prompt_wait:'):
+                model_key = state.split(':', 1)[1]
+                model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
+
+                tg('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
+                send_msg(chat_id, '🧠 AI составляет промпт...')
+
+                generated, err = openrouter_make_prompt(model_key, text)
+                set_session(conn, tid, None)
+
+                if err:
+                    send_msg(chat_id, f'❌ {err}')
+                else:
+                    send_msg(chat_id,
+                        f'✨ <b>Промпт для {model_info["name"]}:</b>\n\n'
+                        f'<code>{generated}</code>\n\n'
+                        f'📋 Скопируйте и отправьте мне — я сгенерирую картинку!\n'
+                        f'Или отправьте фото с этим промптом в подписи.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '🔄 Другой промпт', 'callback_data': f'promptfor:{model_key}'}],
+                            [{'text': '✨ Другая модель', 'callback_data': 'show_prompt'}],
+                            [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
+                        ]}
+                    )
+                return ok()
+
             if remaining(user) <= 0:
                 send_msg(chat_id, '❌ Генерации закончились.')
                 return ok()
 
-            if user.get('state') == 'waiting_prompt' and user.get('photo'):
+            if state == 'waiting_prompt' and user.get('photo'):
                 photo_bytes = download_url(user['photo'])
                 if not photo_bytes:
                     send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
@@ -540,12 +773,114 @@ def handle_callback(callback):
     msg_id = callback['message']['message_id']
     tid = callback['from']['id']
 
+    if cb_data == 'go_start':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            set_session(conn, tid, None)
+            model_name = current_model_text(user['model'])
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': (
+                    f'👋 <b>Главное меню</b>\n\n'
+                    f'📸 Отправьте фото — я отредактирую\n'
+                    f'✍️ Напишите текст — создам картинку\n\n'
+                    f'🤖 Модель: {model_name}\n'
+                    f'💎 Генераций: <b>{remaining(user)}</b>'
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': start_keyboard()
+            })
+        finally:
+            conn.close()
+        return ok()
+
     if cb_data == 'show_models':
         tg('answerCallbackQuery', {'callback_query_id': cb_id})
-        tg('editMessageReplyMarkup', {
+        kb = model_keyboard()
+        kb['inline_keyboard'].append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+        tg('editMessageText', {
             'chat_id': chat_id,
             'message_id': msg_id,
-            'reply_markup': model_keyboard()
+            'text': '🤖 <b>Выберите модель для генерации:</b>',
+            'parse_mode': 'HTML',
+            'reply_markup': kb
+        })
+        return ok()
+
+    if cb_data == 'show_info':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        tg('editMessageText', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'text': '📖 <b>Инструкция по моделям</b>\n\nВыберите модель, чтобы узнать подробности:',
+            'parse_mode': 'HTML',
+            'reply_markup': info_keyboard()
+        })
+        return ok()
+
+    if cb_data == 'show_prompt':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        tg('editMessageText', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'text': (
+                '✨ <b>AI-промтер</b>\n\n'
+                'AI составит оптимальный промпт для выбранной нейросети.\n\n'
+                'Выберите модель:'
+            ),
+            'parse_mode': 'HTML',
+            'reply_markup': prompt_keyboard()
+        })
+        return ok()
+
+    if cb_data.startswith('info:'):
+        model_key = cb_data.split(':', 1)[1]
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        instruction = MODEL_INSTRUCTIONS.get(model_key, 'Информация недоступна.')
+        tg('editMessageText', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'text': instruction,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': [
+                [{'text': '📖 Другие модели', 'callback_data': 'show_info'}],
+                [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
+            ]}
+        })
+        return ok()
+
+    if cb_data.startswith('promptfor:'):
+        model_key = cb_data.split(':', 1)[1]
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
+
+        conn = get_db()
+        try:
+            set_session(conn, tid, f'prompt_wait:{model_key}')
+        finally:
+            conn.close()
+
+        tg('editMessageText', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'text': (
+                f'✨ <b>AI-промтер для {model_info["name"]}</b>\n\n'
+                f'Опишите своими словами, какую картинку хотите.\n\n'
+                f'<i>Примеры:\n'
+                f'• Кот в костюме космонавта\n'
+                f'• Девушка на фоне осеннего парка\n'
+                f'• Закат над горами в стиле масляной живописи</i>\n\n'
+                f'✏️ Напишите описание:'
+            ),
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': [
+                [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+            ]}
         })
         return ok()
 
@@ -566,8 +901,11 @@ def handle_callback(callback):
         tg('editMessageText', {
             'chat_id': chat_id,
             'message_id': msg_id,
-            'text': f'✅ Модель установлена: {model_info["name"]}\n<i>{model_info["desc"]}</i>\n\nОтправьте фото или текст для генерации!',
-            'parse_mode': 'HTML'
+            'text': f'✅ Модель: {model_info["name"]}\n<i>{model_info["desc"]}</i>\n\nОтправьте фото или текст для генерации!',
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': [
+                [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
+            ]}
         })
 
     return ok()
