@@ -2,7 +2,7 @@ export interface AIModel {
   id: string;
   name: string;
   provider: string;
-  type: 'text' | 'code' | 'image' | 'vision';
+  type: 'text' | 'code' | 'image' | 'vision' | 'img2img';
   free: boolean;
   description?: string;
 }
@@ -295,10 +295,62 @@ export const AI_MODELS: AIModel[] = [
     type: 'vision',
     free: false,
     description: 'GPT-4o с анализом изображений'
+  },
+  {
+    id: 'img2img-google/nano-banana-pro-edit-multi',
+    name: 'Nano Banana Pro Edit',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Мультиредактирование изображений от Google'
+  },
+  {
+    id: 'img2img-flux/flux-2-klein-4b',
+    name: 'FLUX 2 Klein 4B',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Компактная FLUX модель для редактирования'
+  },
+  {
+    id: 'img2img-bytedance/seedream-v4.5-edit-multi',
+    name: 'Seedream v4.5 Edit',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Мультиредактирование от ByteDance'
+  },
+  {
+    id: 'img2img-reve-fast-edit-multi',
+    name: 'Reve Fast Edit',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Быстрое редактирование изображений'
+  },
+  {
+    id: 'img2img-nvidia/chrono-edit-thinking',
+    name: 'Chrono Edit Thinking',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Продвинутое редактирование с рассуждением от NVIDIA'
+  },
+  {
+    id: 'img2img-google/flash-25-edit-multi',
+    name: 'Flash 2.5 Edit',
+    provider: 'VseGPT',
+    type: 'img2img',
+    free: false,
+    description: 'Быстрое мультиредактирование от Google'
   }
 ];
 
-export const getModelsByType = (type: 'text' | 'code' | 'image' | 'vision') => {
+export const getImg2ImgModels = () => {
+  return AI_MODELS.filter(model => model.type === 'img2img');
+};
+
+export const getModelsByType = (type: 'text' | 'code' | 'image' | 'vision' | 'img2img') => {
   return AI_MODELS.filter(model => model.type === type);
 };
 

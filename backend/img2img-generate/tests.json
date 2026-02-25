@@ -1,0 +1,45 @@
+{
+  "tests": [
+    {
+      "name": "GET available models",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"status": "ready"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST without model returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {"prompt": "test", "image_base64": "data:image/jpeg;base64,test"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST without prompt returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {"model": "img2img-google/nano-banana-pro-edit-multi", "image_base64": "data:image/jpeg;base64,test"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST with invalid model returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {"model": "invalid-model", "prompt": "test", "image_base64": "data:image/jpeg;base64,test"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
