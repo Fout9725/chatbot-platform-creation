@@ -1,37 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import BotMarketplace from '@/components/BotMarketplace';
-import { Link, useNavigate } from 'react-router-dom';
-import BotConstructorModal from '@/components/modals/BotConstructorModal';
+import { useNavigate } from 'react-router-dom';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
-import EarningsCalculatorModal from '@/components/modals/EarningsCalculatorModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { FIRST_VISIT_KEY } from '@/components/onboarding/TourManager';
+import HowItWorks from '@/components/landing/HowItWorks';
+import CtaBlock from '@/components/landing/CtaBlock';
+import SiteFooter from '@/components/landing/SiteFooter';
+
 const Index = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState('marketplace');
-
-  // Debug: глобальный перехватчик событий
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      console.log('🟢 GLOBAL CLICK:', e.target);
-      const target = e.target as HTMLElement;
-      console.log('Tag:', target.tagName, 'Classes:', target.className);
-    };
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, []);
-  const [isConstructorOpen, setIsConstructorOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
-  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [activeBots, setActiveBots] = useState<any[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -42,31 +27,11 @@ const Index = () => {
           setTotalUsers(data.users.length);
         }
       } catch (error) {
-        console.error('Ошибка загрузки пользователей:', error);
+        console.error('Error loading users:', error);
       }
     };
     fetchUsers();
-
-    const loadActiveBots = () => {
-      const saved = localStorage.getItem('activeBots');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setActiveBots(parsed || []);
-        } catch (error) {
-          console.error('Ошибка загрузки ботов:', error);
-          setActiveBots([]);
-        }
-      } else {
-        setActiveBots([]);
-      }
-    };
-    loadActiveBots();
   }, []);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-  };
 
   const handleProfileClick = () => {
     if (isAuthenticated) {
@@ -76,172 +41,160 @@ const Index = () => {
     }
   };
 
+  const scrollToCatalog = () => {
+    document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <>
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-gray-100 bg-white/90 backdrop-blur-lg sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-primary to-secondary p-2.5 rounded-xl">
-                <Icon name="Bot" className="text-white" size={28} />
+            <div className="flex items-center gap-2.5">
+              <div className="bg-violet-600 p-2 rounded-xl">
+                <Icon name="Bot" className="text-white" size={22} />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  ИнтеллектПро
-                </h1>
-                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
-              </div>
+              <span className="text-lg font-bold text-gray-900">ИнтеллектПро</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => { localStorage.removeItem(FIRST_VISIT_KEY); localStorage.removeItem('tour-seen-/'); window.location.reload(); }}>
-                <Icon name="GraduationCap" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Экскурсия</span>
+
+            <nav className="hidden md:flex items-center gap-1">
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/pricing')}>
+                Тарифы
               </Button>
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/automation-hub')}>
-                <Icon name="Zap" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Автоматизация</span>
-              </Button>
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/docs')}>
-                <Icon name="BookOpen" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Документация</span>
-              </Button>
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/legal')}>
-                <Icon name="Scale" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Юридическая информация</span>
-              </Button>
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => window.location.href = 'mailto:support@intellectpro.ru'}>
-                <Icon name="Mail" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Контакты</span>
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={scrollToCatalog}>
+                Каталог
               </Button>
               {user?.role === 'admin' && (
-                <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/admin')}>
-                  <Icon name="Shield" size={18} className="mr-2" />
-                  <span className="hidden lg:inline">Админ-панель</span>
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/admin')}>
+                  Админ
                 </Button>
               )}
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/notifications')}>
-                <Icon name="Bell" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Уведомления</span>
+              <Button
+                variant={isAuthenticated ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleProfileClick}
+                className={isAuthenticated ? 'bg-violet-600 hover:bg-violet-700 ml-2' : 'ml-2'}
+              >
+                <Icon name="User" size={16} className="mr-1.5" />
+                {isAuthenticated ? user?.name : 'Войти'}
               </Button>
-              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/prompt-engineer')}>
-                <Icon name="Sparkles" size={18} className="mr-2" />
-                <span className="hidden lg:inline">Промт-Инженер</span>
-              </Button>
-              <Button variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
-                <Icon name="User" size={18} className="md:mr-2" />
-                <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>
-              </Button>
+            </nav>
 
+            <div className="md:hidden flex items-center gap-2">
+              <Button
+                variant={isAuthenticated ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleProfileClick}
+                className={isAuthenticated ? 'bg-violet-600 hover:bg-violet-700' : ''}
+              >
+                <Icon name="User" size={16} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                <Icon name={mobileMenuOpen ? "X" : "Menu"} size={20} />
+              </Button>
             </div>
           </div>
+
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-100 mt-3 pt-3 pb-1 space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}>
+                <Icon name="CreditCard" size={16} className="mr-2" /> Тарифы
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { scrollToCatalog(); setMobileMenuOpen(false); }}>
+                <Icon name="Store" size={16} className="mr-2" /> Каталог
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/my-bots'); setMobileMenuOpen(false); }}>
+                <Icon name="Folder" size={16} className="mr-2" /> Мои боты
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/prompt-engineer'); setMobileMenuOpen(false); }}>
+                <Icon name="Sparkles" size={16} className="mr-2" /> Промт-Инженер
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/docs'); setMobileMenuOpen(false); }}>
+                <Icon name="BookOpen" size={16} className="mr-2" /> Документация
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/automation-hub'); setMobileMenuOpen(false); }}>
+                <Icon name="Zap" size={16} className="mr-2" /> Автоматизация
+              </Button>
+              {user?.role === 'admin' && (
+                <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}>
+                  <Icon name="Shield" size={16} className="mr-2" /> Админ-панель
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8" style={{ pointerEvents: 'auto' }}>
-        <div className="mb-6 md:mb-8 animate-fade-in">
-          <h2 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
-            Создавайте умных ИИ-сотрудников за минуты
-          </h2>
-          <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-            Платформа для разработки ИИ-сотрудников и ИИ-агентов для социальных сетей и бизнеса
+      <section className="py-16 md:py-28">
+        <div className="container mx-auto px-4 text-center max-w-3xl">
+          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
+            ИИ-сотрудники для вашего бизнеса
+          </h1>
+          <p className="text-lg md:text-xl text-gray-500 mb-8 max-w-xl mx-auto leading-relaxed">
+            Готовые боты для Telegram, WhatsApp и VK. Подключите за 5 минут без программиста.
           </p>
-        </div>
-
-
-
-
-
-        <div className="flex flex-col sm:flex-row gap-3 mb-6" style={{ pointerEvents: 'auto' }}>
-          <div className="flex-1" style={{ pointerEvents: 'auto' }}>
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6" style={{ pointerEvents: 'auto' }}>
-              <div className="flex gap-2">
-                <TabsList className="flex-1 grid grid-cols-1 h-auto p-1">
-                  <TabsTrigger 
-                    value="marketplace" 
-                    data-tour="marketplace"
-                    className="flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  >
-                    <Icon name="Store" size={16} className="md:w-[18px] md:h-[18px]" />
-                    <span className="hidden sm:inline">Маркетплейс</span>
-                    <span className="sm:hidden">Магазин</span>
-                  </TabsTrigger>
-                </TabsList>
-                
-                <Button
-                  variant={activeTab === 'constructor' ? 'default' : 'outline'}
-                  data-tour="constructor"
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => {
-                    if (!isAuthenticated) {
-                      setIsAuthOpen(true);
-                    } else if (!user?.plan || user?.plan === 'free') {
-                      navigate('/pricing');
-                    } else {
-                      setIsModeModalOpen(true);
-                    }
-                  }}
-                >
-                  <Icon name="Boxes" size={16} className="md:w-[18px] md:h-[18px]" />
-                  <span className="hidden sm:inline">Конструктор</span>
-                  <span className="sm:hidden">Создать</span>
-                </Button>
-
-                <Button
-                  variant={activeTab === 'my-bots' ? 'default' : 'outline'}
-                  data-tour="my-bots"
-                  className="flex-1 flex items-center gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm"
-                  onClick={() => {
-                    if (isAuthenticated) {
-                      navigate('/my-bots');
-                    } else {
-                      setIsAuthOpen(true);
-                    }
-                  }}
-                >
-                  <Icon name="Folder" size={16} className="md:w-[18px] md:h-[18px]" />
-                  <span className="hidden sm:inline">Мои боты</span>
-                  <span className="sm:hidden">Мои</span>
-                </Button>
+          <Button
+            size="lg"
+            onClick={scrollToCatalog}
+            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-8 h-13 text-base shadow-lg shadow-violet-500/20"
+          >
+            Посмотреть решения
+            <Icon name="ArrowDown" size={18} className="ml-2" />
+          </Button>
+          <div className="flex items-center justify-center gap-8 mt-10 text-sm text-gray-400">
+            {totalUsers > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Icon name="Users" size={16} className="text-violet-400" />
+                <span><b className="text-gray-600">{totalUsers.toLocaleString()}+</b> пользователей</span>
               </div>
-
-              <TabsContent value="marketplace" className="animate-fade-in pointer-events-auto">
-                <BotMarketplace />
-              </TabsContent>
-            </Tabs>
+            )}
+            <div className="flex items-center gap-1.5">
+              <Icon name="Bot" size={16} className="text-violet-400" />
+              <span><b className="text-gray-600">85</b> готовых ботов</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Icon name="Clock" size={16} className="text-violet-400" />
+              <span><b className="text-gray-600">3 дня</b> бесплатно</span>
+            </div>
           </div>
         </div>
-      </main>
-    </div>
+      </section>
 
-    <footer className="border-t bg-white backdrop-blur-sm">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row items-center justify-center gap-3 text-xs md:text-sm text-muted-foreground">
-          <p className="text-center">© 2024 ИнтеллектПро. Все права защищены.</p>
+      <HowItWorks />
+
+      <BotMarketplace />
+
+      <section className="py-16 md:py-20 bg-gray-50">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-8">Работает с популярными мессенджерами</h2>
+          <div className="flex items-center justify-center gap-8 md:gap-16 opacity-60">
+            <div className="flex flex-col items-center gap-2">
+              <Icon name="MessageCircle" size={36} className="text-blue-500" />
+              <span className="text-sm text-gray-500">Telegram</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Icon name="Phone" size={36} className="text-green-500" />
+              <span className="text-sm text-gray-500">WhatsApp</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Icon name="Users" size={36} className="text-blue-600" />
+              <span className="text-sm text-gray-500">ВКонтакте</span>
+            </div>
+            <div className="hidden md:flex flex-col items-center gap-2">
+              <Icon name="Globe" size={36} className="text-gray-500" />
+              <span className="text-sm text-gray-500">Веб-сайт</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </footer>
+      </section>
 
-    <BotConstructorModal 
-        isOpen={isConstructorOpen} 
-        onClose={() => setIsConstructorOpen(false)} 
-      />
-      
-      <ConstructorModeModal 
-        isOpen={isModeModalOpen} 
-        onClose={() => setIsModeModalOpen(false)} 
-      />
-      
-      <AuthModal 
-        isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
-      />
-      
-      <EarningsCalculatorModal
-        isOpen={isCalculatorOpen}
-        onClose={() => setIsCalculatorOpen(false)}
-      />
-    </>
+      <CtaBlock onAuthOpen={() => setIsAuthOpen(true)} />
+
+      <SiteFooter />
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <ConstructorModeModal isOpen={isModeModalOpen} onClose={() => setIsModeModalOpen(false)} />
+    </div>
   );
 };
 
