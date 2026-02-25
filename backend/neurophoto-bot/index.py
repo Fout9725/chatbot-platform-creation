@@ -8,6 +8,8 @@ import urllib.request
 import urllib.error
 import psycopg2
 import boto3
+from PIL import Image
+import io
 
 SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 'public')
 BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
