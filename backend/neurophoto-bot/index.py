@@ -418,7 +418,7 @@ def openrouter_make_prompt(model_key, user_description):
     )
 
     payload = json.dumps({
-        'model': 'nvidia/nemotron-3-nano-30b-a3b:free',
+        'model': 'meta-llama/llama-3.3-70b-instruct:free',
         'messages': [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_description}
@@ -448,11 +448,16 @@ def openrouter_make_prompt(model_key, user_description):
 
     choices = result.get('choices', [])
     if not choices:
+        print(f'OpenRouter no choices, full response: {json.dumps(result)[:500]}')
+        err_msg = result.get('error', {}).get('message', '')
+        if err_msg:
+            return None, f'AI ошибка: {err_msg[:200]}'
         return None, 'AI не вернул промпт. Попробуйте ещё раз.'
 
     content = choices[0].get('message', {}).get('content', '').strip()
     if not content:
-        return None, 'Пустой ответ от AI.'
+        print(f'OpenRouter empty content, choice: {json.dumps(choices[0])[:300]}')
+        return None, 'Пустой ответ от AI. Попробуйте ещё раз.'
 
     return content, None
 
