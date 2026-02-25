@@ -218,23 +218,19 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None):
     model_info = MODELS.get(model_key, {})
     api_model = model_info.get('api_id', '')
 
-    content_parts = []
+    body = {
+        'model': api_model,
+        'prompt': prompt,
+        'response_format': 'b64_json'
+    }
     if photo_bytes:
         b64 = base64.b64encode(photo_bytes).decode('utf-8')
-        content_parts.append({
-            'type': 'image_url',
-            'image_url': {'url': f'data:image/jpeg;base64,{b64}'}
-        })
-    content_parts.append({'type': 'text', 'text': prompt})
+        body['image_url'] = f'data:image/jpeg;base64,{b64}'
 
-    payload = json.dumps({
-        'model': api_model,
-        'messages': [{'role': 'user', 'content': content_parts}],
-        'max_tokens': 4096
-    }).encode('utf-8')
+    payload = json.dumps(body).encode('utf-8')
 
     req = urllib.request.Request(
-        'https://api.vsegpt.ru/v1/chat/completions',
+        'https://api.vsegpt.ru/v1/images/generations',
         data=payload,
         headers={
             'Content-Type': 'application/json',
@@ -252,52 +248,21 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None):
     except Exception as e:
         return None, f'Ошибка соединения: {str(e)[:100]}'
 
-    choices = result.get('choices', [])
-    if not choices:
-        return None, 'Пустой ответ от VseGPT'
+    data_list = result.get('data', [])
+    if not data_list:
+        return None, 'Пустой ответ от VseGPT. Попробуйте другой промпт.'
 
-    message = choices[0].get('message', {})
-    content = message.get('content', '')
+    item = data_list[0]
 
-    if isinstance(content, list):
-        for part in content:
-            if isinstance(part, dict):
-                if part.get('type') == 'image_url':
-                    img_url = part.get('image_url', {})
-                    url_val = img_url.get('url', '') if isinstance(img_url, dict) else str(img_url)
-                    if url_val:
-                        if url_val.startswith('data:image'):
-                            header, data = url_val.split(',', 1)
-                            return base64.b64decode(data), None
-                        img_data = download_url(url_val)
-                        if img_data:
-                            return img_data, None
-                elif part.get('type') == 'image':
-                    url_val = part.get('url', '') or part.get('image_url', {}).get('url', '')
-                    if url_val:
-                        img_data = download_url(url_val)
-                        if img_data:
-                            return img_data, None
+    b64_data = item.get('b64_json', '')
+    if b64_data:
+        return base64.b64decode(b64_data), None
 
-    if isinstance(content, str):
-        if content.startswith('data:image'):
-            header, data = content.split(',', 1)
-            return base64.b64decode(data), None
-        if content.startswith('http'):
-            img_data = download_url(content)
-            if img_data:
-                return img_data, None
-
-    images = message.get('images', [])
-    if images:
-        url_val = images[0] if isinstance(images[0], str) else images[0].get('url', '')
-        if url_val:
-            if url_val.startswith('data:image'):
-                header, data = url_val.split(',', 1)
-                return base64.b64decode(data), None
-            img_data = download_url(url_val)
-            if img_data:
-                return img_data, None
+    url_val = item.get('url', '')
+    if url_val:
+        img_data = download_url(url_val)
+        if img_data:
+            return img_data, None
 
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
