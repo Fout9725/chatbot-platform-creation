@@ -423,7 +423,7 @@ def openrouter_make_prompt(model_key, user_description):
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_description}
         ],
-        'max_tokens': 400,
+        'max_tokens': 2000,
         'temperature': 0.7
     }).encode('utf-8')
 
@@ -438,7 +438,7 @@ def openrouter_make_prompt(model_key, user_description):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8') if e.fp else ''
@@ -446,7 +446,7 @@ def openrouter_make_prompt(model_key, user_description):
     except Exception as e:
         return None, f'Ошибка AI: {str(e)[:100]}'
 
-    print(f'OpenRouter full response: {json.dumps(result)[:800]}')
+    print(f'OpenRouter response keys: {list(result.keys())}, choices count: {len(result.get("choices", []))}')
 
     choices = result.get('choices', [])
     if not choices:
@@ -456,14 +456,21 @@ def openrouter_make_prompt(model_key, user_description):
         return None, 'AI не вернул промпт. Попробуйте ещё раз.'
 
     choice = choices[0]
-    print(f'OpenRouter choice: {json.dumps(choice)[:500]}')
+    msg = choice.get('message', {})
 
-    content = choice.get('message', {}).get('content')
-    if content is None:
-        content = choice.get('text', '')
-    if isinstance(content, list):
-        content = ' '.join(str(c) for c in content)
-    content = str(content).strip()
+    content = (msg.get('content') or '').strip()
+
+    if not content:
+        reasoning = (msg.get('reasoning') or '').strip()
+        if reasoning:
+            lines = [l.strip() for l in reasoning.split('\n') if l.strip()]
+            for line in reversed(lines):
+                clean = line.strip('"').strip("'").strip()
+                if len(clean) > 15 and not clean.startswith('We ') and not clean.startswith('The ') and not clean.startswith('According') and not clean.startswith('So ') and not clean.startswith('Rule'):
+                    content = clean
+                    break
+            if not content and lines:
+                content = lines[-1].strip('"').strip("'").strip()
 
     if not content:
         return None, 'Пустой ответ от AI. Попробуйте ещё раз.'
