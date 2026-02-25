@@ -24,7 +24,7 @@ CORS = {
 MODELS = {
     'gemini': {
         'name': '🟢 Gemini Flash (Google)',
-        'api_id': 'gemini-2.5-flash-preview-image-generation',
+        'api_id': 'gemini-2.5-flash-image',
         'provider': 'gemini',
         'desc': 'Быстрая, хорошее качество'
     },
@@ -449,13 +449,21 @@ def handler(event, context):
             send_msg(chat_id,
                 f'👋 Привет, <b>{fname}</b>!\n\n'
                 f'Я бот <b>Нейрофотосессия PRO</b> — создаю и редактирую фото с помощью 7 AI моделей.\n\n'
-                f'📸 <b>Отправьте фото</b> — я спрошу, что изменить\n'
-                f'✍️ <b>Напишите текст</b> — создам картинку с нуля\n\n'
-                f'🤖 Текущая модель: {model_name}\n'
+                f'<b>🚀 Как пользоваться:</b>\n'
+                f'📸 Отправьте фото — я спрошу, что изменить\n'
+                f'✍️ Напишите текст — создам картинку с нуля\n\n'
+                f'<b>🤖 Доступные нейросети:</b>\n'
+                f'🟢 <b>Gemini Flash</b> — Google, быстрая и качественная\n'
+                f'🍌 <b>Nano Banana</b> — Google, мульти-редактирование\n'
+                f'⚡ <b>FLUX Klein</b> — компактная FLUX модель\n'
+                f'🌱 <b>Seedream</b> — ByteDance, мульти-редактирование\n'
+                f'✨ <b>Reve Fast</b> — быстрое редактирование\n'
+                f'🧠 <b>Chrono Thinking</b> — NVIDIA, думающая модель\n'
+                f'💎 <b>Flash 2.5</b> — Google Flash мульти\n\n'
+                f'Сейчас выбрана: {model_name}\n'
                 f'💎 Генераций: <b>{remaining(user)}</b>\n\n'
-                f'/model — сменить модель\n'
-                f'/help — помощь\n'
-                f'/balance — баланс'
+                f'/balance — баланс',
+                reply_markup={'inline_keyboard': [[{'text': '🤖 Выбрать модель', 'callback_data': 'show_models'}]]}
             )
             return ok()
 
@@ -565,6 +573,15 @@ def handle_callback(callback):
     msg_id = callback['message']['message_id']
     tid = callback['from']['id']
 
+    if cb_data == 'show_models':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        tg('editMessageReplyMarkup', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'reply_markup': model_keyboard()
+        })
+        return ok()
+
     if cb_data.startswith('model:'):
         model_key = cb_data.split(':', 1)[1]
         if model_key not in MODELS:
@@ -582,7 +599,7 @@ def handle_callback(callback):
         tg('editMessageText', {
             'chat_id': chat_id,
             'message_id': msg_id,
-            'text': f'✅ Модель установлена: {model_info["name"]}\n<i>{model_info["desc"]}</i>',
+            'text': f'✅ Модель установлена: {model_info["name"]}\n<i>{model_info["desc"]}</i>\n\nОтправьте фото или текст для генерации!',
             'parse_mode': 'HTML'
         })
 
