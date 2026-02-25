@@ -15,7 +15,7 @@ SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 'public')
 BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
-OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -396,70 +396,59 @@ def generate_image(model_key, prompt, photo_bytes=None):
         return vsegpt_generate(model_key, prompt, photo_bytes)
 
 
-def openrouter_make_prompt(model_key, user_description):
-    if not OPENROUTER_KEY:
-        return None, 'OPENROUTER_API_KEY не настроен'
+def gemini_make_prompt(model_key, user_description):
+    if not GEMINI_KEY:
+        return None, 'GEMINI_API_KEY не настроен'
 
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
     tips = model_info.get('prompt_tips', '')
 
-    system_prompt = (
+    prompt_text = (
         'You are an expert AI image generation prompt engineer. '
-        'The user gives you a description in any language. '
-        f'Create an optimal prompt for the image generation model "{model_info["name"]}".\n\n'
+        f'The user wants an image and you must create an optimal prompt for the model "{model_info["name"]}".\n\n'
         f'Model tips: {tips}\n\n'
         'Rules:\n'
-        '1. Output ONLY the final prompt, no explanations\n'
+        '1. Output ONLY the final prompt text, nothing else\n'
         '2. Make it detailed: style, lighting, quality, composition\n'
         '3. For Gemini model — write in Russian if user wrote in Russian\n'
         '4. For all other models — write in English\n'
         '5. Keep under 250 characters\n'
-        '6. No quotes around the prompt'
+        '6. No quotes around the prompt\n\n'
+        f'User description: {user_description}'
     )
 
     payload = json.dumps({
-        'model': 'meta-llama/llama-3.3-70b-instruct:free',
-        'messages': [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_description}
-        ],
-        'max_tokens': 400,
-        'temperature': 0.7
+        'contents': [{'parts': [{'text': prompt_text}]}],
+        'generationConfig': {
+            'responseModalities': ['TEXT'],
+            'maxOutputTokens': 300,
+            'temperature': 0.7
+        }
     }).encode('utf-8')
 
-    req = urllib.request.Request(
-        'https://openrouter.ai/api/v1/chat/completions',
-        data=payload,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {OPENROUTER_KEY}'
-        },
-        method='POST'
-    )
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}'
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8') if e.fp else ''
-        return None, f'AI error {e.code}: {err_body[:200]}'
+        return None, f'Gemini error {e.code}: {err_body[:200]}'
     except Exception as e:
         return None, f'Ошибка AI: {str(e)[:100]}'
 
-    choices = result.get('choices', [])
-    if not choices:
-        print(f'OpenRouter no choices, full response: {json.dumps(result)[:500]}')
-        err_msg = result.get('error', {}).get('message', '')
-        if err_msg:
-            return None, f'AI ошибка: {err_msg[:200]}'
+    candidates = result.get('candidates', [])
+    if not candidates:
         return None, 'AI не вернул промпт. Попробуйте ещё раз.'
 
-    content = choices[0].get('message', {}).get('content', '').strip()
-    if not content:
-        print(f'OpenRouter empty content, choice: {json.dumps(choices[0])[:300]}')
-        return None, 'Пустой ответ от AI. Попробуйте ещё раз.'
+    parts = candidates[0].get('content', {}).get('parts', [])
+    for p in parts:
+        text = p.get('text', '').strip()
+        if text:
+            return text, None
 
-    return content, None
+    return None, 'Пустой ответ от AI. Попробуйте ещё раз.'
 
 
 def get_user(conn, tid, uname, fname):
@@ -725,7 +714,7 @@ def handler(event, context):
                 tg('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
                 send_msg(chat_id, '🧠 AI составляет промпт...')
 
-                generated, err = openrouter_make_prompt(model_key, text)
+                generated, err = gemini_make_prompt(model_key, text)
                 set_session(conn, tid, None)
 
                 if err:
