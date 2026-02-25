@@ -124,6 +124,10 @@ const Index = () => {
                 <Icon name="Bell" size={18} className="mr-2" />
                 <span className="hidden lg:inline">Уведомления</span>
               </Button>
+              <Button variant="ghost" size="sm" className="hidden md:flex" onClick={() => navigate('/prompt-engineer')}>
+                <Icon name="Sparkles" size={18} className="mr-2" />
+                <span className="hidden lg:inline">Промт-Инженер</span>
+              </Button>
               <Button variant={isAuthenticated ? 'default' : 'outline'} size="sm" onClick={handleProfileClick}>
                 <Icon name="User" size={18} className="md:mr-2" />
                 <span className="hidden md:inline">{isAuthenticated ? user?.name : 'Войти'}</span>

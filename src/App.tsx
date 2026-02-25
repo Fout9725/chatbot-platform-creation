@@ -40,6 +40,7 @@ import YouTubeAutomation from "./components/YouTubeAutomation";
 import VKAutomation from "./components/VKAutomation";
 import TikTokAutomation from "./components/TikTokAutomation";
 import Img2ImgEditor from "./pages/Img2ImgEditor";
+import PromptEngineer from "./pages/PromptEngineer";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => (
                 <Route path="/vk-automation" element={<VKAutomation />} />
                 <Route path="/tiktok-automation" element={<TikTokAutomation />} />
                 <Route path="/img2img" element={<Img2ImgEditor />} />
+                <Route path="/prompt-engineer" element={<PromptEngineer />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -276,6 +276,30 @@ const Dashboard = () => {
                   </Link>
                 </CardContent>
               </Card>
+
+              <Card className="bg-gradient-to-br from-violet-50 to-fuchsia-50 border-violet-200">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-3 rounded-lg">
+                      <Icon name="Sparkles" className="text-white" size={24} />
+                    </div>
+                    <div>
+                      <CardTitle>Промт-Инженер</CardTitle>
+                      <CardDescription>
+                        AI составит идеальный промт для любой нейросети
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/prompt-engineer">
+                    <Button type="button" className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500" disabled={false}>
+                      <Icon name="Sparkles" size={18} className="mr-2" />
+                      Открыть Промт-Инженер
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
             </div>
 
             <Card>
