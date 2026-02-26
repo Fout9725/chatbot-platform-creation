@@ -1118,19 +1118,25 @@ def handle_callback(callback):
             user = get_user(conn, tid, uname, fname)
             set_session(conn, tid, None)
             model_name = current_model_text(user['model'])
-            tg('editMessageText', {
-                'chat_id': chat_id,
-                'message_id': msg_id,
-                'text': (
-                    f'👋 <b>Главное меню</b>\n\n'
-                    f'📸 Отправьте фото — я отредактирую\n'
-                    f'✍️ Напишите текст — создам картинку\n\n'
-                    f'🤖 Модель: {model_name}\n'
-                    f'💎 Генераций: <b>{remaining(user)}</b>'
-                ),
-                'parse_mode': 'HTML',
-                'reply_markup': start_keyboard()
-            })
+            menu_text = (
+                f'👋 <b>Главное меню</b>\n\n'
+                f'📸 Отправьте фото — я отредактирую\n'
+                f'✍️ Напишите текст — создам картинку\n\n'
+                f'🤖 Модель: {model_name}\n'
+                f'💎 Генераций: <b>{remaining(user)}</b>'
+            )
+            is_photo_msg = bool(callback.get('message', {}).get('photo'))
+            if is_photo_msg:
+                tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+                send_msg(chat_id, menu_text, reply_markup=start_keyboard())
+            else:
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': menu_text,
+                    'parse_mode': 'HTML',
+                    'reply_markup': start_keyboard()
+                })
         finally:
             conn.close()
         return ok()
@@ -1139,13 +1145,18 @@ def handle_callback(callback):
         tg('answerCallbackQuery', {'callback_query_id': cb_id})
         kb = model_keyboard()
         kb['inline_keyboard'].append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
-        tg('editMessageText', {
-            'chat_id': chat_id,
-            'message_id': msg_id,
-            'text': '🤖 <b>Выберите модель для генерации:</b>',
-            'parse_mode': 'HTML',
-            'reply_markup': kb
-        })
+        is_photo_msg = bool(callback.get('message', {}).get('photo'))
+        if is_photo_msg:
+            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            send_msg(chat_id, '🤖 <b>Выберите модель для генерации:</b>', reply_markup=kb)
+        else:
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': '🤖 <b>Выберите модель для генерации:</b>',
+                'parse_mode': 'HTML',
+                'reply_markup': kb
+            })
         return ok()
 
     if cb_data == 'show_info':
