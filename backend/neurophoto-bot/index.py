@@ -37,14 +37,16 @@ MODELS = {
         'api_id': 'img2img-google/nano-banana-pro-edit-multi',
         'provider': 'vsegpt',
         'desc': 'Google, мульти-редактирование',
-        'prompt_tips': 'Английские промпты. Несколько инструкций через запятую. Пример: "change background to sunset, add sunglasses, make hair blonde"'
+        'multi_photo': True,
+        'prompt_tips': 'Английские промпты. Несколько инструкций через запятую. Поддерживает несколько фото для объединения. Пример: "change background to sunset, add sunglasses, make hair blonde"'
     },
     'flux-klein': {
         'name': '⚡ FLUX 2 Klein 4B',
         'api_id': 'img2img-flux/flux-2-klein-4b',
         'provider': 'vsegpt',
         'desc': 'Компактная FLUX модель',
-        'prompt_tips': 'Английские промпты. Фотореализм. Пример: "a portrait of woman in autumn park, golden leaves, soft lighting, 4k, photorealistic"'
+        'multi_photo': True,
+        'prompt_tips': 'Английские промпты. Фотореализм. Поддерживает несколько фото для объединения. Пример: "a portrait of woman in autumn park, golden leaves, soft lighting, 4k, photorealistic"'
     },
     'seedream': {
         'name': '🌱 Seedream v4.5 Edit',
@@ -98,30 +100,34 @@ MODEL_INSTRUCTIONS = {
         '🍌 <b>Nano Banana Pro Edit</b>\n\n'
         '<b>Тип:</b> Мульти-редактирование\n'
         '<b>Язык:</b> Английский\n'
-        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n'
+        '📸 <b>Поддержка нескольких фото!</b>\n\n'
         '<b>Что умеет:</b>\n'
         '• Менять несколько элементов сразу\n'
+        '• Объединять несколько фото в одну картинку\n'
         '• Работа с портретами и пейзажами\n'
         '• Точечные правки на фото\n\n'
-        '<b>Лучше всего для:</b> Комплексного редактирования, нескольких изменений сразу\n\n'
+        '<b>Лучше всего для:</b> Комплексного редактирования, объединения фото\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Change background to sunset, add sunglasses\n'
-        '• Make hair blonde, add professional lighting\n'
+        '• Combine these photos into one image\n'
         '• Remove text, improve quality</i>'
     ),
     'flux-klein': (
         '⚡ <b>FLUX 2 Klein 4B</b>\n\n'
         '<b>Тип:</b> Генерация изображений\n'
         '<b>Язык:</b> Английский\n'
-        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n'
+        '📸 <b>Поддержка нескольких фото!</b>\n\n'
         '<b>Что умеет:</b>\n'
         '• Фотореалистичные изображения\n'
+        '• Объединять несколько фото в одну\n'
         '• Портреты, пейзажи, предметы\n'
         '• Хорошая детализация\n\n'
-        '<b>Лучше всего для:</b> Реалистичных изображений по описанию\n\n'
+        '<b>Лучше всего для:</b> Реалистичных изображений, объединения фото\n\n'
         '<b>Примеры:</b>\n'
-        '<i>• A portrait in autumn park, golden leaves, soft light\n'
-        '• Modern kitchen interior, minimalist, 4k\n'
+        '<i>• Combine these two photos into one portrait\n'
+        '• A portrait in autumn park, golden leaves, soft light\n'
         '• Cat wearing a tiny hat, studio photo</i>'
     ),
     'seedream': (
@@ -353,7 +359,7 @@ def gemini_generate(prompt, photo_bytes=None):
     return None, 'Модель не вернула изображение. ' + (' '.join(texts))[:200]
 
 
-def vsegpt_generate(model_key, prompt, photo_bytes=None):
+def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     if not VSEGPT_KEY:
         return None, 'VSEGPT_API_KEY не настроен'
 
@@ -368,6 +374,11 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None):
     if photo_bytes:
         b64 = base64.b64encode(photo_bytes).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
+
+    if extra_photos:
+        for i, extra_bytes in enumerate(extra_photos):
+            b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
+            body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
 
@@ -409,7 +420,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None):
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
 
-def generate_image(model_key, prompt, photo_bytes=None):
+def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None):
     model_info = MODELS.get(model_key)
     if not model_info:
         return None, f'Неизвестная модель: {model_key}'
@@ -417,7 +428,7 @@ def generate_image(model_key, prompt, photo_bytes=None):
     if model_info['provider'] == 'gemini':
         return gemini_generate(prompt, photo_bytes)
     else:
-        return vsegpt_generate(model_key, prompt, photo_bytes)
+        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
 
 def openrouter_make_prompt(model_key, user_description):
@@ -505,7 +516,7 @@ def openrouter_make_prompt(model_key, user_description):
 def get_user(conn, tid, uname, fname):
     cur = conn.cursor()
     cur.execute(
-        f"SELECT telegram_id, free_generations, paid_generations, total_used, preferred_model, session_state, session_photo_url FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+        f"SELECT telegram_id, free_generations, paid_generations, total_used, preferred_model, session_state, session_photo_url, session_media_group FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
         (tid,)
     )
     row = cur.fetchone()
@@ -514,14 +525,14 @@ def get_user(conn, tid, uname, fname):
         model = row[4] or DEFAULT_MODEL
         if model not in MODELS:
             model = DEFAULT_MODEL
-        return {'tid': row[0], 'free': row[1], 'paid': row[2], 'used': row[3], 'model': model, 'state': row[5], 'photo': row[6]}
+        return {'tid': row[0], 'free': row[1], 'paid': row[2], 'used': row[3], 'model': model, 'state': row[5], 'photo': row[6], 'media_group': row[7]}
 
     cur.execute(
         f"INSERT INTO {SCHEMA}.neurophoto_users (telegram_id, username, first_name, free_generations, paid_generations, preferred_model) VALUES (%s, %s, %s, 3, 0, %s)",
         (tid, uname or '', fname or 'User', DEFAULT_MODEL)
     )
     cur.close()
-    return {'tid': tid, 'free': 3, 'paid': 0, 'used': 0, 'model': DEFAULT_MODEL, 'state': None, 'photo': None}
+    return {'tid': tid, 'free': 3, 'paid': 0, 'used': 0, 'model': DEFAULT_MODEL, 'state': None, 'photo': None, 'media_group': None}
 
 
 def set_session(conn, tid, state, photo=None):
@@ -531,6 +542,49 @@ def set_session(conn, tid, state, photo=None):
         (state, photo, tid)
     )
     cur.close()
+
+
+def save_album_photo(conn, tid, media_group_id, photo_url, order_num):
+    cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.neurophoto_album_photos (telegram_id, media_group_id, photo_url, photo_order) VALUES (%s, %s, %s, %s)",
+        (tid, media_group_id, photo_url, order_num)
+    )
+    cur.close()
+
+
+def get_album_photos(conn, tid, media_group_id):
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT photo_url FROM {SCHEMA}.neurophoto_album_photos WHERE telegram_id = %s AND media_group_id = %s ORDER BY photo_order",
+        (tid, media_group_id)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return [r[0] for r in rows]
+
+
+def set_session_album(conn, tid, state, media_group_id):
+    cur = conn.cursor()
+    cur.execute(
+        f"UPDATE {SCHEMA}.neurophoto_users SET session_state = %s, session_media_group = %s, session_updated_at = CURRENT_TIMESTAMP WHERE telegram_id = %s",
+        (state, media_group_id, tid)
+    )
+    cur.close()
+
+
+def get_user_media_group(conn, tid):
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT session_media_group FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+        (tid,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    return row[0] if row else None
+
+
+MULTI_PHOTO_MODELS = [k for k, v in MODELS.items() if v.get('multi_photo')]
 
 
 def set_model(conn, tid, model_key):
@@ -620,7 +674,7 @@ def after_gen_keyboard():
     ]}
 
 
-def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
+def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None):
     cur = conn.cursor()
     cur.execute(
         f"SELECT session_state FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
@@ -637,10 +691,15 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
     model_key = user.get('model', DEFAULT_MODEL)
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
 
-    tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
-    send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
+    photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
+    if photo_count > 1:
+        tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
+        send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+    else:
+        tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
+        send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
 
-    img_bytes, err = generate_image(model_key, prompt, photo_bytes)
+    img_bytes, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
     if err:
         send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
@@ -696,6 +755,16 @@ def handler(event, context):
 
         media_group_id = message.get('media_group_id')
         if media_group_id:
+            photos = message.get('photo', [])
+            if photos:
+                largest = max(photos, key=lambda p: p.get('file_size', 0))
+                r = tg('getFile', {'file_id': largest['file_id']})
+                if r.get('ok'):
+                    fp = r['result']['file_path']
+                    photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
+                    existing = get_album_photos(conn, tid, media_group_id)
+                    save_album_photo(conn, tid, media_group_id, photo_url, len(existing))
+
             cur = conn.cursor()
             cur.execute(
                 f"SELECT 1 FROM {SCHEMA}.neurophoto_processed_updates WHERE update_id = -%s",
@@ -710,7 +779,35 @@ def handler(event, context):
                     (abs(hash(media_group_id)) % 2147483647,)
                 )
                 cur2.close()
-                send_msg(chat_id, '📸 Вижу несколько фото! Отправьте, пожалуйста, <b>одно фото</b> — я его обработаю.\n\nЕсли хотите сразу отредактировать — отправьте одно фото с подписью.')
+
+                user = get_user(conn, tid, uname, fname)
+                model_key = user.get('model', DEFAULT_MODEL)
+                model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
+                supports_multi = model_info.get('multi_photo', False)
+
+                set_session_album(conn, tid, 'waiting_album_prompt', media_group_id)
+
+                if supports_multi:
+                    send_msg(chat_id,
+                        f'📸 Получаю несколько фото! Модель <b>{model_info["name"]}</b> умеет объединять их.\n\n'
+                        f'✍️ Напишите, что сделать с этими фотографиями.\n\n'
+                        f'<i>Например: Объедини в коллаж, Совмести лица, Сделай одну картинку из двух</i>',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+                        ]}
+                    )
+                else:
+                    multi_names = ', '.join(MODELS[k]['name'] for k in MULTI_PHOTO_MODELS)
+                    send_msg(chat_id,
+                        f'📸 Получила несколько фото, но модель <b>{model_info["name"]}</b> работает только с одним.\n\n'
+                        f'Модели с поддержкой нескольких фото:\n{multi_names}\n\n'
+                        f'Переключить модель и написать промпт?',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': m['name'], 'callback_data': f'switch_multi:{k}'}] for k, m in MODELS.items() if m.get('multi_photo')
+                        ] + [
+                            [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+                        ]}
+                    )
             return ok()
 
         user = get_user(conn, tid, uname, fname)
@@ -833,6 +930,31 @@ def handler(event, context):
 
             if remaining(user) <= 0:
                 send_msg(chat_id, '❌ Генерации закончились.')
+                return ok()
+
+            if state == 'waiting_album_prompt':
+                mg = get_user_media_group(conn, tid)
+                if not mg:
+                    send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                photo_urls = get_album_photos(conn, tid, mg)
+                if not photo_urls:
+                    send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                all_bytes = []
+                for url in photo_urls:
+                    data = download_url(url)
+                    if data:
+                        all_bytes.append(data)
+                if len(all_bytes) < 2:
+                    send_msg(chat_id, '❌ Не удалось загрузить фото. Отправьте альбом заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                first_photo = all_bytes[0]
+                extra = all_bytes[1:]
+                do_generate(conn, chat_id, tid, user, text, first_photo, extra_photos=extra)
                 return ok()
 
             if state == 'waiting_prompt' and user.get('photo'):
@@ -1055,6 +1177,37 @@ def handle_callback(callback):
                         [{'text': '🏠 На главную', 'callback_data': 'go_start'}]
                     ]}
                 )
+        finally:
+            conn.close()
+        return ok()
+
+    if cb_data.startswith('switch_multi:'):
+        model_key = cb_data.split(':', 1)[1]
+        if model_key not in MODELS:
+            tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': 'Неизвестная модель'})
+            return ok()
+
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            set_model(conn, tid, model_key)
+            mg = get_user_media_group(conn, tid)
+            if mg:
+                set_session_album(conn, tid, 'waiting_album_prompt', mg)
+            model_info = MODELS[model_key]
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': (
+                    f'✅ Модель переключена на <b>{model_info["name"]}</b>\n\n'
+                    f'✍️ Теперь напишите, что сделать с фотографиями.\n\n'
+                    f'<i>Например: Объедини в одну картинку, Совмести эти фото, Сделай коллаж</i>'
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': {'inline_keyboard': [
+                    [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+                ]}
+            })
         finally:
             conn.close()
         return ok()
