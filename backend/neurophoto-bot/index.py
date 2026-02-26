@@ -724,9 +724,9 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
     def _fire():
         try:
             req = urllib.request.Request(SELF_URL, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-            urllib.request.urlopen(req, timeout=120)
+            urllib.request.urlopen(req, timeout=115)
         except Exception as e:
-            print(f'[ASYNC] fire error (expected if timeout): {type(e).__name__}')
+            print(f'[ASYNC] fire error: {type(e).__name__}: {e}')
 
     t = threading.Thread(target=_fire, daemon=True)
     t.start()
@@ -802,9 +802,8 @@ def _generate_worker(body):
 
 
 def handle_internal_generate(body):
-    print(f'[HANDLER] Internal generate — launching background thread')
-    t = threading.Thread(target=_generate_worker, args=(body,))
-    t.start()
+    print(f'[HANDLER] Internal generate — running synchronously (120s timeout)')
+    _generate_worker(body)
     return ok()
 
 
