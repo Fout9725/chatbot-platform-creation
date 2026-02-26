@@ -359,7 +359,7 @@ def gemini_generate(prompt, photo_bytes=None):
     return None, 'Модель не вернула изображение. ' + (' '.join(texts))[:200]
 
 
-def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, photo_urls=None):
+def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     if not VSEGPT_KEY:
         return None, 'VSEGPT_API_KEY не настроен'
 
@@ -372,21 +372,16 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
         'response_format': 'b64_json'
     }
 
-    if photo_urls and len(photo_urls) > 0:
-        body['image_url'] = photo_urls[0]
-        for i, url in enumerate(photo_urls[1:]):
-            body[f'image{i + 2}_url'] = url
-        print(f'[VSEGPT] Sending {len(photo_urls)} photo URLs to {api_model}')
-    elif photo_bytes:
+    if photo_bytes:
         b64 = base64.b64encode(photo_bytes).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
-        if extra_photos:
-            for i, extra_bytes in enumerate(extra_photos):
-                b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
-                body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
+    if extra_photos:
+        for i, extra_bytes in enumerate(extra_photos):
+            b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
+            body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
-    print(f'[VSEGPT] Request payload size: {len(payload)} bytes, model: {api_model}')
+    print(f'[VSEGPT] payload={len(payload)} bytes, model={api_model}, photos={1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0}')
 
     req = urllib.request.Request(
         'https://api.vsegpt.ru/v1/images/generations',
@@ -425,7 +420,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
 
-def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, photo_urls=None):
+def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None):
     model_info = MODELS.get(model_key)
     if not model_info:
         return None, f'Неизвестная модель: {model_key}'
@@ -433,7 +428,7 @@ def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, photo
     if model_info['provider'] == 'gemini':
         return gemini_generate(prompt, photo_bytes)
     else:
-        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos, photo_urls=photo_urls)
+        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
 
 def openrouter_make_prompt(model_key, user_description):
@@ -679,7 +674,7 @@ def after_gen_keyboard():
     ]}
 
 
-def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_urls=None):
+def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None):
     cur = conn.cursor()
     cur.execute(
         f"SELECT session_state FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
@@ -698,17 +693,13 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
     tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
 
-    if photo_urls and len(photo_urls) > 1:
-        print(f'[MULTI-PHOTO] tid={tid}, model={model_key}, urls={len(photo_urls)}')
-        send_msg(chat_id, f'🎨 Генерирую из {len(photo_urls)} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
-        img_bytes_result, err = generate_image(model_key, prompt, photo_urls=photo_urls)
+    photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
+    if photo_count > 1:
+        print(f'[MULTI-PHOTO] tid={tid}, model={model_key}, photos={photo_count}')
+        send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
     else:
-        photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
-        if photo_count > 1:
-            send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
-        else:
-            send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
-        img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
+        send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
+    img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
     if err:
         send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
@@ -952,12 +943,21 @@ def handler(event, context):
                     send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
                     set_session(conn, tid, None)
                     return ok()
-                photo_urls = get_album_photos(conn, tid, mg)
-                if len(photo_urls) < 2:
+                cdn_urls = get_album_photos(conn, tid, mg)
+                if len(cdn_urls) < 2:
                     send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
                     set_session(conn, tid, None)
                     return ok()
-                do_generate(conn, chat_id, tid, user, text, photo_urls=photo_urls)
+                all_bytes = []
+                for url in cdn_urls:
+                    data = download_url(url)
+                    if data:
+                        all_bytes.append(data)
+                if len(all_bytes) < 2:
+                    send_msg(chat_id, '❌ Не удалось загрузить фото. Отправьте альбом заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                do_generate(conn, chat_id, tid, user, text, all_bytes[0], extra_photos=all_bytes[1:])
                 return ok()
 
             if state == 'waiting_prompt' and user.get('photo'):
