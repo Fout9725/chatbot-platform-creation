@@ -1,4 +1,4 @@
-"""Бот Нейрофотосессия PRO — генерация и редактирование фото через 7 AI моделей + AI-промтер"""
+"""Бот Нейрофотосессия PRO — генерация и редактирование фото через AI моделей + AI-промтер"""
 
 import json
 import os
@@ -31,6 +31,7 @@ MODELS = {
         'name': '🟢 Gemini Flash (Google)',
         'api_id': 'gemini-2.5-flash-image',
         'provider': 'gemini',
+        'mode': 'both',
         'desc': 'Быстрая, хорошее качество',
         'prompt_tips': 'Понимает русский и английский. Детальные описания, стиль, настроение. Пример: "Портрет девушки в осеннем парке, мягкий свет, тёплые тона"'
     },
@@ -38,6 +39,7 @@ MODELS = {
         'name': '🍌 Nano Banana Pro Edit',
         'api_id': 'img2img-google/nano-banana-pro-edit-multi',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'Google, мульти-редактирование',
         'multi_photo': True,
         'prompt_tips': 'Английские промпты. Несколько инструкций через запятую. Поддерживает несколько фото для объединения. Пример: "change background to sunset, add sunglasses, make hair blonde"'
@@ -46,6 +48,7 @@ MODELS = {
         'name': '⚡ FLUX 2 Klein 4B',
         'api_id': 'img2img-flux/flux-2-klein-4b',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'Компактная FLUX модель',
         'multi_photo': True,
         'prompt_tips': 'Английские промпты. Фотореализм. Поддерживает несколько фото для объединения. Пример: "a portrait of woman in autumn park, golden leaves, soft lighting, 4k, photorealistic"'
@@ -54,6 +57,7 @@ MODELS = {
         'name': '🌱 Seedream v4.5 Edit',
         'api_id': 'img2img-bytedance/seedream-v4.5-edit-multi',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'ByteDance, мульти-редактирование',
         'prompt_tips': 'Английские промпты. Сильна в стилизации. Пример: "convert to watercolor painting", "make it look like anime"'
     },
@@ -61,6 +65,7 @@ MODELS = {
         'name': '✨ Reve Fast Edit',
         'api_id': 'img2img-reve-fast-edit-multi',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'Быстрое редактирование',
         'prompt_tips': 'Короткие чёткие промпты на английском. Одно изменение. Пример: "change background to blue sky", "add red hat"'
     },
@@ -68,6 +73,7 @@ MODELS = {
         'name': '🧠 Chrono Edit Thinking',
         'api_id': 'img2img-nvidia/chrono-edit-thinking',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'NVIDIA, думающая модель',
         'prompt_tips': 'Подробные промпты на английском. Пример: "carefully replace the sky with dramatic storm clouds while preserving lighting"'
     },
@@ -75,9 +81,58 @@ MODELS = {
         'name': '💎 Flash 2.5 Edit (Google)',
         'api_id': 'img2img-google/flash-25-edit-multi',
         'provider': 'vsegpt',
+        'mode': 'img2img',
         'desc': 'Google Flash, мульти-редактирование',
         'prompt_tips': 'Английские промпты. Сложные мульти-инструкции. Пример: "change hair to platinum blonde, add studio lighting, smooth skin"'
-    }
+    },
+    'txt-flux-klein-9b': {
+        'name': '⚡ FLUX 2 Klein 9B',
+        'api_id': 'img-flux/flux-2-klein-9b',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'FLUX 9B — качественная генерация по тексту',
+        'prompt_tips': 'Английские промпты. Фотореализм, детальные описания. Пример: "a portrait of woman in autumn park, golden leaves, soft lighting, 4k"'
+    },
+    'txt-flux-klein-4b': {
+        'name': '⚡ FLUX 2 Klein 4B',
+        'api_id': 'img-flux/flux-2-klein-4b',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'FLUX 4B — быстрая генерация по тексту',
+        'prompt_tips': 'Английские промпты. Быстрая генерация. Пример: "cat astronaut floating in space, studio photo, 8k"'
+    },
+    'txt-seedream': {
+        'name': '🌱 Seedream v4.5',
+        'api_id': 'img-bytedance/seedream-v4.5',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'ByteDance — стилизация и арт по тексту',
+        'prompt_tips': 'Английские промпты. Стилизация, арт. Пример: "watercolor painting of sunset over mountains"'
+    },
+    'txt-flux-pro': {
+        'name': '🔥 FLUX 2 Pro',
+        'api_id': 'img-flux/flux-2-pro',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'FLUX Pro — максимальное качество',
+        'prompt_tips': 'Английские промпты. Максимальное качество. Пример: "hyperrealistic portrait, dramatic lighting, 8k resolution"'
+    },
+    'txt-nano-banana': {
+        'name': '🍌 Nano Banana Pro',
+        'api_id': 'img-google/nano-banana-pro',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'Google — генерация по тексту',
+        'prompt_tips': 'Английские промпты. Пример: "beautiful landscape, cherry blossom, Japanese garden"'
+    },
+    'txt-flash-25': {
+        'name': '💎 Flash 2.5',
+        'api_id': 'img-google/flash-25',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'Google Flash — быстрая генерация по тексту',
+        'prompt_tips': 'Английские промпты. Пример: "professional headshot photo, studio lighting, clean background"'
+    },
 }
 
 DEFAULT_MODEL = 'gemini'
@@ -85,7 +140,7 @@ DEFAULT_MODEL = 'gemini'
 MODEL_INSTRUCTIONS = {
     'gemini': (
         '🟢 <b>Gemini Flash (Google)</b>\n\n'
-        '<b>Тип:</b> Генерация + редактирование\n'
+        '<b>Тип:</b> Генерация по тексту + редактирование фото\n'
         '<b>Язык:</b> Русский и английский\n'
         '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
         '<b>Что умеет:</b>\n'
@@ -93,6 +148,8 @@ MODEL_INSTRUCTIONS = {
         '• Редактировать загруженные фото\n'
         '• Менять фон, стиль, добавлять элементы\n\n'
         '<b>Лучше всего для:</b> Первого знакомства, простых задач, русскоязычных промптов\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Нет ограничений — работает и с текстом, и с фото\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Сделай фон осенним парком\n'
         '• Преврати в акварельную картину\n'
@@ -110,6 +167,9 @@ MODEL_INSTRUCTIONS = {
         '• Работа с портретами и пейзажами\n'
         '• Точечные правки на фото\n\n'
         '<b>Лучше всего для:</b> Комплексного редактирования, объединения фото\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Change background to sunset, add sunglasses\n'
         '• Combine these photos into one image\n'
@@ -127,6 +187,9 @@ MODEL_INSTRUCTIONS = {
         '• Портреты, пейзажи, предметы\n'
         '• Хорошая детализация\n\n'
         '<b>Лучше всего для:</b> Реалистичных изображений, объединения фото\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Combine these two photos into one portrait\n'
         '• A portrait in autumn park, golden leaves, soft light\n'
@@ -142,6 +205,9 @@ MODEL_INSTRUCTIONS = {
         '• Мульти-редактирование\n'
         '• Понимание стилей (акварель, аниме, масло)\n\n'
         '<b>Лучше всего для:</b> Стилизации под арт, аниме, живопись\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Convert to watercolor painting\n'
         '• Make it look like anime character\n'
@@ -157,6 +223,9 @@ MODEL_INSTRUCTIONS = {
         '• Смена цветов и фона\n'
         '• Добавление/удаление элементов\n\n'
         '<b>Лучше всего для:</b> Быстрых простых правок\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Change background to blue sky\n'
         '• Add red hat\n'
@@ -172,6 +241,9 @@ MODEL_INSTRUCTIONS = {
         '• Сложные комплексные правки\n'
         '• Сохранение деталей\n\n'
         '<b>Лучше всего для:</b> Сложных задач, где важна точность\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Carefully replace sky with dramatic storm clouds\n'
         '• Transform into professional headshot\n'
@@ -187,11 +259,116 @@ MODEL_INSTRUCTIONS = {
         '• Высокое качество обработки\n'
         '• Сохранение идентичности лица\n\n'
         '<b>Лучше всего для:</b> Профессиональной обработки портретов\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Не генерирует с нуля по тексту\n\n'
         '<b>Примеры:</b>\n'
         '<i>• Change hair to platinum blonde, add studio lighting\n'
         '• Professional retouching, smooth skin, subtle makeup\n'
         '• Place person in Paris with Eiffel Tower</i>'
-    )
+    ),
+    'txt-flux-klein-9b': (
+        '⚡ <b>FLUX 2 Klein 9B</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Генерация изображений по текстовому описанию\n'
+        '• Фотореалистичные портреты и пейзажи\n'
+        '• Высокая детализация\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• A portrait of woman in autumn park, golden leaves\n'
+        '• Futuristic city at night, neon lights, cyberpunk\n'
+        '• Cat wearing a tiny hat, studio photo</i>'
+    ),
+    'txt-flux-klein-4b': (
+        '⚡ <b>FLUX 2 Klein 4B</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Быстрая генерация по описанию\n'
+        '• Хорошее качество при высокой скорости\n'
+        '• Портреты, пейзажи, предметы\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Cat astronaut floating in space, studio photo\n'
+        '• Beautiful sunset over ocean, cinematic\n'
+        '• Cozy coffee shop interior, warm lighting</i>'
+    ),
+    'txt-seedream': (
+        '🌱 <b>Seedream v4.5 (ByteDance)</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Художественная генерация\n'
+        '• Стилизация: акварель, масло, аниме\n'
+        '• Красивые арт-работы\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Watercolor painting of sunset over mountains\n'
+        '• Anime girl in cherry blossom garden\n'
+        '• Oil painting, renaissance style portrait</i>'
+    ),
+    'txt-flux-pro': (
+        '🔥 <b>FLUX 2 Pro</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (20-40 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Максимальное качество генерации\n'
+        '• Фотореализм высочайшего уровня\n'
+        '• Сложные сцены и композиции\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Hyperrealistic portrait, dramatic lighting, 8k\n'
+        '• Photorealistic landscape, mountain lake, golden hour\n'
+        '• Professional product photo, minimal background</i>'
+    ),
+    'txt-nano-banana': (
+        '🍌 <b>Nano Banana Pro (Google)</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Генерация по текстовому описанию\n'
+        '• Хорошая работа с лицами\n'
+        '• Стабильное качество\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Beautiful landscape, cherry blossom, Japanese garden\n'
+        '• Portrait of young woman, natural lighting\n'
+        '• Cute puppy in a flower field</i>'
+    ),
+    'txt-flash-25': (
+        '💎 <b>Flash 2.5 (Google)</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Быстрая генерация по описанию\n'
+        '• Портреты, предметы, сцены\n'
+        '• Google качество\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Professional headshot, studio lighting\n'
+        '• Modern interior design, minimalist\n'
+        '• Food photography, appetizing dish</i>'
+    ),
 }
 
 
@@ -658,6 +835,38 @@ def model_keyboard():
     return {'inline_keyboard': buttons}
 
 
+def text_model_keyboard():
+    buttons = []
+    row = []
+    for key, info in MODELS.items():
+        mode = info.get('mode', '')
+        if mode in ('text2img', 'both'):
+            row.append({'text': info['name'], 'callback_data': f'model:{key}'})
+            if len(row) == 2:
+                buttons.append(row)
+                row = []
+    if row:
+        buttons.append(row)
+    buttons.append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
+def img_model_keyboard():
+    buttons = []
+    row = []
+    for key, info in MODELS.items():
+        mode = info.get('mode', '')
+        if mode in ('img2img', 'both'):
+            row.append({'text': info['name'], 'callback_data': f'model:{key}'})
+            if len(row) == 2:
+                buttons.append(row)
+                row = []
+    if row:
+        buttons.append(row)
+    buttons.append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
 def info_keyboard():
     buttons = []
     row = []
@@ -693,7 +902,6 @@ def current_model_text(model_key):
 
 def start_keyboard():
     return {'inline_keyboard': [
-        [{'text': '🤖 Выбрать модель', 'callback_data': 'show_models'}],
         [{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}],
         [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}]
     ]}
@@ -702,7 +910,7 @@ def start_keyboard():
 def after_gen_keyboard():
     return {'inline_keyboard': [
         [{'text': '✏️ Редактировать', 'callback_data': 'after_edit'}, {'text': '🎨 Сменить дизайн', 'callback_data': 'after_redesign'}],
-        [{'text': '🤖 Сменить модель', 'callback_data': 'show_models'}, {'text': '🏠 На главную', 'callback_data': 'go_start'}]
+        [{'text': '🤖 Сменить модель', 'callback_data': 'show_img_models'}, {'text': '🏠 На главную', 'callback_data': 'go_start'}]
     ]}
 
 
@@ -850,7 +1058,7 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
 
 def handler(event, context):
-    """Обработчик вебхука Telegram бота Нейрофотосессия PRO — генерация и редактирование через 7 AI + AI-промтер"""
+    """Обработчик вебхука Telegram бота Нейрофотосессия PRO — генерация и редактирование через AI + AI-промтер"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
 
@@ -947,15 +1155,17 @@ def handler(event, context):
 
         if text == '/start':
             set_session(conn, tid, None)
-            model_name = current_model_text(user['model'])
             send_msg(chat_id,
                 f'👋 Привет, <b>{fname}</b>!\n\n'
-                f'Я бот <b>Нейрофотосессия PRO</b> — создаю и редактирую фото с помощью 7 AI моделей.\n\n'
-                f'<b>🚀 Как пользоваться:</b>\n'
-                f'📸 Отправьте фото — я спрошу, что изменить\n'
-                f'✍️ Напишите текст — создам картинку с нуля\n\n'
-                f'🤖 Модель: {model_name}\n'
-                f'💎 Генераций: <b>{remaining(user)}</b>',
+                f'Я — <b>Нейрофотосессия PRO</b>, твой AI-ассистент для работы с изображениями.\n\n'
+                f'🎨 <b>Что я умею:</b>\n'
+                f'• Генерировать картинки по текстовому описанию\n'
+                f'• Редактировать и стилизовать загруженные фото\n'
+                f'• Объединять несколько фото в одну картинку\n\n'
+                f'🚀 <b>Как начать:</b>\n'
+                f'✍️ Напишите текст — я предложу нейросети для генерации\n'
+                f'📸 Отправьте фото — я предложу нейросети для редактирования\n\n'
+                f'💎 Доступно генераций: <b>{remaining(user)}</b>',
                 reply_markup=start_keyboard()
             )
             return ok()
@@ -1027,7 +1237,11 @@ def handler(event, context):
                     fp = r['result']['file_path']
                     photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
                     set_session(conn, tid, 'waiting_prompt', photo_url)
-                    send_msg(chat_id, f'📸 Фото получено! Напишите, что нужно изменить.\n\n🤖 Модель: {current_model_text(user["model"])}\n\n<i>Например: Сделай фон осенним</i>')
+                    send_msg(chat_id,
+                        '📸 <b>Фото получено!</b>\n\n'
+                        '🤖 Выберите нейросеть для редактирования:',
+                        reply_markup=img_model_keyboard()
+                    )
                 else:
                     send_msg(chat_id, '❌ Не удалось получить фото.')
             return ok()
@@ -1086,8 +1300,29 @@ def handler(event, context):
                     set_session(conn, tid, None)
                     return ok()
                 do_generate(conn, chat_id, tid, user, text, photo_bytes)
+            elif state == 'chosen_img_model' and user.get('photo'):
+                photo_bytes = download_url(user['photo'])
+                if not photo_bytes:
+                    send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
+                    set_session(conn, tid, None)
+                    return ok()
+                do_generate(conn, chat_id, tid, user, text, photo_bytes)
+            elif state == 'choosing_text_model':
+                send_msg(chat_id, '👆 Сначала выберите нейросеть из списка выше.')
             else:
-                do_generate(conn, chat_id, tid, user, text)
+                set_session(conn, tid, 'choosing_text_model')
+                cur2 = conn.cursor()
+                cur2.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                    (text, tid)
+                )
+                cur2.close()
+                send_msg(chat_id,
+                    '✍️ <b>Генерация по тексту</b>\n\n'
+                    f'Ваш запрос: <i>{text[:200]}</i>\n\n'
+                    '🤖 Выберите нейросеть для генерации:',
+                    reply_markup=text_model_keyboard()
+                )
             return ok()
 
         return ok()
@@ -1117,12 +1352,10 @@ def handle_callback(callback):
             fname = callback['from'].get('first_name', 'User')
             user = get_user(conn, tid, uname, fname)
             set_session(conn, tid, None)
-            model_name = current_model_text(user['model'])
             menu_text = (
                 f'👋 <b>Главное меню</b>\n\n'
-                f'📸 Отправьте фото — я отредактирую\n'
-                f'✍️ Напишите текст — создам картинку\n\n'
-                f'🤖 Модель: {model_name}\n'
+                f'✍️ Напишите текст — предложу нейросети для генерации\n'
+                f'📸 Отправьте фото — предложу нейросети для редактирования\n\n'
                 f'💎 Генераций: <b>{remaining(user)}</b>'
             )
             is_photo_msg = bool(callback.get('message', {}).get('photo'))
@@ -1148,15 +1381,44 @@ def handle_callback(callback):
         is_photo_msg = bool(callback.get('message', {}).get('photo'))
         if is_photo_msg:
             tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
-            send_msg(chat_id, '🤖 <b>Выберите модель для генерации:</b>', reply_markup=kb)
+            send_msg(chat_id, '🤖 <b>Все модели:</b>', reply_markup=kb)
         else:
             tg('editMessageText', {
                 'chat_id': chat_id,
                 'message_id': msg_id,
-                'text': '🤖 <b>Выберите модель для генерации:</b>',
+                'text': '🤖 <b>Все модели:</b>',
                 'parse_mode': 'HTML',
                 'reply_markup': kb
             })
+        return ok()
+
+    if cb_data == 'show_img_models':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        kb = img_model_keyboard()
+        is_photo_msg = bool(callback.get('message', {}).get('photo'))
+        if is_photo_msg:
+            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            send_msg(chat_id, '🤖 <b>Выберите модель для редактирования фото:</b>', reply_markup=kb)
+        else:
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': '🤖 <b>Выберите модель для редактирования фото:</b>',
+                'parse_mode': 'HTML',
+                'reply_markup': kb
+            })
+        return ok()
+
+    if cb_data == 'show_text_models':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        kb = text_model_keyboard()
+        tg('editMessageText', {
+            'chat_id': chat_id,
+            'message_id': msg_id,
+            'text': '🤖 <b>Выберите модель для генерации по тексту:</b>',
+            'parse_mode': 'HTML',
+            'reply_markup': kb
+        })
         return ok()
 
     if cb_data == 'show_info':
@@ -1239,21 +1501,49 @@ def handle_callback(callback):
 
         conn = get_db()
         try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
             set_model(conn, tid, model_key)
+
+            state = user.get('state', '') or ''
+            saved_prompt = user.get('photo', '')
+
+            if state == 'choosing_text_model' and saved_prompt:
+                user['model'] = model_key
+                model_info = MODELS[model_key]
+                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                    'parse_mode': 'HTML'
+                })
+                do_generate(conn, chat_id, tid, user, saved_prompt)
+            elif state == 'waiting_prompt' and saved_prompt:
+                set_session(conn, tid, 'chosen_img_model', saved_prompt)
+                set_model(conn, tid, model_key)
+                model_info = MODELS[model_key]
+                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'✅ Модель: <b>{model_info["name"]}</b>\n\nТеперь напишите, что изменить на фото.\n\n<i>Например: Сделай фон осенним, Add sunglasses</i>',
+                    'parse_mode': 'HTML',
+                    'reply_markup': {'inline_keyboard': [[{'text': '🏠 Отмена', 'callback_data': 'go_start'}]]}
+                })
+            else:
+                model_info = MODELS[model_key]
+                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'✅ Модель: {model_info["name"]}\n<i>{model_info["desc"]}</i>\n\nОтправьте фото или текст для генерации!',
+                    'parse_mode': 'HTML',
+                    'reply_markup': {'inline_keyboard': [[{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]]}
+                })
         finally:
             conn.close()
-
-        model_info = MODELS[model_key]
-        tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
-        tg('editMessageText', {
-            'chat_id': chat_id,
-            'message_id': msg_id,
-            'text': f'✅ Модель: {model_info["name"]}\n<i>{model_info["desc"]}</i>\n\nОтправьте фото или текст для генерации!',
-            'parse_mode': 'HTML',
-            'reply_markup': {'inline_keyboard': [
-                [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
-            ]}
-        })
         return ok()
 
     if cb_data == 'after_edit':
