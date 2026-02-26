@@ -6,6 +6,7 @@ import base64
 import time
 import urllib.request
 import urllib.error
+import threading
 import psycopg2
 import boto3
 from PIL import Image
@@ -13,6 +14,7 @@ import io
 
 SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 'public')
 BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
+SELF_URL = 'https://functions.poehali.dev/1be088c2-be07-4761-a09f-12486000897f'
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
 OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
@@ -674,6 +676,83 @@ def after_gen_keyboard():
     ]}
 
 
+def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None):
+    payload = {
+        '_internal': 'generate',
+        'chat_id': chat_id,
+        'tid': tid,
+        'prompt': prompt,
+        'model_key': model_key,
+    }
+    if photo_bytes:
+        payload['photo_b64'] = base64.b64encode(photo_bytes).decode('utf-8')
+    if extra_photos:
+        payload['extra_b64'] = [base64.b64encode(p).decode('utf-8') for p in extra_photos]
+
+    data = json.dumps(payload).encode('utf-8')
+    print(f'[ASYNC] Firing generate: tid={tid}, model={model_key}, payload={len(data)} bytes')
+
+    def _fire():
+        try:
+            req = urllib.request.Request(SELF_URL, data=data, headers={'Content-Type': 'application/json'}, method='POST')
+            urllib.request.urlopen(req, timeout=120)
+        except Exception as e:
+            print(f'[ASYNC] fire error (expected if timeout): {type(e).__name__}')
+
+    t = threading.Thread(target=_fire, daemon=True)
+    t.start()
+
+
+def handle_internal_generate(body):
+    chat_id = body['chat_id']
+    tid = body['tid']
+    prompt = body['prompt']
+    model_key = body['model_key']
+
+    photo_bytes = None
+    if body.get('photo_b64'):
+        photo_bytes = base64.b64decode(body['photo_b64'])
+
+    extra_photos = None
+    if body.get('extra_b64'):
+        extra_photos = [base64.b64decode(b) for b in body['extra_b64']]
+
+    model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
+    print(f'[GEN] Starting: tid={tid}, model={model_key}, has_photo={photo_bytes is not None}, extras={len(extra_photos) if extra_photos else 0}')
+
+    img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
+
+    conn = get_db()
+    try:
+        if err:
+            print(f'[GEN] Error: {err}')
+            send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
+            set_session(conn, tid, None)
+            return ok()
+
+        user = get_user(conn, tid, '', '')
+        left = remaining(user) - 1
+        caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
+        kb = after_gen_keyboard()
+
+        print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
+        res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
+        print(f'[GEN] send_photo_bytes ok={res.get("ok")}')
+
+        cdn_url = ''
+        try:
+            fname_out = f'{tid}_{int(time.time())}.png'
+            cdn_url = upload_s3(img_bytes_result, fname_out)
+        except Exception as e:
+            print(f'[S3] Upload failed: {e}')
+
+        record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
+        set_session(conn, tid, 'after_gen', cdn_url or 'generated')
+    finally:
+        conn.close()
+    return ok()
+
+
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None):
     cur = conn.cursor()
     cur.execute(
@@ -695,34 +774,11 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
     photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
     if photo_count > 1:
-        print(f'[MULTI-PHOTO] tid={tid}, model={model_key}, photos={photo_count}')
         send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
     else:
         send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
-    img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
-    if err:
-        send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
-        set_session(conn, tid, None)
-        return
-
-    left = remaining(user) - 1
-    caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
-    kb = after_gen_keyboard()
-
-    print(f'[RESULT] Got {len(img_bytes_result)} bytes, sending to Telegram...')
-    res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
-    print(f'[RESULT] send_photo_bytes ok={res.get("ok")}')
-
-    cdn_url = ''
-    try:
-        fname_out = f'{tid}_{int(time.time())}.png'
-        cdn_url = upload_s3(img_bytes_result, fname_out)
-    except Exception as e:
-        print(f'[S3] Upload failed: {e}')
-
-    record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-    set_session(conn, tid, 'after_gen', cdn_url or 'generated')
+    fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes, extra_photos)
 
 
 def handler(event, context):
@@ -734,6 +790,10 @@ def handler(event, context):
         return ok({'status': 'ok', 'bot': 'neurophoto-pro', 'models': list(MODELS.keys())})
 
     body = json.loads(event.get('body', '{}'))
+
+    if body.get('_internal') == 'generate':
+        print('[HANDLER] Internal generate request')
+        return handle_internal_generate(body)
 
     update_id = body.get('update_id')
 
