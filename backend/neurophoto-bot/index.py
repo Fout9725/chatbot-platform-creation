@@ -453,7 +453,7 @@ def send_photo_bytes(chat_id, img_bytes, caption='', reply_markup=None):
         headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode('utf-8'))
     except Exception:
         return {'ok': False}
@@ -466,7 +466,7 @@ def download_tg_file(file_id):
     fp = r['result']['file_path']
     url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
     try:
-        with urllib.request.urlopen(urllib.request.Request(url), timeout=30) as resp:
+        with urllib.request.urlopen(urllib.request.Request(url), timeout=10) as resp:
             return resp.read()
     except Exception:
         return None
@@ -474,7 +474,7 @@ def download_tg_file(file_id):
 
 def download_url(url):
     try:
-        with urllib.request.urlopen(urllib.request.Request(url), timeout=30) as resp:
+        with urllib.request.urlopen(urllib.request.Request(url), timeout=10) as resp:
             return resp.read()
     except Exception:
         return None
@@ -514,12 +514,15 @@ def gemini_generate(prompt, photo_bytes=None):
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=24) as resp:
             result = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8') if e.fp else ''
         return None, f'Gemini API error {e.code}: {err_body[:200]}'
     except Exception as e:
+        err_str = str(e).lower()
+        if 'timed out' in err_str or 'timeout' in err_str:
+            return None, 'TIMEOUT'
         return None, f'Ошибка соединения: {str(e)[:100]}'
 
     candidates = result.get('candidates', [])
@@ -557,7 +560,7 @@ def compress_photo(photo_bytes, max_size=512):
         return photo_bytes
 
 
-def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
+def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None):
     if not VSEGPT_KEY:
         return None, 'VSEGPT_API_KEY не настроен'
 
@@ -570,48 +573,43 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
         'response_format': 'b64_json'
     }
 
-    if photo_bytes:
+    if cdn_urls:
+        body['image_url'] = cdn_urls[0]
+        for i, curl in enumerate(cdn_urls[1:]):
+            body[f'image{i + 2}_url'] = curl
+    elif photo_bytes:
         b64 = base64.b64encode(photo_bytes).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
-    if extra_photos:
-        for i, extra_bytes in enumerate(extra_photos):
-            b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
-            body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
+        if extra_photos:
+            for i, extra_bytes in enumerate(extra_photos):
+                b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
+                body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
-    print(f'[VSEGPT] payload={len(payload)} bytes, model={api_model}, photos={1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0}')
+    print(f'[VSEGPT] payload={len(payload)} bytes, model={api_model}, photos={len(cdn_urls) if cdn_urls else (1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0)}')
 
-    max_retries = 3
-    last_err = ''
-    for attempt in range(max_retries):
-        req = urllib.request.Request(
-            'https://api.vsegpt.ru/v1/images/generations',
-            data=payload,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {VSEGPT_KEY}'
-            },
-            method='POST'
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                result = json.loads(resp.read().decode('utf-8'))
-            break
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode('utf-8') if e.fp else ''
-            print(f'[VSEGPT] HTTP error {e.code} (attempt {attempt+1}/{max_retries}): {err_body[:500]}')
-            last_err = f'VseGPT error {e.code}: {err_body[:200]}'
-            if e.code >= 500 and attempt < max_retries - 1:
-                time.sleep(3 * (attempt + 1))
-                continue
-            return None, last_err
-        except Exception as e:
-            print(f'[VSEGPT] Exception (attempt {attempt+1}/{max_retries}): {str(e)}')
-            last_err = f'Ошибка соединения: {str(e)[:100]}'
-            if attempt < max_retries - 1:
-                time.sleep(3 * (attempt + 1))
-                continue
-            return None, last_err
+    req = urllib.request.Request(
+        'https://api.vsegpt.ru/v1/images/generations',
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {VSEGPT_KEY}'
+        },
+        method='POST'
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=24) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8') if e.fp else ''
+        print(f'[VSEGPT] HTTP error {e.code}: {err_body[:500]}')
+        return None, f'VseGPT error {e.code}: {err_body[:200]}'
+    except Exception as e:
+        err_str = str(e).lower()
+        print(f'[VSEGPT] Exception: {str(e)}')
+        if 'timed out' in err_str or 'timeout' in err_str:
+            return None, 'TIMEOUT'
+        return None, f'Ошибка соединения: {str(e)[:100]}'
 
     print(f'[VSEGPT] Response keys: {list(result.keys())}')
     data_list = result.get('data', [])
@@ -629,7 +627,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
 
-def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None):
+def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None):
     model_info = MODELS.get(model_key)
     if not model_info:
         return None, f'Неизвестная модель: {model_key}'
@@ -637,7 +635,7 @@ def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None):
     if model_info['provider'] == 'gemini':
         return gemini_generate(prompt, photo_bytes)
     else:
-        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos)
+        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=cdn_urls)
 
 
 def openrouter_make_prompt(model_key, user_description):
@@ -921,6 +919,7 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
         'tid': tid,
         'prompt': prompt,
         'model_key': model_key,
+        'attempt': 0,
     }
 
     if photo_cdn_urls:
@@ -957,15 +956,17 @@ def _generate_worker(body):
     prompt = body['prompt']
     model_key = body['model_key']
     cdn_urls = body.get('cdn_urls', [])
+    attempt = body.get('attempt', 0)
 
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
-    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}')
+    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}, attempt={attempt}')
 
     try:
         photo_bytes = None
         extra_photos = None
+        vsegpt_cdn = None
 
-        if cdn_urls:
+        if cdn_urls and model_info['provider'] == 'gemini':
             all_bytes = []
             for url in cdn_urls:
                 data = download_url(url)
@@ -977,21 +978,48 @@ def _generate_worker(body):
                 photo_bytes = all_bytes[0]
                 if len(all_bytes) > 1:
                     extra_photos = all_bytes[1:]
-            print(f'[GEN] Downloaded {len(all_bytes)} photos, sizes: {[len(b) for b in all_bytes]}')
+            print(f'[GEN] Downloaded {len(all_bytes)} photos for Gemini')
+        elif cdn_urls and model_info['provider'] != 'gemini':
+            vsegpt_cdn = cdn_urls
+            print(f'[GEN] Passing {len(cdn_urls)} CDN URLs directly to VseGPT')
 
-        img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
+        img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=vsegpt_cdn)
+
+        if err == 'TIMEOUT' and attempt < 3:
+            print(f'[GEN] Timeout on attempt {attempt}, firing chain retry')
+            if attempt == 0:
+                send_msg(chat_id, '\u23f3 \u041d\u0435\u0439\u0440\u043e\u0441\u0435\u0442\u044c \u0435\u0449\u0451 \u0434\u0443\u043c\u0430\u0435\u0442... \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435 \u043d\u0435\u043c\u043d\u043e\u0433\u043e.')
+            retry_payload = json.dumps({
+                '_internal': 'generate',
+                'chat_id': chat_id,
+                'tid': tid,
+                'prompt': prompt,
+                'model_key': model_key,
+                'cdn_urls': cdn_urls,
+                'attempt': attempt + 1
+            }).encode('utf-8')
+            def _fire_chain():
+                try:
+                    req = urllib.request.Request(SELF_URL, data=retry_payload, headers={'Content-Type': 'application/json'}, method='POST')
+                    urllib.request.urlopen(req, timeout=28)
+                except Exception as e:
+                    print(f'[CHAIN] fire error: {type(e).__name__}: {e}')
+            t = threading.Thread(target=_fire_chain, daemon=True)
+            t.start()
+            time.sleep(0.3)
+            return
 
         conn = get_db()
         try:
             if err:
                 print(f'[GEN] Error: {err}')
-                send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
+                send_msg(chat_id, f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438: {err}\n\n\u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043e\u0439 \u043f\u0440\u043e\u043c\u043f\u0442 \u0438\u043b\u0438 \u0441\u043c\u0435\u043d\u0438\u0442\u0435 \u043c\u043e\u0434\u0435\u043b\u044c.')
                 set_session(conn, tid, None)
                 return
 
             user = get_user(conn, tid, '', '')
             left = remaining(user) - 1
-            caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
+            caption = f'\u2728 \u0413\u043e\u0442\u043e\u0432\u043e! \u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\ud83d\udc8e \u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c: <b>{left}</b>'
             kb = after_gen_keyboard()
 
             print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
@@ -1012,7 +1040,7 @@ def _generate_worker(body):
     except Exception as e:
         print(f'[GEN-THREAD] Fatal error: {e}')
         try:
-            send_msg(chat_id, '❌ Произошла ошибка при генерации. Попробуйте ещё раз.')
+            send_msg(chat_id, '\u274c \u041f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.')
             c = get_db()
             set_session(c, tid, None)
             c.close()
@@ -1029,13 +1057,13 @@ def handle_internal_generate(body):
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
     cur = conn.cursor()
     cur.execute(
-        f"SELECT session_state FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+        f"SELECT 1 FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s AND session_state = 'generating' AND session_updated_at > CURRENT_TIMESTAMP - INTERVAL '120 seconds'",
         (tid,)
     )
-    row = cur.fetchone()
+    still_generating = cur.fetchone() is not None
     cur.close()
-    if row and row[0] == 'generating':
-        send_msg(chat_id, '⏳ Предыдущая генерация ещё выполняется. Дождитесь результата.')
+    if still_generating:
+        send_msg(chat_id, '\u23f3 \u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u0435\u0449\u0451 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f. \u0414\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0430.')
         return
 
     set_session(conn, tid, 'generating')
