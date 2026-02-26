@@ -457,10 +457,6 @@ def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None):
     if not model_info:
         return None, f'Неизвестная модель: {model_key}'
 
-    if model_info['provider'] != 'gemini' and not photo_bytes:
-        print(f'[GEN] No photo for img2img model {model_key}, falling back to gemini')
-        return gemini_generate(prompt, None)
-
     if model_info['provider'] == 'gemini':
         return gemini_generate(prompt, photo_bytes)
     else:
