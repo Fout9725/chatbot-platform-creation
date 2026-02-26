@@ -361,17 +361,17 @@ def gemini_generate(prompt, photo_bytes=None):
     return None, 'Модель не вернула изображение. ' + (' '.join(texts))[:200]
 
 
-def compress_photo(photo_bytes, max_size=768):
+def compress_photo(photo_bytes, max_size=512):
     try:
         img = Image.open(io.BytesIO(photo_bytes))
         if img.mode == 'RGBA':
             img = img.convert('RGB')
         w, h = img.size
-        if w > max_size or h > max_size:
-            ratio = min(max_size / w, max_size / h)
+        ratio = min(max_size / w, max_size / h)
+        if ratio < 1:
             img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
         buf = io.BytesIO()
-        img.save(buf, format='JPEG', quality=80)
+        img.save(buf, format='JPEG', quality=55)
         result = buf.getvalue()
         print(f'[COMPRESS] {len(photo_bytes)} -> {len(result)} bytes, {img.size}')
         return result
@@ -394,13 +394,11 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     }
 
     if photo_bytes:
-        compressed = compress_photo(photo_bytes)
-        b64 = base64.b64encode(compressed).decode('utf-8')
+        b64 = base64.b64encode(photo_bytes).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
     if extra_photos:
         for i, extra_bytes in enumerate(extra_photos):
-            compressed_extra = compress_photo(extra_bytes)
-            b64_extra = base64.b64encode(compressed_extra).decode('utf-8')
+            b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
             body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
@@ -697,7 +695,7 @@ def after_gen_keyboard():
     ]}
 
 
-def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None):
+def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
     payload = {
         '_internal': 'generate',
         'chat_id': chat_id,
@@ -705,11 +703,20 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
         'prompt': prompt,
         'model_key': model_key,
     }
-    if photo_bytes:
+
+    if photo_cdn_urls:
+        payload['cdn_urls'] = photo_cdn_urls
+    elif photo_bytes:
         compressed = compress_photo(photo_bytes)
-        payload['photo_b64'] = base64.b64encode(compressed).decode('utf-8')
-    if extra_photos:
-        payload['extra_b64'] = [base64.b64encode(compress_photo(p)).decode('utf-8') for p in extra_photos]
+        fname_tmp = f'tmp_{tid}_{int(time.time())}_0.jpg'
+        cdn = upload_s3(compressed, fname_tmp)
+        urls = [cdn]
+        if extra_photos:
+            for i, ep in enumerate(extra_photos):
+                comp = compress_photo(ep)
+                fn = f'tmp_{tid}_{int(time.time())}_{i+1}.jpg'
+                urls.append(upload_s3(comp, fn))
+        payload['cdn_urls'] = urls
 
     data = json.dumps(payload).encode('utf-8')
     print(f'[ASYNC] Firing generate: tid={tid}, model={model_key}, payload={len(data)} bytes')
@@ -730,17 +737,27 @@ def handle_internal_generate(body):
     tid = body['tid']
     prompt = body['prompt']
     model_key = body['model_key']
-
-    photo_bytes = None
-    if body.get('photo_b64'):
-        photo_bytes = base64.b64decode(body['photo_b64'])
-
-    extra_photos = None
-    if body.get('extra_b64'):
-        extra_photos = [base64.b64decode(b) for b in body['extra_b64']]
+    cdn_urls = body.get('cdn_urls', [])
 
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
-    print(f'[GEN] Starting: tid={tid}, model={model_key}, has_photo={photo_bytes is not None}, extras={len(extra_photos) if extra_photos else 0}')
+    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}')
+
+    photo_bytes = None
+    extra_photos = None
+
+    if cdn_urls:
+        all_bytes = []
+        for url in cdn_urls:
+            data = download_url(url)
+            if data:
+                all_bytes.append(compress_photo(data))
+            else:
+                print(f'[GEN] Failed to download: {url[:80]}')
+        if all_bytes:
+            photo_bytes = all_bytes[0]
+            if len(all_bytes) > 1:
+                extra_photos = all_bytes[1:]
+        print(f'[GEN] Downloaded {len(all_bytes)} photos, sizes: {[len(b) for b in all_bytes]}')
 
     img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
@@ -775,7 +792,7 @@ def handle_internal_generate(body):
     return ok()
 
 
-def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None):
+def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
     cur = conn.cursor()
     cur.execute(
         f"SELECT session_state FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
@@ -794,13 +811,16 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
     tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
 
-    photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
-    if photo_count > 1:
-        send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+    if photo_cdn_urls:
+        send_msg(chat_id, f'🎨 Генерирую из {len(photo_cdn_urls)} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+        fire_async_generate(chat_id, tid, prompt, model_key, photo_cdn_urls=photo_cdn_urls)
     else:
-        send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
-
-    fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes, extra_photos)
+        photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
+        if photo_count > 1:
+            send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+        else:
+            send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
+        fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes, extra_photos)
 
 
 def handler(event, context):
@@ -1030,16 +1050,7 @@ def handler(event, context):
                     send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
                     set_session(conn, tid, None)
                     return ok()
-                all_bytes = []
-                for url in cdn_urls:
-                    data = download_url(url)
-                    if data:
-                        all_bytes.append(data)
-                if len(all_bytes) < 2:
-                    send_msg(chat_id, '❌ Не удалось загрузить фото. Отправьте альбом заново.')
-                    set_session(conn, tid, None)
-                    return ok()
-                do_generate(conn, chat_id, tid, user, text, all_bytes[0], extra_photos=all_bytes[1:])
+                do_generate(conn, chat_id, tid, user, text, photo_cdn_urls=cdn_urls)
                 return ok()
 
             if state == 'waiting_prompt' and user.get('photo'):
