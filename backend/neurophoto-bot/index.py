@@ -361,6 +361,25 @@ def gemini_generate(prompt, photo_bytes=None):
     return None, 'Модель не вернула изображение. ' + (' '.join(texts))[:200]
 
 
+def compress_photo(photo_bytes, max_size=768):
+    try:
+        img = Image.open(io.BytesIO(photo_bytes))
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+        w, h = img.size
+        if w > max_size or h > max_size:
+            ratio = min(max_size / w, max_size / h)
+            img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=80)
+        result = buf.getvalue()
+        print(f'[COMPRESS] {len(photo_bytes)} -> {len(result)} bytes, {img.size}')
+        return result
+    except Exception as e:
+        print(f'[COMPRESS] Failed: {e}, using original')
+        return photo_bytes
+
+
 def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     if not VSEGPT_KEY:
         return None, 'VSEGPT_API_KEY не настроен'
@@ -375,11 +394,13 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     }
 
     if photo_bytes:
-        b64 = base64.b64encode(photo_bytes).decode('utf-8')
+        compressed = compress_photo(photo_bytes)
+        b64 = base64.b64encode(compressed).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
     if extra_photos:
         for i, extra_bytes in enumerate(extra_photos):
-            b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
+            compressed_extra = compress_photo(extra_bytes)
+            b64_extra = base64.b64encode(compressed_extra).decode('utf-8')
             body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
@@ -685,9 +706,10 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
         'model_key': model_key,
     }
     if photo_bytes:
-        payload['photo_b64'] = base64.b64encode(photo_bytes).decode('utf-8')
+        compressed = compress_photo(photo_bytes)
+        payload['photo_b64'] = base64.b64encode(compressed).decode('utf-8')
     if extra_photos:
-        payload['extra_b64'] = [base64.b64encode(p).decode('utf-8') for p in extra_photos]
+        payload['extra_b64'] = [base64.b64encode(compress_photo(p)).decode('utf-8') for p in extra_photos]
 
     data = json.dumps(payload).encode('utf-8')
     print(f'[ASYNC] Firing generate: tid={tid}, model={model_key}, payload={len(data)} bytes')
