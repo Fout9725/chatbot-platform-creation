@@ -435,17 +435,20 @@ def send_photo_url(chat_id, photo_url, caption='', reply_markup=None):
 
 def send_photo_bytes(chat_id, img_bytes, caption='', reply_markup=None):
     boundary = f'----NeuroBotBoundary{int(time.time())}'
+    enc = 'utf-8'
+    if caption:
+        caption = caption.encode(enc, errors='replace').decode(enc)
     body = b''
-    body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode()
-    body += f'--{boundary}\r\nContent-Disposition: form-data; name="photo"; filename="result.png"\r\nContent-Type: image/png\r\n\r\n'.encode()
+    body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode(enc)
+    body += f'--{boundary}\r\nContent-Disposition: form-data; name="photo"; filename="result.png"\r\nContent-Type: image/png\r\n\r\n'.encode(enc)
     body += img_bytes
     body += b'\r\n'
     if caption:
-        body += f'--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{caption}\r\n'.encode()
-        body += f'--{boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n'.encode()
+        body += f'--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{caption}\r\n'.encode(enc)
+        body += f'--{boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n'.encode(enc)
     if reply_markup:
-        body += f'--{boundary}\r\nContent-Disposition: form-data; name="reply_markup"\r\n\r\n{json.dumps(reply_markup)}\r\n'.encode()
-    body += f'--{boundary}--\r\n'.encode()
+        body += f'--{boundary}\r\nContent-Disposition: form-data; name="reply_markup"\r\n\r\n{json.dumps(reply_markup, ensure_ascii=False)}\r\n'.encode(enc)
+    body += f'--{boundary}--\r\n'.encode(enc)
 
     req = urllib.request.Request(
         f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto',
@@ -453,10 +456,11 @@ def send_photo_bytes(chat_id, img_bytes, caption='', reply_markup=None):
         headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode('utf-8'))
-    except Exception:
-        return {'ok': False}
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode(enc))
+    except Exception as e:
+        print(f'[SEND_PHOTO] Error: {e}')
+        return {'ok': False, 'error': str(e)}
 
 
 def download_tg_file(file_id):
@@ -598,7 +602,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
         method='POST'
     )
     try:
-        with urllib.request.urlopen(req, timeout=24) as resp:
+        with urllib.request.urlopen(req, timeout=100) as resp:
             result = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8') if e.fp else ''
@@ -608,7 +612,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
         err_str = str(e).lower()
         print(f'[VSEGPT] Exception: {str(e)}')
         if 'timed out' in err_str or 'timeout' in err_str:
-            return None, 'TIMEOUT'
+            return None, 'Таймаут: нейросеть не ответила за 100 секунд. Попробуйте ещё раз или выберите другую модель.'
         return None, f'Ошибка соединения: {str(e)[:100]}'
 
     print(f'[VSEGPT] Response keys: {list(result.keys())}')
@@ -921,7 +925,6 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
         'tid': tid,
         'prompt': prompt,
         'model_key': model_key,
-        'attempt': 0,
     }
 
     if photo_cdn_urls:
@@ -958,10 +961,9 @@ def _generate_worker(body):
     prompt = body['prompt']
     model_key = body['model_key']
     cdn_urls = body.get('cdn_urls', [])
-    attempt = body.get('attempt', 0)
 
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
-    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}, attempt={attempt}')
+    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}')
 
     try:
         photo_bytes = None
@@ -987,30 +989,6 @@ def _generate_worker(body):
 
         img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=vsegpt_cdn)
 
-        if err == 'TIMEOUT' and attempt < 3:
-            print(f'[GEN] Timeout on attempt {attempt}, firing chain retry')
-            if attempt == 0:
-                send_msg(chat_id, '\u23f3 \u041d\u0435\u0439\u0440\u043e\u0441\u0435\u0442\u044c \u0435\u0449\u0451 \u0434\u0443\u043c\u0430\u0435\u0442... \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435 \u043d\u0435\u043c\u043d\u043e\u0433\u043e.')
-            retry_payload = json.dumps({
-                '_internal': 'generate',
-                'chat_id': chat_id,
-                'tid': tid,
-                'prompt': prompt,
-                'model_key': model_key,
-                'cdn_urls': cdn_urls,
-                'attempt': attempt + 1
-            }).encode('utf-8')
-            def _fire_chain():
-                try:
-                    req = urllib.request.Request(SELF_URL, data=retry_payload, headers={'Content-Type': 'application/json'}, method='POST')
-                    urllib.request.urlopen(req, timeout=28)
-                except Exception as e:
-                    print(f'[CHAIN] fire error: {type(e).__name__}: {e}')
-            t = threading.Thread(target=_fire_chain, daemon=True)
-            t.start()
-            time.sleep(0.3)
-            return
-
         conn = get_db()
         try:
             if err:
@@ -1026,7 +1004,9 @@ def _generate_worker(body):
 
             print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
             res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
-            print(f'[GEN] send_photo_bytes ok={res.get("ok")}')
+            print(f'[GEN] send_photo_bytes result={json.dumps(res, ensure_ascii=False)[:300]}')
+            if not res.get('ok'):
+                send_msg(chat_id, f'❌ Картинка сгенерирована ({len(img_bytes_result)} байт), но не удалось отправить в Telegram.\nПричина: {res.get("error", res.get("description", "неизвестно"))[:200]}')
 
             cdn_url = ''
             try:
