@@ -404,26 +404,37 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     payload = json.dumps(body).encode('utf-8')
     print(f'[VSEGPT] payload={len(payload)} bytes, model={api_model}, photos={1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0}')
 
-    req = urllib.request.Request(
-        'https://api.vsegpt.ru/v1/images/generations',
-        data=payload,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {VSEGPT_KEY}'
-        },
-        method='POST'
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8') if e.fp else ''
-        print(f'[VSEGPT] HTTP error {e.code}: {err_body[:300]}')
-        return None, f'VseGPT error {e.code}: {err_body[:200]}'
-    except Exception as e:
-        print(f'[VSEGPT] Exception: {str(e)}')
-        return None, f'Ошибка соединения: {str(e)[:100]}'
+    max_retries = 3
+    last_err = ''
+    for attempt in range(max_retries):
+        req = urllib.request.Request(
+            'https://api.vsegpt.ru/v1/images/generations',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {VSEGPT_KEY}'
+            },
+            method='POST'
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+            break
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8') if e.fp else ''
+            print(f'[VSEGPT] HTTP error {e.code} (attempt {attempt+1}/{max_retries}): {err_body[:500]}')
+            last_err = f'VseGPT error {e.code}: {err_body[:200]}'
+            if e.code >= 500 and attempt < max_retries - 1:
+                time.sleep(3 * (attempt + 1))
+                continue
+            return None, last_err
+        except Exception as e:
+            print(f'[VSEGPT] Exception (attempt {attempt+1}/{max_retries}): {str(e)}')
+            last_err = f'Ошибка соединения: {str(e)[:100]}'
+            if attempt < max_retries - 1:
+                time.sleep(3 * (attempt + 1))
+                continue
+            return None, last_err
 
     print(f'[VSEGPT] Response keys: {list(result.keys())}')
     data_list = result.get('data', [])
