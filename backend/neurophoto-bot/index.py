@@ -369,7 +369,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
     body = {
         'model': api_model,
         'prompt': prompt,
-        'response_format': 'url'
+        'response_format': 'b64_json'
     }
 
     if photo_urls and len(photo_urls) > 0:
@@ -417,10 +417,6 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
 
     item = data_list[0]
     print(f'[VSEGPT] Item keys: {list(item.keys())}')
-
-    url_val = item.get('url', '')
-    if url_val:
-        return ('url', url_val), None
 
     b64_data = item.get('b64_json', '')
     if b64_data:
@@ -723,27 +719,19 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
     caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
     kb = after_gen_keyboard()
 
-    if isinstance(img_bytes_result, tuple) and img_bytes_result[0] == 'url':
-        result_url = img_bytes_result[1]
-        print(f'[RESULT] Sending URL directly: {result_url[:100]}')
-        res = send_photo_url(chat_id, result_url, caption, reply_markup=kb)
-        if not res.get('ok'):
-            print(f'[RESULT] send_photo_url failed: {res}')
-            img_data = download_url(result_url)
-            if img_data:
-                send_photo_bytes(chat_id, img_data, caption, reply_markup=kb)
-            else:
-                send_msg(chat_id, f'❌ Не удалось отправить фото. Ссылка: {result_url}')
-        record_gen(conn, tid, prompt, model_key, result_url, user['paid'] > 0)
-        set_session(conn, tid, 'after_gen', result_url)
-    else:
+    print(f'[RESULT] Got {len(img_bytes_result)} bytes, sending to Telegram...')
+    res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
+    print(f'[RESULT] send_photo_bytes ok={res.get("ok")}')
+
+    cdn_url = ''
+    try:
         fname_out = f'{tid}_{int(time.time())}.png'
         cdn_url = upload_s3(img_bytes_result, fname_out)
-        res = send_photo_url(chat_id, cdn_url, caption, reply_markup=kb)
-        if not res.get('ok'):
-            send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
-        record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-        set_session(conn, tid, 'after_gen', cdn_url)
+    except Exception as e:
+        print(f'[S3] Upload failed: {e}')
+
+    record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
+    set_session(conn, tid, 'after_gen', cdn_url or 'generated')
 
 
 def handler(event, context):
