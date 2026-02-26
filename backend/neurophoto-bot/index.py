@@ -1253,25 +1253,40 @@ def handler(event, context):
             largest = max(photos, key=lambda p: p.get('file_size', 0))
             caption = message.get('caption', '').strip()
 
+            r = tg('getFile', {'file_id': largest['file_id']})
+            if not r.get('ok'):
+                send_msg(chat_id, '❌ Не удалось получить фото.')
+                return ok()
+            fp = r['result']['file_path']
+            photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
+
             if caption:
-                photo_bytes = download_tg_file(largest['file_id'])
-                if not photo_bytes:
-                    send_msg(chat_id, '❌ Не удалось загрузить фото. Попробуйте ещё раз.')
-                    return ok()
-                do_generate(conn, chat_id, tid, user, caption, photo_bytes)
+                cur_cap = conn.cursor()
+                cur_cap.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                    (photo_url, tid)
+                )
+                cur_cap.close()
+                set_session(conn, tid, 'caption_choose_model', photo_url)
+                cur_cap2 = conn.cursor()
+                cur_cap2.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_media_group = %s WHERE telegram_id = %s",
+                    (caption[:500], tid)
+                )
+                cur_cap2.close()
+                send_msg(chat_id,
+                    f'📸 <b>Фото получено!</b>\n'
+                    f'✍️ Промпт: <i>{caption[:150]}</i>\n\n'
+                    f'🤖 Выберите нейросеть для редактирования:',
+                    reply_markup=img_model_keyboard()
+                )
             else:
-                r = tg('getFile', {'file_id': largest['file_id']})
-                if r.get('ok'):
-                    fp = r['result']['file_path']
-                    photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
-                    set_session(conn, tid, 'waiting_prompt', photo_url)
-                    send_msg(chat_id,
-                        '📸 <b>Фото получено!</b>\n\n'
-                        '🤖 Выберите нейросеть для редактирования:',
-                        reply_markup=img_model_keyboard()
-                    )
-                else:
-                    send_msg(chat_id, '❌ Не удалось получить фото.')
+                set_session(conn, tid, 'waiting_prompt', photo_url)
+                send_msg(chat_id,
+                    '📸 <b>Фото получено!</b>\n\n'
+                    '🤖 Выберите нейросеть для редактирования:',
+                    reply_markup=img_model_keyboard()
+                )
             return ok()
 
         if text and not text.startswith('/'):
@@ -1537,7 +1552,36 @@ def handle_callback(callback):
             state = user.get('state', '') or ''
             saved_prompt = user.get('photo', '')
 
-            if state == 'choosing_text_model' and saved_prompt:
+            if state == 'caption_choose_model' and saved_prompt:
+                saved_caption = user.get('media_group', '') or ''
+                if saved_caption:
+                    user['model'] = model_key
+                    model_info = MODELS[model_key]
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                    tg('editMessageText', {
+                        'chat_id': chat_id,
+                        'message_id': msg_id,
+                        'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                        'parse_mode': 'HTML'
+                    })
+                    photo_bytes = download_url(saved_prompt)
+                    if photo_bytes:
+                        do_generate(conn, chat_id, tid, user, saved_caption, photo_bytes)
+                    else:
+                        send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
+                        set_session(conn, tid, None)
+                else:
+                    set_session(conn, tid, 'chosen_img_model', saved_prompt)
+                    model_info = MODELS[model_key]
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
+                    tg('editMessageText', {
+                        'chat_id': chat_id,
+                        'message_id': msg_id,
+                        'text': f'✅ Модель: <b>{model_info["name"]}</b>\n\nТеперь напишите, что изменить на фото.\n\n<i>Например: Сделай фон осенним, Add sunglasses</i>',
+                        'parse_mode': 'HTML',
+                        'reply_markup': {'inline_keyboard': [[{'text': '🏠 Отмена', 'callback_data': 'go_start'}]]}
+                    })
+            elif state == 'choosing_text_model' and saved_prompt:
                 user['model'] = model_key
                 model_info = MODELS[model_key]
                 tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
