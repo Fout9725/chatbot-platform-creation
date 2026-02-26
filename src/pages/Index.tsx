@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import HowItWorks from '@/components/landing/HowItWorks';
 import CtaBlock from '@/components/landing/CtaBlock';
 import SiteFooter from '@/components/landing/SiteFooter';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -69,6 +70,38 @@ const Index = () => {
                   Админ
                 </Button>
               )}
+
+              <div className="flex items-center gap-0.5 ml-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => navigate('/automation-hub')}
+                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 hover:border-amber-300 hover:from-amber-100 hover:to-orange-100 hover:shadow-md hover:shadow-amber-200/30 transition-all duration-200 hover:scale-105"
+                    >
+                      <Icon name="Zap" size={17} className="text-amber-600 group-hover:text-amber-700 transition-colors" />
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="font-medium">
+                    Автоматизация
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => navigate('/prompt-engineer')}
+                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200/60 hover:border-violet-300 hover:from-violet-100 hover:to-fuchsia-100 hover:shadow-md hover:shadow-violet-200/30 transition-all duration-200 hover:scale-105"
+                    >
+                      <Icon name="Sparkles" size={17} className="text-violet-600 group-hover:text-violet-700 transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="font-medium">
+                    Промт-помощник
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
               <Button
                 variant={isAuthenticated ? 'default' : 'outline'}
                 size="sm"
