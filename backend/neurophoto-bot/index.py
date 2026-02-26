@@ -849,12 +849,14 @@ def text_model_keyboard():
     return {'inline_keyboard': buttons}
 
 
-def img_model_keyboard():
+def img_model_keyboard(multi_only=False):
     buttons = []
     row = []
     for key, info in MODELS.items():
         mode = info.get('mode', '')
         if mode in ('img2img', 'both'):
+            if multi_only and not info.get('multi_photo'):
+                continue
             row.append({'text': info['name'], 'callback_data': f'model:{key}'})
             if len(row) == 2:
                 buttons.append(row)
@@ -1149,33 +1151,26 @@ def handler(event, context):
                 )
                 cur2.close()
 
-                user = get_user(conn, tid, uname, fname)
-                model_key = user.get('model', DEFAULT_MODEL)
-                model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
-                supports_multi = model_info.get('multi_photo', False)
-
-                set_session_album(conn, tid, 'waiting_album_prompt', media_group_id)
-
-                if supports_multi:
+                caption = message.get('caption', '').strip()
+                set_session_album(conn, tid, 'album_choose_model', media_group_id)
+                if caption:
+                    cur_cap = conn.cursor()
+                    cur_cap.execute(
+                        f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                        (caption[:500], tid)
+                    )
+                    cur_cap.close()
                     send_msg(chat_id,
-                        f'📸 Получаю несколько фото! Модель <b>{model_info["name"]}</b> умеет объединять их.\n\n'
-                        f'✍️ Напишите, что сделать с этими фотографиями.\n\n'
-                        f'<i>Например: Объедини в коллаж, Совмести лица, Сделай одну картинку из двух</i>',
-                        reply_markup={'inline_keyboard': [
-                            [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
-                        ]}
+                        f'📸 <b>Получено несколько фото!</b>\n'
+                        f'✍️ Промпт: <i>{caption[:150]}</i>\n\n'
+                        f'🤖 Выберите нейросеть для обработки:',
+                        reply_markup=img_model_keyboard(multi_only=True)
                     )
                 else:
-                    multi_names = ', '.join(MODELS[k]['name'] for k in MULTI_PHOTO_MODELS)
                     send_msg(chat_id,
-                        f'📸 Получила несколько фото, но модель <b>{model_info["name"]}</b> работает только с одним.\n\n'
-                        f'Модели с поддержкой нескольких фото:\n{multi_names}\n\n'
-                        f'Переключить модель и написать промпт?',
-                        reply_markup={'inline_keyboard': [
-                            [{'text': m['name'], 'callback_data': f'switch_multi:{k}'}] for k, m in MODELS.items() if m.get('multi_photo')
-                        ] + [
-                            [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
-                        ]}
+                        '📸 <b>Получено несколько фото!</b>\n\n'
+                        '🤖 Выберите нейросеть для обработки:',
+                        reply_markup=img_model_keyboard(multi_only=True)
                     )
             return ok()
 
@@ -1552,7 +1547,37 @@ def handle_callback(callback):
             state = user.get('state', '') or ''
             saved_prompt = user.get('photo', '')
 
-            if state == 'caption_choose_model' and saved_prompt:
+            if state == 'album_choose_model':
+                mg = user.get('media_group', '')
+                saved_caption = user.get('photo', '')
+                user['model'] = model_key
+                set_model(conn, tid, model_key)
+                model_info = MODELS[model_key]
+                if saved_caption and mg:
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                    tg('editMessageText', {
+                        'chat_id': chat_id,
+                        'message_id': msg_id,
+                        'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                        'parse_mode': 'HTML'
+                    })
+                    cdn_urls = get_album_photos(conn, tid, mg)
+                    if len(cdn_urls) < 2:
+                        send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
+                        set_session(conn, tid, None)
+                    else:
+                        do_generate(conn, chat_id, tid, user, saved_caption, photo_cdn_urls=cdn_urls)
+                else:
+                    set_session_album(conn, tid, 'waiting_album_prompt', mg)
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
+                    tg('editMessageText', {
+                        'chat_id': chat_id,
+                        'message_id': msg_id,
+                        'text': f'✅ Модель: <b>{model_info["name"]}</b>\n\n✍️ Напишите, что сделать с этими фотографиями.\n\n<i>Например: Объедини в коллаж, Совмести лица, Сделай одну картинку из двух</i>',
+                        'parse_mode': 'HTML',
+                        'reply_markup': {'inline_keyboard': [[{'text': '🏠 Отмена', 'callback_data': 'go_start'}]]}
+                    })
+            elif state == 'caption_choose_model' and saved_prompt:
                 saved_caption = user.get('media_group', '') or ''
                 if saved_caption:
                     user['model'] = model_key
