@@ -197,6 +197,26 @@ def get_db():
     return c
 
 
+def is_update_processed(conn, update_id):
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT 1 FROM {SCHEMA}.neurophoto_processed_updates WHERE update_id = %s",
+        (update_id,)
+    )
+    exists = cur.fetchone() is not None
+    cur.close()
+    return exists
+
+
+def mark_update_processed(conn, update_id):
+    cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.neurophoto_processed_updates (update_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (update_id,)
+    )
+    cur.close()
+
+
 def tg(method, data=None):
     url = f'https://api.telegram.org/bot{BOT_TOKEN}/{method}'
     if data:
@@ -601,6 +621,19 @@ def after_gen_keyboard():
 
 
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT session_state FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+        (tid,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    if row and row[0] == 'generating':
+        send_msg(chat_id, '⏳ Предыдущая генерация ещё выполняется. Дождитесь результата.')
+        return
+
+    set_session(conn, tid, 'generating')
+
     model_key = user.get('model', DEFAULT_MODEL)
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
 
@@ -610,7 +643,7 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
     img_bytes, err = generate_image(model_key, prompt, photo_bytes)
 
     if err:
-        send_msg(chat_id, f'❌ {err}')
+        send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
         set_session(conn, tid, None)
         return
 
@@ -638,6 +671,8 @@ def handler(event, context):
 
     body = json.loads(event.get('body', '{}'))
 
+    update_id = body.get('update_id')
+
     callback = body.get('callback_query')
     if callback:
         return handle_callback(callback)
@@ -654,6 +689,30 @@ def handler(event, context):
 
     conn = get_db()
     try:
+        if update_id and is_update_processed(conn, update_id):
+            return ok()
+        if update_id:
+            mark_update_processed(conn, update_id)
+
+        media_group_id = message.get('media_group_id')
+        if media_group_id:
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT 1 FROM {SCHEMA}.neurophoto_processed_updates WHERE update_id = -%s",
+                (abs(hash(media_group_id)) % 2147483647,)
+            )
+            already_replied = cur.fetchone() is not None
+            cur.close()
+            if not already_replied:
+                cur2 = conn.cursor()
+                cur2.execute(
+                    f"INSERT INTO {SCHEMA}.neurophoto_processed_updates (update_id) VALUES (-%s) ON CONFLICT DO NOTHING",
+                    (abs(hash(media_group_id)) % 2147483647,)
+                )
+                cur2.close()
+                send_msg(chat_id, '📸 Вижу несколько фото! Отправьте, пожалуйста, <b>одно фото</b> — я его обработаю.\n\nЕсли хотите сразу отредактировать — отправьте одно фото с подписью.')
+            return ok()
+
         user = get_user(conn, tid, uname, fname)
 
         if text == '/start':
