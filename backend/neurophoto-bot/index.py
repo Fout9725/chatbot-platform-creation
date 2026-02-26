@@ -732,7 +732,7 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
     t.start()
 
 
-def handle_internal_generate(body):
+def _generate_worker(body):
     chat_id = body['chat_id']
     tid = body['tid']
     prompt = body['prompt']
@@ -742,53 +742,69 @@ def handle_internal_generate(body):
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
     print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}')
 
-    photo_bytes = None
-    extra_photos = None
-
-    if cdn_urls:
-        all_bytes = []
-        for url in cdn_urls:
-            data = download_url(url)
-            if data:
-                all_bytes.append(compress_photo(data))
-            else:
-                print(f'[GEN] Failed to download: {url[:80]}')
-        if all_bytes:
-            photo_bytes = all_bytes[0]
-            if len(all_bytes) > 1:
-                extra_photos = all_bytes[1:]
-        print(f'[GEN] Downloaded {len(all_bytes)} photos, sizes: {[len(b) for b in all_bytes]}')
-
-    img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
-
-    conn = get_db()
     try:
-        if err:
-            print(f'[GEN] Error: {err}')
-            send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
-            set_session(conn, tid, None)
-            return ok()
+        photo_bytes = None
+        extra_photos = None
 
-        user = get_user(conn, tid, '', '')
-        left = remaining(user) - 1
-        caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
-        kb = after_gen_keyboard()
+        if cdn_urls:
+            all_bytes = []
+            for url in cdn_urls:
+                data = download_url(url)
+                if data:
+                    all_bytes.append(compress_photo(data))
+                else:
+                    print(f'[GEN] Failed to download: {url[:80]}')
+            if all_bytes:
+                photo_bytes = all_bytes[0]
+                if len(all_bytes) > 1:
+                    extra_photos = all_bytes[1:]
+            print(f'[GEN] Downloaded {len(all_bytes)} photos, sizes: {[len(b) for b in all_bytes]}')
 
-        print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
-        res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
-        print(f'[GEN] send_photo_bytes ok={res.get("ok")}')
+        img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos)
 
-        cdn_url = ''
+        conn = get_db()
         try:
-            fname_out = f'{tid}_{int(time.time())}.png'
-            cdn_url = upload_s3(img_bytes_result, fname_out)
-        except Exception as e:
-            print(f'[S3] Upload failed: {e}')
+            if err:
+                print(f'[GEN] Error: {err}')
+                send_msg(chat_id, f'❌ Ошибка генерации: {err}\n\nМодель: {model_info["name"]}\nПопробуйте другой промпт или смените модель.')
+                set_session(conn, tid, None)
+                return
 
-        record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-        set_session(conn, tid, 'after_gen', cdn_url or 'generated')
-    finally:
-        conn.close()
+            user = get_user(conn, tid, '', '')
+            left = remaining(user) - 1
+            caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
+            kb = after_gen_keyboard()
+
+            print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
+            res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
+            print(f'[GEN] send_photo_bytes ok={res.get("ok")}')
+
+            cdn_url = ''
+            try:
+                fname_out = f'{tid}_{int(time.time())}.png'
+                cdn_url = upload_s3(img_bytes_result, fname_out)
+            except Exception as e:
+                print(f'[S3] Upload failed: {e}')
+
+            record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
+            set_session(conn, tid, 'after_gen', cdn_url or 'generated')
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f'[GEN-THREAD] Fatal error: {e}')
+        try:
+            send_msg(chat_id, '❌ Произошла ошибка при генерации. Попробуйте ещё раз.')
+            c = get_db()
+            set_session(c, tid, None)
+            c.close()
+        except Exception:
+            pass
+
+
+def handle_internal_generate(body):
+    print(f'[HANDLER] Internal generate — launching background thread')
+    t = threading.Thread(target=_generate_worker, args=(body,))
+    t.start()
     return ok()
 
 
