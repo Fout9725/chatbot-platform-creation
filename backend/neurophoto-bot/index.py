@@ -369,7 +369,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
     body = {
         'model': api_model,
         'prompt': prompt,
-        'response_format': 'b64_json'
+        'response_format': 'url'
     }
 
     if photo_urls and len(photo_urls) > 0:
@@ -386,6 +386,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
                 body[f'image{i + 2}_url'] = f'data:image/jpeg;base64,{b64_extra}'
 
     payload = json.dumps(body).encode('utf-8')
+    print(f'[VSEGPT] Request payload size: {len(payload)} bytes, model: {api_model}')
 
     req = urllib.request.Request(
         'https://api.vsegpt.ru/v1/images/generations',
@@ -402,25 +403,28 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, phot
             result = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8') if e.fp else ''
+        print(f'[VSEGPT] HTTP error {e.code}: {err_body[:300]}')
         return None, f'VseGPT error {e.code}: {err_body[:200]}'
     except Exception as e:
+        print(f'[VSEGPT] Exception: {str(e)}')
         return None, f'Ошибка соединения: {str(e)[:100]}'
 
+    print(f'[VSEGPT] Response keys: {list(result.keys())}')
     data_list = result.get('data', [])
     if not data_list:
+        print(f'[VSEGPT] Empty data. Full response: {json.dumps(result)[:500]}')
         return None, 'Пустой ответ от VseGPT. Попробуйте другой промпт.'
 
     item = data_list[0]
+    print(f'[VSEGPT] Item keys: {list(item.keys())}')
+
+    url_val = item.get('url', '')
+    if url_val:
+        return ('url', url_val), None
 
     b64_data = item.get('b64_json', '')
     if b64_data:
         return base64.b64decode(b64_data), None
-
-    url_val = item.get('url', '')
-    if url_val:
-        img_data = download_url(url_val)
-        if img_data:
-            return img_data, None
 
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
@@ -715,18 +719,31 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
         set_session(conn, tid, None)
         return
 
-    fname_out = f'{tid}_{int(time.time())}.png'
-    cdn_url = upload_s3(img_bytes_result, fname_out)
-
     left = remaining(user) - 1
     caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
     kb = after_gen_keyboard()
-    res = send_photo_url(chat_id, cdn_url, caption, reply_markup=kb)
-    if not res.get('ok'):
-        send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
 
-    record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-    set_session(conn, tid, 'after_gen', cdn_url)
+    if isinstance(img_bytes_result, tuple) and img_bytes_result[0] == 'url':
+        result_url = img_bytes_result[1]
+        print(f'[RESULT] Sending URL directly: {result_url[:100]}')
+        res = send_photo_url(chat_id, result_url, caption, reply_markup=kb)
+        if not res.get('ok'):
+            print(f'[RESULT] send_photo_url failed: {res}')
+            img_data = download_url(result_url)
+            if img_data:
+                send_photo_bytes(chat_id, img_data, caption, reply_markup=kb)
+            else:
+                send_msg(chat_id, f'❌ Не удалось отправить фото. Ссылка: {result_url}')
+        record_gen(conn, tid, prompt, model_key, result_url, user['paid'] > 0)
+        set_session(conn, tid, 'after_gen', result_url)
+    else:
+        fname_out = f'{tid}_{int(time.time())}.png'
+        cdn_url = upload_s3(img_bytes_result, fname_out)
+        res = send_photo_url(chat_id, cdn_url, caption, reply_markup=kb)
+        if not res.get('ok'):
+            send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
+        record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
+        set_session(conn, tid, 'after_gen', cdn_url)
 
 
 def handler(event, context):
