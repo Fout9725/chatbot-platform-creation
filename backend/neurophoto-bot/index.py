@@ -218,15 +218,17 @@ def send_msg(chat_id, text, reply_markup=None):
     return tg('sendMessage', d)
 
 
-def send_photo_url(chat_id, photo_url, caption=''):
+def send_photo_url(chat_id, photo_url, caption='', reply_markup=None):
     d = {'chat_id': chat_id, 'photo': photo_url}
     if caption:
         d['caption'] = caption
         d['parse_mode'] = 'HTML'
+    if reply_markup:
+        d['reply_markup'] = reply_markup
     return tg('sendPhoto', d)
 
 
-def send_photo_bytes(chat_id, img_bytes, caption=''):
+def send_photo_bytes(chat_id, img_bytes, caption='', reply_markup=None):
     boundary = f'----NeuroBotBoundary{int(time.time())}'
     body = b''
     body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode()
@@ -236,6 +238,8 @@ def send_photo_bytes(chat_id, img_bytes, caption=''):
     if caption:
         body += f'--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{caption}\r\n'.encode()
         body += f'--{boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n'.encode()
+    if reply_markup:
+        body += f'--{boundary}\r\nContent-Disposition: form-data; name="reply_markup"\r\n\r\n{json.dumps(reply_markup)}\r\n'.encode()
     body += f'--{boundary}--\r\n'.encode()
 
     req = urllib.request.Request(
@@ -589,6 +593,13 @@ def start_keyboard():
     ]}
 
 
+def after_gen_keyboard():
+    return {'inline_keyboard': [
+        [{'text': '✏️ Редактировать', 'callback_data': 'after_edit'}, {'text': '🎨 Сменить дизайн', 'callback_data': 'after_redesign'}],
+        [{'text': '🤖 Сменить модель', 'callback_data': 'show_models'}, {'text': '🏠 На главную', 'callback_data': 'go_start'}]
+    ]}
+
+
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
     model_key = user.get('model', DEFAULT_MODEL)
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
@@ -608,12 +619,13 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None):
 
     left = remaining(user) - 1
     caption = f'✨ Готово! Модель: {model_info["name"]}\n💎 Осталось: <b>{left}</b>'
-    res = send_photo_url(chat_id, cdn_url, caption)
+    kb = after_gen_keyboard()
+    res = send_photo_url(chat_id, cdn_url, caption, reply_markup=kb)
     if not res.get('ok'):
-        send_photo_bytes(chat_id, img_bytes, caption)
+        send_photo_bytes(chat_id, img_bytes, caption, reply_markup=kb)
 
     record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-    set_session(conn, tid, None)
+    set_session(conn, tid, 'after_gen', cdn_url)
 
 
 def handler(event, context):
@@ -928,5 +940,64 @@ def handle_callback(callback):
                 [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
             ]}
         })
+        return ok()
+
+    if cb_data == 'after_edit':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            photo_url = user.get('photo')
+            if photo_url and user.get('state') == 'after_gen':
+                set_session(conn, tid, 'waiting_prompt', photo_url)
+                send_msg(chat_id,
+                    '✏️ <b>Редактирование</b>\n\n'
+                    'Напишите, что изменить на этой картинке.\n\n'
+                    '<i>Например: Добавь закат на фоне, Сделай ярче, Убери фон</i>',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+                    ]}
+                )
+            else:
+                send_msg(chat_id,
+                    '📸 Отправьте фото, которое хотите отредактировать.',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '🏠 На главную', 'callback_data': 'go_start'}]
+                    ]}
+                )
+        finally:
+            conn.close()
+        return ok()
+
+    if cb_data == 'after_redesign':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            photo_url = user.get('photo')
+            if photo_url and user.get('state') == 'after_gen':
+                set_session(conn, tid, 'waiting_prompt', photo_url)
+                send_msg(chat_id,
+                    '🎨 <b>Сменить дизайн</b>\n\n'
+                    'Опишите новый стиль для этой картинки.\n\n'
+                    '<i>Например: В стиле аниме, Как масляная картина, В стиле киберпанк, Акварель</i>',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
+                    ]}
+                )
+            else:
+                send_msg(chat_id,
+                    '📸 Отправьте фото для смены дизайна.',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '🏠 На главную', 'callback_data': 'go_start'}]
+                    ]}
+                )
+        finally:
+            conn.close()
+        return ok()
 
     return ok()
