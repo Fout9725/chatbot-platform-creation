@@ -396,6 +396,13 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None):
     if photo_bytes:
         b64 = base64.b64encode(photo_bytes).decode('utf-8')
         body['image_url'] = f'data:image/jpeg;base64,{b64}'
+    elif api_model.startswith('img2img-'):
+        blank = Image.new('RGB', (512, 512), (255, 255, 255))
+        buf = io.BytesIO()
+        blank.save(buf, format='JPEG', quality=50)
+        b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        body['image_url'] = f'data:image/jpeg;base64,{b64}'
+        print(f'[VSEGPT] No input photo, using blank white image for {api_model}')
     if extra_photos:
         for i, extra_bytes in enumerate(extra_photos):
             b64_extra = base64.b64encode(extra_bytes).decode('utf-8')
