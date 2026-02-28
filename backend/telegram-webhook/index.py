@@ -75,7 +75,7 @@ def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bo
             method='POST'
         )
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read().decode('utf-8'))
             choices = result.get('choices', [])
             if choices and choices[0].get('message', {}).get('content'):
@@ -376,7 +376,7 @@ def handle_webhook(event):
             pass
 
         response_text = None
-        FALLBACK_MODELS = ['google/gemini-2.0-flash-exp:free', 'qwen/qwen3-235b-a22:free', 'mistralai/mistral-small-3.1-24b-instruct:free']
+        FALLBACK_MODELS = ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat-v3-0324:free']
 
         kb_context = None
         if ai_model and ai_model != 'groq':

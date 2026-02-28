@@ -1,0 +1,2 @@
+UPDATE t_p60354232_chatbot_platform_cre.bots SET ai_model = 'meta-llama/llama-3.3-70b-instruct:free' WHERE id = 2;
+UPDATE t_p60354232_chatbot_platform_cre.bots SET ai_model = 'meta-llama/llama-3.3-70b-instruct:free' WHERE id = 9;
