@@ -6,7 +6,7 @@ import base64
 import time
 import urllib.request
 import urllib.error
-import threading
+
 import psycopg2
 import boto3
 from PIL import Image
@@ -14,7 +14,6 @@ import io
 
 SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 'public')
 BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
-SELF_URL = 'https://functions.poehali.dev/1be088c2-be07-4761-a09f-12486000897f'
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
 OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
@@ -927,120 +926,85 @@ def after_gen_keyboard():
     ]}
 
 
-def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
-    payload = {
-        '_internal': 'generate',
-        'chat_id': chat_id,
-        'tid': tid,
-        'prompt': prompt,
-        'model_key': model_key,
-    }
-
-    if photo_cdn_urls:
-        payload['cdn_urls'] = photo_cdn_urls
-    elif photo_bytes:
-        compressed = compress_photo(photo_bytes)
-        fname_tmp = f'tmp_{tid}_{int(time.time())}_0.jpg'
-        cdn = upload_s3(compressed, fname_tmp)
-        urls = [cdn]
-        if extra_photos:
-            for i, ep in enumerate(extra_photos):
-                comp = compress_photo(ep)
-                fn = f'tmp_{tid}_{int(time.time())}_{i+1}.jpg'
-                urls.append(upload_s3(comp, fn))
-        payload['cdn_urls'] = urls
-
-    data = json.dumps(payload).encode('utf-8')
-    print(f'[ASYNC] Firing generate: tid={tid}, model={model_key}, payload={len(data)} bytes')
-
-    import socket
-    try:
-        req = urllib.request.Request(SELF_URL, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-        urllib.request.urlopen(req, timeout=1)
-    except (socket.timeout, urllib.error.URLError, Exception) as e:
-        print(f'[ASYNC] fire sent (timeout expected): {type(e).__name__}')
-    print(f'[ASYNC] Fire complete, returning to caller')
-
-
-def _generate_worker(body):
-    chat_id = body['chat_id']
-    tid = body['tid']
-    prompt = body['prompt']
-    model_key = body['model_key']
-    cdn_urls = body.get('cdn_urls', [])
-
+def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
-    print(f'[GEN] Starting: tid={tid}, model={model_key}, cdn_urls={len(cdn_urls)}')
+    print(f'[GEN] Starting inline: tid={tid}, model={model_key}, has_photo={photo_bytes is not None}, cdn_urls={len(photo_cdn_urls) if photo_cdn_urls else 0}')
 
     try:
-        photo_bytes = None
-        extra_photos = None
+        gen_photo = photo_bytes
+        gen_extra = extra_photos
         vsegpt_cdn = None
 
-        if cdn_urls and model_info['provider'] == 'gemini':
+        if photo_cdn_urls and model_info['provider'] == 'gemini':
             all_bytes = []
-            for url in cdn_urls:
+            for url in photo_cdn_urls:
                 data = download_url(url)
                 if data:
                     all_bytes.append(compress_photo(data))
                 else:
                     print(f'[GEN] Failed to download: {url[:80]}')
             if all_bytes:
-                photo_bytes = all_bytes[0]
+                gen_photo = all_bytes[0]
                 if len(all_bytes) > 1:
-                    extra_photos = all_bytes[1:]
+                    gen_extra = all_bytes[1:]
             print(f'[GEN] Downloaded {len(all_bytes)} photos for Gemini')
-        elif cdn_urls and model_info['provider'] != 'gemini':
-            vsegpt_cdn = cdn_urls
-            print(f'[GEN] Passing {len(cdn_urls)} CDN URLs directly to VseGPT')
+        elif photo_cdn_urls and model_info['provider'] != 'gemini':
+            vsegpt_cdn = photo_cdn_urls
+            print(f'[GEN] Passing {len(photo_cdn_urls)} CDN URLs directly to VseGPT')
+        elif photo_bytes and model_info['provider'] != 'gemini':
+            compressed = compress_photo(photo_bytes)
+            fname_tmp = f'tmp_{tid}_{int(time.time())}_0.jpg'
+            cdn = upload_s3(compressed, fname_tmp)
+            vsegpt_cdn = [cdn]
+            if extra_photos:
+                for i, ep in enumerate(extra_photos):
+                    comp = compress_photo(ep)
+                    fn = f'tmp_{tid}_{int(time.time())}_{i+1}.jpg'
+                    vsegpt_cdn.append(upload_s3(comp, fn))
+            gen_photo = None
+            gen_extra = None
+            print(f'[GEN] Uploaded {len(vsegpt_cdn)} photos to CDN for VseGPT')
 
-        img_bytes_result, err = generate_image(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=vsegpt_cdn)
+        img_bytes_result, err = generate_image(model_key, prompt, gen_photo, extra_photos=gen_extra, cdn_urls=vsegpt_cdn)
 
-        conn = get_db()
+        if err:
+            print(f'[GEN] Error: {err}')
+            send_msg(chat_id, f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438: {err}\n\n\u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043e\u0439 \u043f\u0440\u043e\u043c\u043f\u0442 \u0438\u043b\u0438 \u0441\u043c\u0435\u043d\u0438\u0442\u0435 \u043c\u043e\u0434\u0435\u043b\u044c.')
+            set_session(conn, tid, None)
+            return
+
+        user = get_user(conn, tid, '', '')
+        left = remaining(user) - 1
+        caption = f'\u2728 \u0413\u043e\u0442\u043e\u0432\u043e! \u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\ud83d\udc8e \u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c: <b>{left}</b>'
+        kb = after_gen_keyboard()
+
+        print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
+        res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
+        print(f'[GEN] send_photo_bytes result ok={res.get("ok")}')
+        if not res.get('ok'):
+            fname_fb = f'{tid}_{int(time.time())}_fb.png'
+            cdn_fb = upload_s3(img_bytes_result, fname_fb)
+            print(f'[GEN] Fallback: sending as URL {cdn_fb[:60]}')
+            res2 = send_photo_url(chat_id, cdn_fb, caption, reply_markup=kb)
+            if not res2.get('ok'):
+                send_msg(chat_id, f'❌ Картинка сгенерирована, но не удалось отправить.\nПричина: {res.get("error", res.get("description", "неизвестно"))[:200]}')
+
+        cdn_url = ''
         try:
-            if err:
-                print(f'[GEN] Error: {err}')
-                send_msg(chat_id, f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438: {err}\n\n\u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043e\u0439 \u043f\u0440\u043e\u043c\u043f\u0442 \u0438\u043b\u0438 \u0441\u043c\u0435\u043d\u0438\u0442\u0435 \u043c\u043e\u0434\u0435\u043b\u044c.')
-                set_session(conn, tid, None)
-                return
+            fname_out = f'{tid}_{int(time.time())}.png'
+            cdn_url = upload_s3(img_bytes_result, fname_out)
+        except Exception as e:
+            print(f'[S3] Upload failed: {e}')
 
-            user = get_user(conn, tid, '', '')
-            left = remaining(user) - 1
-            caption = f'\u2728 \u0413\u043e\u0442\u043e\u0432\u043e! \u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\ud83d\udc8e \u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c: <b>{left}</b>'
-            kb = after_gen_keyboard()
-
-            print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
-            res = send_photo_bytes(chat_id, img_bytes_result, caption, reply_markup=kb)
-            print(f'[GEN] send_photo_bytes result={json.dumps(res, ensure_ascii=False)[:300]}')
-            if not res.get('ok'):
-                send_msg(chat_id, f'❌ Картинка сгенерирована ({len(img_bytes_result)} байт), но не удалось отправить в Telegram.\nПричина: {res.get("error", res.get("description", "неизвестно"))[:200]}')
-
-            cdn_url = ''
-            try:
-                fname_out = f'{tid}_{int(time.time())}.png'
-                cdn_url = upload_s3(img_bytes_result, fname_out)
-            except Exception as e:
-                print(f'[S3] Upload failed: {e}')
-
-            record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
-            set_session(conn, tid, 'after_gen', cdn_url or 'generated')
-        finally:
-            conn.close()
+        record_gen(conn, tid, prompt, model_key, cdn_url, user['paid'] > 0)
+        set_session(conn, tid, 'after_gen', cdn_url or 'generated')
     except Exception as e:
-        print(f'[GEN-THREAD] Fatal error: {e}')
+        print(f'[GEN] Fatal error: {type(e).__name__}: {e}')
         try:
             send_msg(chat_id, '\u274c \u041f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.')
-            c = get_db()
-            set_session(c, tid, None)
-            c.close()
+            set_session(conn, tid, None)
         except Exception:
             pass
-
-
-def handle_internal_generate(body):
-    print(f'[HANDLER] Internal generate — running synchronously (120s timeout)')
-    _generate_worker(body)
-    return ok()
 
 
 def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
@@ -1064,14 +1028,14 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
     if photo_cdn_urls:
         send_msg(chat_id, f'🎨 Генерирую из {len(photo_cdn_urls)} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
-        fire_async_generate(chat_id, tid, prompt, model_key, photo_cdn_urls=photo_cdn_urls)
     else:
         photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
         if photo_count > 1:
             send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
         else:
             send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
-        fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes, extra_photos)
+
+    run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes, extra_photos, photo_cdn_urls)
 
 
 def handler(event, context):
@@ -1085,8 +1049,18 @@ def handler(event, context):
     body = json.loads(event.get('body', '{}'))
 
     if body.get('_internal') == 'generate':
-        print('[HANDLER] Internal generate request')
-        return handle_internal_generate(body)
+        print('[HANDLER] Internal generate request (legacy)')
+        chat_id = body['chat_id']
+        tid = body['tid']
+        prompt = body['prompt']
+        model_key = body['model_key']
+        cdn_urls = body.get('cdn_urls', [])
+        conn = get_db()
+        try:
+            run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_cdn_urls=cdn_urls if cdn_urls else None)
+        finally:
+            conn.close()
+        return ok()
 
     update_id = body.get('update_id')
 
