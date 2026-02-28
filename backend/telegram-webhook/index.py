@@ -29,15 +29,35 @@ def get_db():
     return conn
 
 
+import re
+
+def md_to_html(text):
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    text = re.sub(r'__(.+?)__', r'<b>\1</b>', text)
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
+    text = re.sub(r'(?<!_)_(?!_)(.+?)(?<!_)_(?!_)', r'<i>\1</i>', text)
+    text = re.sub(r'```[\w]*\n?(.*?)```', r'<pre>\1</pre>', text, flags=re.DOTALL)
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    text = re.sub(r'^#{1,6}\s+(.+)$', r'<b>\1</b>', text, flags=re.MULTILINE)
+    return text
+
+
 def send_telegram_message(bot_token, chat_id, text):
     url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
-    data = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}).encode('utf-8')
+    html_text = md_to_html(text)
+    data = json.dumps({'chat_id': chat_id, 'text': html_text, 'parse_mode': 'HTML'}).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     try:
         urllib.request.urlopen(req, timeout=10)
         return True
     except Exception:
-        return False
+        data2 = json.dumps({'chat_id': chat_id, 'text': text}).encode('utf-8')
+        req2 = urllib.request.Request(url, data=data2, headers={'Content-Type': 'application/json'})
+        try:
+            urllib.request.urlopen(req2, timeout=10)
+            return True
+        except Exception:
+            return False
 
 
 def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bot_token_for_key):
