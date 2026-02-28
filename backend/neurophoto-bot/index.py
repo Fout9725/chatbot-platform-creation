@@ -628,6 +628,15 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
     if b64_data:
         return base64.b64decode(b64_data), None
 
+    img_url = item.get('url', '')
+    if img_url:
+        print(f'[VSEGPT] Got URL response, downloading: {img_url[:100]}')
+        img_data = download_url(img_url)
+        if img_data:
+            return img_data, None
+        return None, 'Не удалось скачать изображение по ссылке от VseGPT.'
+
+    print(f'[VSEGPT] No b64_json or url in item. Keys: {list(item.keys())}, values preview: {str(item)[:300]}')
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
 
@@ -944,15 +953,13 @@ def fire_async_generate(chat_id, tid, prompt, model_key, photo_bytes=None, extra
     data = json.dumps(payload).encode('utf-8')
     print(f'[ASYNC] Firing generate: tid={tid}, model={model_key}, payload={len(data)} bytes')
 
-    def _fire():
-        try:
-            req = urllib.request.Request(SELF_URL, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-            urllib.request.urlopen(req, timeout=115)
-        except Exception as e:
-            print(f'[ASYNC] fire error: {type(e).__name__}: {e}')
-
-    t = threading.Thread(target=_fire, daemon=True)
-    t.start()
+    import socket
+    try:
+        req = urllib.request.Request(SELF_URL, data=data, headers={'Content-Type': 'application/json'}, method='POST')
+        urllib.request.urlopen(req, timeout=1)
+    except (socket.timeout, urllib.error.URLError, Exception) as e:
+        print(f'[ASYNC] fire sent (timeout expected): {type(e).__name__}')
+    print(f'[ASYNC] Fire complete, returning to caller')
 
 
 def _generate_worker(body):
