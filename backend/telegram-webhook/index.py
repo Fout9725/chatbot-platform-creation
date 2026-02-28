@@ -1,4 +1,4 @@
-"""Обработчик Telegram: подключение бота (connect) и приём сообщений (webhook)"""
+"""Обработчик Telegram: подключение бота (connect) и приём сообщений"""
 
 import json
 import os
@@ -40,27 +40,16 @@ def send_telegram_message(bot_token, chat_id, text):
         return False
 
 
-def call_ml_chat(bot_id, message, ml_chat_url):
-    try:
-        data = json.dumps({"bot_id": bot_id, "message": message}).encode('utf-8')
-        req = urllib.request.Request(ml_chat_url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-            return result.get('content')
-    except Exception:
-        return None
-
-
 def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bot_token_for_key):
-    """Вызывает OpenRouter API для генерации ответа через выбранную AI модель"""
     api_key = os.environ.get('OPENROUTER_API_KEY', '')
     if not api_key:
+        print('[OPENROUTER] No API key')
         return None
 
     try:
-        system_content = system_prompt or 'You are a helpful assistant.'
+        system_content = system_prompt or 'Ты — полезный ассистент. Отвечай на русском языке.'
         if knowledge_context:
-            system_content += f'\n\nRelevant knowledge base context:\n{knowledge_context}'
+            system_content += f'\n\nИспользуй следующую информацию из базы знаний для ответа:\n{knowledge_context}\n\nОтвечай на основе этой информации. Если в базе знаний нет точного ответа, используй эту информацию как контекст и ответь максимально полезно.'
 
         messages = [
             {'role': 'system', 'content': system_content},
@@ -69,8 +58,12 @@ def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bo
 
         payload = json.dumps({
             'model': model_id,
-            'messages': messages
+            'messages': messages,
+            'max_tokens': 2000,
+            'temperature': 0.7
         }).encode('utf-8')
+
+        print(f'[OPENROUTER] Calling model={model_id}, msg={message_text[:80]}, kb={len(knowledge_context) if knowledge_context else 0} chars')
 
         req = urllib.request.Request(
             'https://openrouter.ai/api/v1/chat/completions',
@@ -82,46 +75,109 @@ def call_openrouter(model_id, message_text, system_prompt, knowledge_context, bo
             method='POST'
         )
 
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read().decode('utf-8'))
             choices = result.get('choices', [])
             if choices and choices[0].get('message', {}).get('content'):
-                return choices[0]['message']['content']
+                content = choices[0]['message']['content'].strip()
+                print(f'[OPENROUTER] Got response: {len(content)} chars')
+                return content
+            print(f'[OPENROUTER] Empty choices. Response keys: {list(result.keys())}')
+            err = result.get('error', {})
+            if err:
+                print(f'[OPENROUTER] API error: {err}')
         return None
-    except Exception:
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8')[:500] if e.fp else ''
+        print(f'[OPENROUTER] HTTP {e.code}: {err_body}')
+        return None
+    except Exception as e:
+        print(f'[OPENROUTER] Exception: {type(e).__name__}: {e}')
         return None
 
 
-def get_knowledge_response(bot_id, message_text, conn):
+def get_knowledge_context(bot_id, message_text, conn):
     try:
         cur = conn.cursor()
         cur.execute(
-            f"SELECT content FROM {SCHEMA}.knowledge_sources WHERE bot_id = %s AND status = 'ready' ORDER BY created_at DESC LIMIT 5",
+            f"SELECT content FROM {SCHEMA}.knowledge_sources WHERE bot_id = %s AND status = 'ready' AND content IS NOT NULL AND content != '' ORDER BY created_at DESC LIMIT 10",
+            (bot_id,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        if not rows:
+            print(f'[KB] No knowledge sources for bot_id={bot_id}')
+            return None
+
+        msg_lower = message_text.lower()
+        msg_words = [w for w in msg_lower.split() if len(w) > 2]
+        print(f'[KB] Found {len(rows)} sources, searching with words: {msg_words[:10]}')
+
+        scored_chunks = []
+        for row in rows:
+            content = row[0]
+            if not content:
+                continue
+            sentences = []
+            for sep in ['\n\n', '\n', '. ']:
+                if sep == '. ':
+                    sentences = content.split(sep)
+                else:
+                    parts = content.split(sep)
+                    for part in parts:
+                        if len(part.strip()) > 20:
+                            sentences.append(part.strip())
+                if len(sentences) > 3:
+                    break
+            if not sentences:
+                sentences = [content[i:i+500] for i in range(0, len(content), 400)]
+
+            for chunk in sentences:
+                chunk_lower = chunk.lower()
+                if len(chunk.strip()) < 10:
+                    continue
+                score = 0
+                for w in msg_words:
+                    if w in chunk_lower:
+                        score += 1
+                if score > 0:
+                    scored_chunks.append((score, chunk.strip()))
+
+        scored_chunks.sort(key=lambda x: -x[0])
+        top_chunks = scored_chunks[:5]
+
+        if not top_chunks:
+            all_content = '\n'.join([row[0][:2000] for row in rows if row[0]])
+            if len(all_content) > 4000:
+                all_content = all_content[:4000]
+            print(f'[KB] No word matches, sending full context ({len(all_content)} chars)')
+            return all_content
+
+        result = '\n\n'.join([c[1][:800] for c in top_chunks])
+        if len(result) > 4000:
+            result = result[:4000]
+        print(f'[KB] Found {len(top_chunks)} relevant chunks (best score={top_chunks[0][0]}), total {len(result)} chars')
+        return result
+    except Exception as e:
+        print(f'[KB] Exception: {e}')
+        return None
+
+
+def get_all_knowledge(bot_id, conn):
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT content FROM {SCHEMA}.knowledge_sources WHERE bot_id = %s AND status = 'ready' AND content IS NOT NULL AND content != '' ORDER BY created_at DESC LIMIT 10",
             (bot_id,)
         )
         rows = cur.fetchall()
         cur.close()
         if not rows:
             return None
-
-        msg_lower = message_text.lower()
-        best_score = 0
-        best_chunk = None
-        for row in rows:
-            if not row[0]:
-                continue
-            chunks = row[0].split('. ')
-            for chunk in chunks:
-                chunk_lower = chunk.lower()
-                words = msg_lower.split()
-                matches = sum(1 for w in words if len(w) > 3 and w in chunk_lower)
-                if matches > best_score:
-                    best_score = matches
-                    best_chunk = chunk.strip()
-
-        if best_score >= 2 and best_chunk:
-            return best_chunk[:1000]
-        return None
+        all_content = '\n\n'.join([row[0][:3000] for row in rows if row[0]])
+        if len(all_content) > 6000:
+            all_content = all_content[:6000]
+        return all_content
     except Exception:
         return None
 
@@ -226,10 +282,14 @@ def handle_connect(body):
                     headers={'Content-Type': 'application/json'}
                 )
                 with urllib.request.urlopen(req, timeout=10) as resp:
-                    wh_data = json.loads(resp.read().decode('utf-8'))
-                if wh_data.get('ok'):
-                    webhook_set = True
-                    cur.execute(f"UPDATE {SCHEMA}.bots SET webhook_url = %s WHERE id = %s", (webhook_url, db_bot_id))
+                    wh_result = json.loads(resp.read().decode('utf-8'))
+                    webhook_set = wh_result.get('ok', False)
+
+                if webhook_set:
+                    cur.execute(
+                        f"UPDATE {SCHEMA}.bots SET webhook_url = %s WHERE id = %s",
+                        (webhook_url, db_bot_id)
+                    )
             except Exception:
                 pass
 
@@ -238,9 +298,11 @@ def handle_connect(body):
             'headers': CORS_HEADERS,
             'body': json.dumps({
                 'ok': True,
-                'bot_id': db_bot_id,
-                'username': tg_username,
-                'webhook_set': webhook_set
+                'bot': {
+                    'id': db_bot_id,
+                    'username': tg_username,
+                    'webhook_set': webhook_set
+                }
             })
         }
     finally:
@@ -278,14 +340,19 @@ def handle_webhook(event):
 
     try:
         cur.execute(
-            f"SELECT id, name, ai_model, ai_prompt FROM {SCHEMA}.bots WHERE telegram_token = %s AND status = 'active' LIMIT 1",
+            f"""SELECT b.id, b.name, b.ai_model, b.ai_prompt,
+                       (SELECT COUNT(*) FROM {SCHEMA}.knowledge_sources ks WHERE ks.bot_id = b.id AND ks.status = 'ready') as kb_count
+                FROM {SCHEMA}.bots b
+                WHERE b.telegram_token = %s AND b.status = 'active'
+                ORDER BY kb_count DESC, b.updated_at DESC
+                LIMIT 1""",
             (bot_token,)
         )
         bot = cur.fetchone()
 
         if not bot:
             cur.execute(
-                f"SELECT id, name, ai_model, ai_prompt FROM {SCHEMA}.bots WHERE telegram_token = %s LIMIT 1",
+                f"SELECT id, name, ai_model, ai_prompt FROM {SCHEMA}.bots WHERE telegram_token = %s ORDER BY updated_at DESC LIMIT 1",
                 (bot_token,)
             )
             bot = cur.fetchone()
@@ -298,6 +365,8 @@ def handle_webhook(event):
         ai_model = bot.get('ai_model') or ''
         ai_prompt = bot.get('ai_prompt') or ''
 
+        print(f'[WEBHOOK] bot_id={bot_id}, model={ai_model}, msg={message_text[:50]}')
+
         try:
             cur.execute(
                 f"INSERT INTO {SCHEMA}.messages (bot_id, user_id, username, message_text) VALUES (%s, %s, %s, %s)",
@@ -308,20 +377,16 @@ def handle_webhook(event):
 
         response_text = None
 
-        # If bot has a real AI model set (not legacy 'groq' default), use OpenRouter
         if ai_model and ai_model != 'groq':
-            kb_context = get_knowledge_response(bot_id, message_text, conn)
+            kb_context = get_knowledge_context(bot_id, message_text, conn)
+            if not kb_context:
+                kb_context = get_all_knowledge(bot_id, conn)
             response_text = call_openrouter(ai_model, message_text, ai_prompt, kb_context, bot_token)
 
-        # Fallback chain: knowledge base -> ml-chat -> static fallback
         if not response_text:
-            kb_response = get_knowledge_response(bot_id, message_text, conn)
-            if kb_response:
-                response_text = kb_response
-
-        if not response_text:
-            ml_chat_url = 'https://functions.poehali.dev/23f5dcaf-616d-4957-922d-ef9968ec1662'
-            response_text = call_ml_chat(bot_id, message_text, ml_chat_url)
+            all_kb = get_all_knowledge(bot_id, conn)
+            if all_kb and ai_model and ai_model != 'groq':
+                response_text = call_openrouter(ai_model, message_text, ai_prompt, all_kb, bot_token)
 
         if not response_text:
             response_text = get_fallback_response(message_text)
