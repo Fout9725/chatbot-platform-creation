@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get tenders empty",
+      "method": "GET",
+      "path": "/?action=get_tenders&owner_id=test123",
+      "expectedStatus": 200
+    }
+  ]
+}

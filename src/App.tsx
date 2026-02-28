@@ -41,6 +41,9 @@ import VKAutomation from "./components/VKAutomation";
 import TikTokAutomation from "./components/TikTokAutomation";
 import Img2ImgEditor from "./pages/Img2ImgEditor";
 import PromptEngineer from "./pages/PromptEngineer";
+import ProcurementDashboard from "./pages/ProcurementDashboard";
+import ProcurementCreate from "./pages/ProcurementCreate";
+import ProcurementTender from "./pages/ProcurementTender";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +89,9 @@ const App = () => (
                 <Route path="/tiktok-automation" element={<TikTokAutomation />} />
                 <Route path="/img2img" element={<Img2ImgEditor />} />
                 <Route path="/prompt-engineer" element={<PromptEngineer />} />
+                <Route path="/procurement" element={<ProcurementDashboard />} />
+                <Route path="/procurement/create" element={<ProcurementCreate />} />
+                <Route path="/procurement/:id" element={<ProcurementTender />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
