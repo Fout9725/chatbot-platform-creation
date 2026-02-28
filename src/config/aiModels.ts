@@ -49,7 +49,7 @@ export const AI_MODELS: AIModel[] = [
     description: 'Компактная быстрая модель от Google'
   },
   {
-    id: 'deepseek/deepseek-r1-0528:free',
+    id: 'deepseek/deepseek-r1:free',
     name: 'DeepSeek R1',
     provider: 'OpenRouter',
     type: 'text',

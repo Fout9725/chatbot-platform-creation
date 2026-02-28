@@ -376,7 +376,9 @@ def handle_webhook(event):
             pass
 
         response_text = None
+        FALLBACK_MODELS = ['google/gemini-2.0-flash-exp:free', 'qwen/qwen3-235b-a22:free', 'mistralai/mistral-small-3.1-24b-instruct:free']
 
+        kb_context = None
         if ai_model and ai_model != 'groq':
             kb_context = get_knowledge_context(bot_id, message_text, conn)
             if not kb_context:
@@ -384,9 +386,15 @@ def handle_webhook(event):
             response_text = call_openrouter(ai_model, message_text, ai_prompt, kb_context, bot_token)
 
         if not response_text:
-            all_kb = get_all_knowledge(bot_id, conn)
-            if all_kb and ai_model and ai_model != 'groq':
-                response_text = call_openrouter(ai_model, message_text, ai_prompt, all_kb, bot_token)
+            if not kb_context:
+                kb_context = get_all_knowledge(bot_id, conn)
+            for fallback_model in FALLBACK_MODELS:
+                if fallback_model == ai_model:
+                    continue
+                print(f'[WEBHOOK] Trying fallback model: {fallback_model}')
+                response_text = call_openrouter(fallback_model, message_text, ai_prompt, kb_context, bot_token)
+                if response_text:
+                    break
 
         if not response_text:
             response_text = get_fallback_response(message_text)
