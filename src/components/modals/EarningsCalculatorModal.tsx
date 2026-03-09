@@ -185,7 +185,6 @@ export default function EarningsCalculatorModal({ isOpen, onClose }: EarningsCal
         <div className="flex gap-2">
           <Button
             type="button"
-            disabled={false}
             onClick={onClose}
             variant="outline"
             className="flex-1"
@@ -194,7 +193,6 @@ export default function EarningsCalculatorModal({ isOpen, onClose }: EarningsCal
           </Button>
           <Button
             type="button"
-            disabled={false}
             onClick={() => window.open('/partner', '_self')}
             className="flex-1"
           >

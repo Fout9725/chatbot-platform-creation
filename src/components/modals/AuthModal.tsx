@@ -130,7 +130,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  disabled={false}
                   variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
                   className="flex-1"
@@ -140,7 +139,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </Button>
                 <Button
                   type="button"
-                  disabled={false}
                   variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
                   className="flex-1"
@@ -152,7 +150,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               
               <Button
                 type="button"
-                disabled={false}
                 variant={isAdminMode ? 'default' : 'outline'}
                 onClick={() => setIsAdminMode(!isAdminMode)}
                 className="w-full"
@@ -211,7 +208,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <Button 
                 type="button"
-                disabled={false}
                 onClick={authMethod === 'email' ? handleEmailAuth : handlePhoneAuth}
                 className="w-full"
               >
@@ -256,7 +252,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <Button
                 type="button"
-                disabled={false}
                 variant="link"
                 className="w-full text-sm"
                 onClick={() => setIsForgotPasswordOpen(true)}
@@ -281,7 +276,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  disabled={false}
                   variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
                   className="flex-1"
@@ -291,7 +285,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </Button>
                 <Button
                   type="button"
-                  disabled={false}
                   variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
                   className="flex-1"
@@ -339,7 +332,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <Button 
                 type="button"
-                disabled={false}
                 onClick={handleRegister}
                 className="w-full"
               >
@@ -361,7 +353,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
-                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('Google')}
                   className="w-full"
@@ -370,7 +361,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </Button>
                 <Button
                   type="button"
-                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('Яндекс')}
                   className="w-full"
@@ -379,7 +369,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </Button>
                 <Button
                   type="button"
-                  disabled={false}
                   variant="outline"
                   onClick={() => handleAuth('VK')}
                   className="w-full"

@@ -281,7 +281,6 @@ const PlanSelection = () => {
                   className="w-full"
                   variant={selectedPlan === plan.id ? 'default' : 'outline'}
                   onClick={() => handleSelectPlan(plan.id)}
-                  disabled={false}
                 >
                   {plan.price === 0 ? (
                     'Начать бесплатно'
@@ -308,7 +307,6 @@ const PlanSelection = () => {
               type="button"
               variant="ghost"
               onClick={() => navigate('/dashboard')}
-              disabled={false}
             >
               Пропустить (использовать Бесплатный)
             </Button>

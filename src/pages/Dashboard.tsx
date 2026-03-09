@@ -119,27 +119,27 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center gap-2">
               <Link to="/">
-                <Button type="button" variant="ghost" size="sm" disabled={false}>
+                <Button type="button" variant="ghost" size="sm">
                   <Icon name="Home" size={18} className="mr-2" />
                   <span className="hidden md:inline">Главная</span>
                 </Button>
               </Link>
               {user?.role === 'admin' && (
                 <Link to="/admin">
-                  <Button type="button" variant="outline" size="sm" disabled={false}>
+                  <Button type="button" variant="outline" size="sm">
                     <Icon name="Shield" size={18} className="mr-2" />
                     <span className="hidden md:inline">Админ</span>
                   </Button>
                 </Link>
               )}
               <Link to="/notifications">
-                <Button type="button" variant="outline" size="sm" disabled={false}>
+                <Button type="button" variant="outline" size="sm">
                   <Icon name="Bell" size={18} className="mr-2" />
                   <span className="hidden md:inline">Уведомления</span>
                 </Button>
               </Link>
               <Link to="/profile">
-                <Button type="button" variant="outline" size="sm" disabled={false}>
+                <Button type="button" variant="outline" size="sm">
                   <Icon name="User" size={18} className="mr-2" />
                   <span className="hidden md:inline">Профиль</span>
                 </Button>
@@ -239,13 +239,13 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Link to="/constructor?mode=visual">
-                    <Button type="button" className="w-full" variant="outline" disabled={false}>
+                    <Button type="button" className="w-full" variant="outline">
                       <Icon name="Workflow" size={18} className="mr-2" />
                       Визуальный конструктор
                     </Button>
                   </Link>
                   <Link to="/constructor?mode=professional">
-                    <Button type="button" className="w-full" variant="outline" disabled={false}>
+                    <Button type="button" className="w-full" variant="outline">
                       <Icon name="Code2" size={18} className="mr-2" />
                       Профессиональный режим
                     </Button>
@@ -269,7 +269,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <Link to="/">
-                    <Button type="button" className="w-full" disabled={false}>
+                    <Button type="button" className="w-full">
                       <Icon name="ShoppingBag" size={18} className="mr-2" />
                       Перейти в маркетплейс
                     </Button>
@@ -293,7 +293,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <Link to="/prompt-engineer">
-                    <Button type="button" className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500" disabled={false}>
+                    <Button type="button" className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500">
                       <Icon name="Sparkles" size={18} className="mr-2" />
                       Открыть Промт-Инженер
                     </Button>
@@ -309,19 +309,19 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button type="button" variant="outline" className="h-20 flex-col" disabled={false}>
+                  <Button type="button" variant="outline" className="h-20 flex-col">
                     <Icon name="Send" size={24} className="mb-2" />
                     <span className="text-xs">Telegram</span>
                   </Button>
-                  <Button type="button" variant="outline" className="h-20 flex-col" disabled={false}>
+                  <Button type="button" variant="outline" className="h-20 flex-col">
                     <Icon name="MessageCircle" size={24} className="mb-2" />
                     <span className="text-xs">WhatsApp</span>
                   </Button>
-                  <Button type="button" variant="outline" className="h-20 flex-col" disabled={false}>
+                  <Button type="button" variant="outline" className="h-20 flex-col">
                     <Icon name="Facebook" size={24} className="mb-2" />
                     <span className="text-xs">VK</span>
                   </Button>
-                  <Button type="button" variant="outline" className="h-20 flex-col" disabled={false}>
+                  <Button type="button" variant="outline" className="h-20 flex-col">
                     <Icon name="Instagram" size={24} className="mb-2" />
                     <span className="text-xs">Instagram</span>
                   </Button>
@@ -339,7 +339,7 @@ const Dashboard = () => {
                     <CardDescription>Управляйте своими чат-ботами</CardDescription>
                   </div>
                   <Link to="/my-bots">
-                    <Button type="button" disabled={false}>
+                    <Button type="button">
                       <Icon name="ExternalLink" size={18} className="mr-2" />
                       Все боты
                     </Button>
@@ -362,7 +362,7 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <Link to="/">
-                  <Button type="button" size="lg" disabled={false}>
+                  <Button type="button" size="lg">
                     <Icon name="ShoppingBag" size={20} className="mr-2" />
                     Открыть маркетплейс
                   </Button>
@@ -385,7 +385,7 @@ const Dashboard = () => {
                     <div className="bg-white p-3 rounded-lg border mb-3 font-mono text-sm break-all">
                       https://chatbot-platform.com/ref/ABC123XYZ
                     </div>
-                    <Button type="button" className="w-full" disabled={false}>
+                    <Button type="button" className="w-full">
                       <Icon name="Copy" size={18} className="mr-2" />
                       Скопировать ссылку
                     </Button>

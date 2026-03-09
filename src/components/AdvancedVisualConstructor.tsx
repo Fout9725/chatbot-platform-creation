@@ -182,11 +182,11 @@ const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorP
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">Холст (Drag & Drop)</CardTitle>
               <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={saveWorkflow} disabled={false}>
+                <Button type="button" size="sm" variant="outline" onClick={saveWorkflow}>
                   <Icon name="Save" size={14} className="mr-1" />
                   Сохранить
                 </Button>
-                <Button type="button" size="sm" variant="outline" disabled={false}>
+                <Button type="button" size="sm" variant="outline">
                   <Icon name="Play" size={14} className="mr-1" />
                   Тест
                 </Button>
@@ -362,7 +362,6 @@ const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorP
                             const newOptions = (selectedNode.data.options || []).filter((_, i) => i !== idx);
                             updateNodeData('options', newOptions);
                           }}
-                          disabled={false}
                         >
                           <Icon name="X" size={14} />
                         </Button>
@@ -374,7 +373,6 @@ const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorP
                       variant="outline"
                       className="w-full"
                       onClick={() => updateNodeData('options', [...(selectedNode.data.options || []), ''])}
-                      disabled={false}
                     >
                       <Icon name="Plus" size={14} className="mr-1" />
                       Добавить вариант
@@ -412,7 +410,6 @@ const AdvancedVisualConstructor = ({ initialConfig }: AdvancedVisualConstructorP
                   variant="destructive"
                   className="w-full"
                   onClick={() => deleteNode(selectedNode.id)}
-                  disabled={false}
                 >
                   <Icon name="Trash2" size={14} className="mr-1" />
                   Удалить узел

@@ -99,7 +99,7 @@ export function ProfileTabs({
                 onChange={(e) => onCompanyChange(e.target.value)}
               />
             </div>
-            <Button type="button" disabled={false} onClick={onSave} className="w-full">
+            <Button type="button" onClick={onSave} className="w-full">
               <Icon name="Save" size={16} className="mr-2" />
               Сохранить изменения
             </Button>
@@ -118,7 +118,7 @@ export function ProfileTabs({
               <Label htmlFor="confirm-password">Подтвердите пароль</Label>
               <Input id="confirm-password" type="password" />
             </div>
-            <Button type="button" disabled={false} className="w-full">
+            <Button type="button" className="w-full">
               <Icon name="Shield" size={16} className="mr-2" />
               Изменить пароль
             </Button>

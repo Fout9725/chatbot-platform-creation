@@ -105,7 +105,7 @@ const Profile = () => {
               </div>
             </Link>
             <Link to="/dashboard">
-              <Button type="button" disabled={false} variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm">
                 <Icon name="ArrowLeft" size={18} className="mr-2" />
                 Назад
               </Button>

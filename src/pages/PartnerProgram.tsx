@@ -25,7 +25,7 @@ const PartnerProgram = () => {
               </div>
             </div>
             <Link to="/">
-              <Button type="button" variant="outline" size="sm" disabled={false}>
+              <Button type="button" variant="outline" size="sm">
                 <Icon name="Home" size={18} className="mr-2" />
                 На главную
               </Button>
@@ -288,7 +288,7 @@ const PartnerProgram = () => {
 
           <div className="text-center mt-12">
             <Link to="/plan-selection">
-              <Button type="button" size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" disabled={false}>
+              <Button type="button" size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
                 <Icon name="Rocket" size={20} className="mr-2" />
                 Стать партнёром
               </Button>

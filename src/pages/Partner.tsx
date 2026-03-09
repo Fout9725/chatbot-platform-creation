@@ -89,13 +89,13 @@ const Partner = () => {
             </div>
             <div className="flex items-center gap-2">
               <Link to="/dashboard">
-                <Button type="button" variant="outline" size="sm" disabled={false}>
+                <Button type="button" variant="outline" size="sm">
                   <Icon name="LayoutDashboard" size={18} className="mr-2" />
                   Личный кабинет
                 </Button>
               </Link>
               <Link to="/">
-                <Button type="button" variant="ghost" size="sm" disabled={false}>
+                <Button type="button" variant="ghost" size="sm">
                   <Icon name="Home" size={18} className="mr-2" />
                   Главная
                 </Button>
@@ -250,7 +250,6 @@ const Partner = () => {
                   />
                   <Button
                     type="button"
-                    disabled={false}
                     onClick={handleCopyLink}
                     className="shrink-0"
                   >

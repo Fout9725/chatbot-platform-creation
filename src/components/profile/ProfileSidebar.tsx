@@ -26,7 +26,6 @@ export function ProfileSidebar({ name, email, avatar, onChangeAvatar, onLogout }
           </div>
           <Button 
             type="button" 
-            disabled={false} 
             variant="outline" 
             className="w-full"
             onClick={onChangeAvatar}
@@ -36,7 +35,6 @@ export function ProfileSidebar({ name, email, avatar, onChangeAvatar, onLogout }
           </Button>
           <Button 
             type="button" 
-            disabled={false}
             variant="destructive" 
             className="w-full"
             onClick={onLogout}
