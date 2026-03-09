@@ -24,6 +24,7 @@ const AdminStatsTab = ({ platformStats }: AdminStatsTabProps) => {
     const syncStats = async () => {
       try {
         const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec');
+        if (!response.ok) throw new Error('API error');
         const data = await response.json();
         
         if (data.total !== undefined) {

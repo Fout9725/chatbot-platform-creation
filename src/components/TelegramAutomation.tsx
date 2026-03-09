@@ -8,6 +8,7 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import AutomationAIAssistant from '@/components/automation/AutomationAIAssistant';
 
 export default function TelegramAutomation() {
   const navigate = useNavigate();
@@ -273,6 +274,12 @@ export default function TelegramAutomation() {
           </Tabs>
         </CardContent>
       </Card>
+      <AutomationAIAssistant
+        platform="telegram"
+        workflowJson={workflowJson}
+        formData={formData}
+        onApplySuggestion={(json) => setWorkflowJson(json)}
+      />
     </div>
   );
 }

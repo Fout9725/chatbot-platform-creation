@@ -6,8 +6,65 @@
       "path": "/",
       "expectedStatus": 200,
       "expectedBody": {
-        "users": "array",
         "total": "number"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Register with missing email",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "register",
+        "password": "testpass123"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with missing credentials",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "email": "nonexistent@test.com",
+        "password": "wrongpass"
+      },
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Legacy sync with email",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "sync-test@example.com",
+        "name": "Test",
+        "role": "user",
+        "plan": "free"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
       },
       "bodyMatcher": "partial"
     }

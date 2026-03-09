@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import AutomationAIAssistant from '@/components/automation/AutomationAIAssistant';
 
 export default function YouTubeAutomation() {
   const navigate = useNavigate();
@@ -252,6 +253,10 @@ export default function YouTubeAutomation() {
           </Tabs>
         </CardContent>
       </Card>
+      <AutomationAIAssistant
+        platform="youtube"
+        formData={formData}
+      />
     </div>
   );
 }

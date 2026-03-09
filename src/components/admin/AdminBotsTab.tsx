@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,9 @@ const AdminBotsTab = ({
   handleFileUpload,
   handleCreateBot
 }: AdminBotsTabProps) => {
+  const [category, setCategory] = useState('');
+  const [price, setPrice] = useState('');
+  const [platform, setPlatform] = useState('Telegram');
   return (
     <Card>
       <CardHeader>
@@ -56,15 +60,15 @@ const AdminBotsTab = ({
         <div className="grid md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Категория</label>
-            <Input type="text" placeholder="Продажи" />
+            <Input type="text" placeholder="Продажи" value={category} onChange={(e) => setCategory(e.target.value)} />
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Цена (₽)</label>
-            <Input type="number" placeholder="0" />
+            <Input type="number" placeholder="0" value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Платформа</label>
-            <Input type="text" placeholder="Telegram" />
+            <Input type="text" placeholder="Telegram" value={platform} onChange={(e) => setPlatform(e.target.value)} />
           </div>
         </div>
 

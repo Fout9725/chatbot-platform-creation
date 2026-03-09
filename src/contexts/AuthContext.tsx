@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
+const API_URL = 'https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec';
+
 interface User {
   id: string;
   name: string;
@@ -26,6 +28,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('user');
@@ -48,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user && user.id && user.email) {
       const syncUser = async () => {
         try {
-          const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+          const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -96,75 +106,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const login = async (email: string, password: string) => {
-    const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
-    
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: 'Пользователь',
-      email,
-      plan: 'free',
-      registeredAt: new Date(),
-      hasActivatedBot: false,
-      sessionExpiry
-    };
-    
-    try {
-      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: mockUser.id,
-          email: mockUser.email,
-          name: mockUser.name,
-          role: 'user',
-          plan: mockUser.plan,
-          avatar: mockUser.avatar
-        })
-      });
-      const data = await response.json();
-      if (data.user && data.user.avatar) {
-        mockUser.avatar = data.user.avatar;
-      }
-    } catch (error) {
-      console.error('Ошибка синхронизации пользователя с БД:', error);
+    const hashedPassword = await hashPassword(password);
+
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        email,
+        password: hashedPassword
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Login failed');
     }
-    
-    setUser(mockUser);
+
+    const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
+
+    const loggedInUser: User = {
+      id: String(data.user.id),
+      name: data.user.name || 'Пользователь',
+      email: data.user.email,
+      plan: data.user.plan || 'free',
+      registeredAt: data.user.created_at ? new Date(data.user.created_at) : new Date(),
+      hasActivatedBot: false,
+      sessionExpiry,
+      role: data.user.role || 'user',
+      avatar: data.user.avatar || undefined
+    };
+
+    setUser(loggedInUser);
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      plan: 'free',
-      registeredAt: new Date(),
-      hasActivatedBot: false,
-      sessionExpiry
-    };
-    
-    try {
-      const response = await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-          role: 'user',
-          plan: newUser.plan,
-          avatar: newUser.avatar
-        })
-      });
-      const data = await response.json();
-      if (data.user && data.user.avatar) {
-        newUser.avatar = data.user.avatar;
-      }
-    } catch (error) {
-      console.error('Ошибка синхронизации с БД:', error);
+    const hashedPassword = await hashPassword(password);
+
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'register',
+        name,
+        email,
+        password: hashedPassword
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Registration failed');
     }
-    
+
+    const sessionExpiry = Date.now() + (4 * 60 * 60 * 1000);
+
+    const newUser: User = {
+      id: String(data.user.id),
+      name: data.user.name || name,
+      email: data.user.email,
+      plan: data.user.plan || 'free',
+      registeredAt: data.user.created_at ? new Date(data.user.created_at) : new Date(),
+      hasActivatedBot: false,
+      sessionExpiry,
+      role: data.user.role || 'user',
+      avatar: data.user.avatar || undefined
+    };
+
     setUser(newUser);
   };
 
@@ -196,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(updatedUser);
       
       try {
-        await fetch('https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec', {
+        await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

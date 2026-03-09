@@ -44,21 +44,29 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
     
-    await login(email, password);
-    
-    const savedUser = localStorage.getItem('user');
-    const userData = savedUser ? JSON.parse(savedUser) : null;
-    
-    toast({
-      title: 'Добро пожаловать! 👋',
-      description: `Вы успешно вошли в систему`,
-    });
-    onClose();
-    
-    if (userData && userData.plan && userData.plan !== 'free') {
-      navigate('/dashboard');
-    } else {
-      navigate('/plan-selection');
+    try {
+      await login(email, password);
+      
+      const savedUser = localStorage.getItem('user');
+      const userData = savedUser ? JSON.parse(savedUser) : null;
+      
+      toast({
+        title: 'Добро пожаловать!',
+        description: 'Вы успешно вошли в систему',
+      });
+      onClose();
+      
+      if (userData && userData.plan && userData.plan !== 'free') {
+        navigate('/dashboard');
+      } else {
+        navigate('/plan-selection');
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка входа',
+        description: error instanceof Error ? error.message : 'Неверный email или пароль',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -97,13 +105,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
     
-    await register(name, email, password);
-    toast({
-      title: 'Регистрация успешна! 🎉',
-      description: 'Выберите тарифный план для продолжения',
-    });
-    onClose();
-    navigate('/plan-selection');
+    try {
+      await register(name, email, password);
+      toast({
+        title: 'Регистрация успешна!',
+        description: 'Выберите тарифный план для продолжения',
+      });
+      onClose();
+      navigate('/plan-selection');
+    } catch (error) {
+      toast({
+        title: 'Ошибка регистрации',
+        description: error instanceof Error ? error.message : 'Не удалось зарегистрироваться',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

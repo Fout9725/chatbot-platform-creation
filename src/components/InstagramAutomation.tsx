@@ -8,6 +8,7 @@ import TemplatesGallery from '@/components/automation/TemplatesGallery';
 import InstagramSetupForm from '@/components/automation/InstagramSetupForm';
 import WorkflowViewer from '@/components/automation/WorkflowViewer';
 import InstructionsTab from '@/components/automation/InstructionsTab';
+import AutomationAIAssistant from '@/components/automation/AutomationAIAssistant';
 
 const InstagramAutomation = () => {
   const navigate = useNavigate();
@@ -80,6 +81,11 @@ const InstagramAutomation = () => {
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground text-center mt-4">* Instagram признан экстремистской организацией и запрещен на территории РФ.</p>
+      <AutomationAIAssistant
+        platform="instagram"
+        workflowJson={workflowJson}
+        onApplySuggestion={(json) => setWorkflowJson(json)}
+      />
     </div>
   );
 };

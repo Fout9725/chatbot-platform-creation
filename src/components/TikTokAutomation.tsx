@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import AutomationAIAssistant from '@/components/automation/AutomationAIAssistant';
 
 export default function TikTokAutomation() {
   const navigate = useNavigate();
@@ -187,6 +188,10 @@ export default function TikTokAutomation() {
           )}
         </CardContent>
       </Card>
+      <AutomationAIAssistant
+        platform="tiktok"
+        formData={{ niche }}
+      />
     </div>
   );
 }
