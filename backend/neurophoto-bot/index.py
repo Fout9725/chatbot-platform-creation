@@ -460,6 +460,20 @@ def get_db():
     return c
 
 
+def ensure_conn(conn):
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT 1')
+        cur.close()
+        return conn
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return get_db()
+
+
 def is_update_processed(conn, update_id):
     cur = conn.cursor()
     cur.execute(
@@ -1097,6 +1111,8 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
 
         img_bytes_result, err = generate_image(model_key, prompt, gen_photo, extra_photos=gen_extra, cdn_urls=vsegpt_cdn)
 
+        conn = ensure_conn(conn)
+
         if err:
             print(f'[GEN] Error: {err}')
             send_msg(chat_id, f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438: {err}\n\n\u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043e\u0439 \u043f\u0440\u043e\u043c\u043f\u0442 \u0438\u043b\u0438 \u0441\u043c\u0435\u043d\u0438\u0442\u0435 \u043c\u043e\u0434\u0435\u043b\u044c.')
@@ -1132,6 +1148,7 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
         print(f'[GEN] Fatal error: {type(e).__name__}: {e}')
         try:
             send_msg(chat_id, '\u274c \u041f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.')
+            conn = ensure_conn(conn)
             set_session(conn, tid, None)
         except Exception:
             pass

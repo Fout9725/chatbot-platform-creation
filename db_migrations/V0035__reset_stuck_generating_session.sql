@@ -1,0 +1,1 @@
+UPDATE "t_p60354232_chatbot_platform_cre"."neurophoto_users" SET session_state = NULL WHERE telegram_id = 285675692 AND session_state = 'generating';
