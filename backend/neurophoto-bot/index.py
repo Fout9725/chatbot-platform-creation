@@ -494,6 +494,19 @@ def tg(method, data=None):
         return {'ok': False}
 
 
+def setup_bot_commands():
+    tg('setMyCommands', {
+        'commands': [
+            {'command': 'start', 'description': '🚀 Запустить бота'},
+            {'command': 'model', 'description': '🎨 Выбрать модель'},
+            {'command': 'prompt', 'description': '✨ AI-генератор промптов'},
+            {'command': 'balance', 'description': '💰 Мой баланс'},
+            {'command': 'pricing', 'description': '💎 Тарифы'},
+            {'command': 'help', 'description': '📖 Инструкция'},
+        ]
+    })
+
+
 def send_msg(chat_id, text, reply_markup=None):
     d = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     if reply_markup:
@@ -1149,6 +1162,10 @@ def handler(event, context):
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
 
     if event.get('httpMethod') == 'GET':
+        qs = event.get('queryStringParameters') or {}
+        if qs.get('setup') == 'menu':
+            setup_bot_commands()
+            return ok({'status': 'ok', 'commands_set': True})
         return ok({'status': 'ok', 'bot': 'neurophoto-pro', 'models': list(MODELS.keys())})
 
     body = json.loads(event.get('body', '{}'))
