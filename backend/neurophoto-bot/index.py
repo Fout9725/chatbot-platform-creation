@@ -26,14 +26,6 @@ CORS = {
 }
 
 MODELS = {
-    'gemini': {
-        'name': '🟢 Gemini Flash (Google)',
-        'api_id': 'gemini-2.5-flash-image',
-        'provider': 'gemini',
-        'mode': 'both',
-        'desc': 'Быстрая, хорошее качество',
-        'prompt_tips': 'Понимает русский и английский. Детальные описания, стиль, настроение. Пример: "Портрет девушки в осеннем парке, мягкий свет, тёплые тона"'
-    },
     'nano-banana': {
         'name': '🍌 Nano Banana Pro Edit',
         'api_id': 'img2img-google/nano-banana-pro-edit-multi',
@@ -161,10 +153,9 @@ MODELS = {
     },
 }
 
-DEFAULT_MODEL = 'gemini'
+DEFAULT_MODEL = 'nano-banana-2'
 
 MODEL_PRICING = {
-    'gemini': {'cost_rub': 0, 'label': 'Бесплатно'},
     'nano-banana': {'cost_rub': 34.0, 'label': '34 ₽'},
     'nano-banana-2': {'cost_rub': 23.0, 'label': '23 ₽'},
     'flux-klein': {'cost_rub': 12.0, 'label': '12 ₽'},
@@ -183,23 +174,6 @@ MODEL_PRICING = {
 }
 
 MODEL_INSTRUCTIONS = {
-    'gemini': (
-        '🟢 <b>Gemini Flash (Google)</b>\n\n'
-        '<b>Тип:</b> Генерация по тексту + редактирование фото\n'
-        '<b>Язык:</b> Русский и английский\n'
-        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
-        '<b>Что умеет:</b>\n'
-        '• Создавать изображения с нуля\n'
-        '• Редактировать загруженные фото\n'
-        '• Менять фон, стиль, добавлять элементы\n\n'
-        '<b>Лучше всего для:</b> Первого знакомства, простых задач, русскоязычных промптов\n\n'
-        '<b>Ограничения:</b>\n'
-        '⚠️ Нет ограничений — работает и с текстом, и с фото\n\n'
-        '<b>Примеры:</b>\n'
-        '<i>• Сделай фон осенним парком\n'
-        '• Преврати в акварельную картину\n'
-        '• Нарисуй кота в космосе</i>'
-    ),
     'nano-banana': (
         '🍌 <b>Nano Banana Pro Edit</b>\n\n'
         '<b>Тип:</b> Мульти-редактирование\n'
@@ -617,7 +591,7 @@ def gemini_generate(prompt, photo_bytes=None):
         }
     }).encode('utf-8')
 
-    model_id = MODELS['gemini']['api_id']
+    model_id = 'gemini-2.5-flash-image'
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={GEMINI_KEY}'
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
 
@@ -1036,7 +1010,7 @@ def build_pricing_text():
             lines.append(f'  • {info["name"]} — <b>{label}</b>')
     lines.append('')
     lines.append(
-        '💡 <i>Стоимость за 1 генерацию. Gemini — бесплатно.\n'
+        '💡 <i>Стоимость за 1 генерацию.\n'
         'Цены включают наценку 20% за работу сервиса.</i>'
     )
     return '\n'.join(lines)
