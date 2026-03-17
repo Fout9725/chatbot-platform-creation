@@ -58,6 +58,7 @@ MODELS = {
         'provider': 'vsegpt',
         'mode': 'img2img',
         'desc': 'ByteDance, мульти-редактирование',
+        'multi_photo': True,
         'prompt_tips': 'Английские промпты. Сильна в стилизации. Пример: "convert to watercolor painting", "make it look like anime"'
     },
     'reve': {
@@ -82,6 +83,7 @@ MODELS = {
         'provider': 'vsegpt',
         'mode': 'img2img',
         'desc': 'Google Flash, мульти-редактирование',
+        'multi_photo': True,
         'prompt_tips': 'Английские промпты. Сложные мульти-инструкции. Пример: "change hair to platinum blonde, add studio lighting, smooth skin"'
     },
     'txt-flux-klein-9b': {
@@ -132,9 +134,53 @@ MODELS = {
         'desc': 'Google Flash — быстрая генерация по тексту',
         'prompt_tips': 'Английские промпты. Пример: "professional headshot photo, studio lighting, clean background"'
     },
+    'nano-banana-2': {
+        'name': '🍌 Nano Banana 2 Edit',
+        'api_id': 'img2img-google/nano-banana-2-edit-multi',
+        'provider': 'vsegpt',
+        'mode': 'img2img',
+        'desc': 'Google, новейшая версия мульти-редактирования',
+        'multi_photo': True,
+        'prompt_tips': 'Английские промпты. Улучшенное качество, точные правки. Поддерживает несколько фото. Пример: "merge these photos, change background to studio, improve lighting"'
+    },
+    'txt-nano-banana-2': {
+        'name': '🍌 Nano Banana 2',
+        'api_id': 'img-google/nano-banana-2',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'Google — новейшая генерация по тексту, Pro-качество',
+        'prompt_tips': 'Английские промпты. Pro-качество на скорости Flash. Пример: "professional product photo on marble surface, studio lighting"'
+    },
+    'txt-seedream-45': {
+        'name': '🌱 Seedream v4.5',
+        'api_id': 'img-bytedance/seedream-v4.5',
+        'provider': 'vsegpt',
+        'mode': 'text2img',
+        'desc': 'ByteDance — улучшенная стилизация и арт',
+        'prompt_tips': 'Английские промпты. Художественная генерация. Пример: "impressionist painting of Paris street, rainy evening, warm palette"'
+    },
 }
 
 DEFAULT_MODEL = 'gemini'
+
+MODEL_PRICING = {
+    'gemini': {'cost_rub': 0, 'label': 'Бесплатно'},
+    'nano-banana': {'cost_rub': 16.0, 'label': '16 ₽'},
+    'nano-banana-2': {'cost_rub': 4.2, 'label': '4.2 ₽'},
+    'flux-klein': {'cost_rub': 1.2, 'label': '1.2 ₽'},
+    'seedream': {'cost_rub': 4.3, 'label': '4.3 ₽'},
+    'reve': {'cost_rub': 3.2, 'label': '3.2 ₽'},
+    'chrono': {'cost_rub': 6.0, 'label': '6 ₽'},
+    'flash-25': {'cost_rub': 4.3, 'label': '4.3 ₽'},
+    'txt-flux-klein-9b': {'cost_rub': 1.2, 'label': '1.2 ₽'},
+    'txt-flux-klein-4b': {'cost_rub': 1.2, 'label': '1.2 ₽'},
+    'txt-seedream': {'cost_rub': 4.3, 'label': '4.3 ₽'},
+    'txt-seedream-45': {'cost_rub': 4.3, 'label': '4.3 ₽'},
+    'txt-flux-pro': {'cost_rub': 6.0, 'label': '6 ₽'},
+    'txt-nano-banana': {'cost_rub': 16.0, 'label': '16 ₽'},
+    'txt-nano-banana-2': {'cost_rub': 4.2, 'label': '4.2 ₽'},
+    'txt-flash-25': {'cost_rub': 4.3, 'label': '4.3 ₽'},
+}
 
 MODEL_INSTRUCTIONS = {
     'gemini': (
@@ -367,6 +413,62 @@ MODEL_INSTRUCTIONS = {
         '<i>• Professional headshot, studio lighting\n'
         '• Modern interior design, minimalist\n'
         '• Food photography, appetizing dish</i>'
+    ),
+    'nano-banana-2': (
+        '🍌 <b>Nano Banana 2 Edit (Google)</b>\n\n'
+        '<b>Тип:</b> Мульти-редактирование нового поколения\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n'
+        '📸 <b>Поддержка нескольких фото!</b>\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Pro-качество на скорости Flash\n'
+        '• Точные локальные правки\n'
+        '• Объединение нескольких фото\n'
+        '• Улучшенная работа с лицами\n\n'
+        '<b>Лучше всего для:</b> Профессиональной обработки, объединения фото\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Требуется загрузить фото для редактирования\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Merge these photos into one portrait\n'
+        '• Change background to studio, improve lighting\n'
+        '• Professional retouching, smooth skin</i>'
+    ),
+    'txt-nano-banana-2': (
+        '🍌 <b>Nano Banana 2 (Google)</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Быстрая (10-20 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Pro-качество изображений\n'
+        '• Фотореалистичные портреты\n'
+        '• Точная работа с текстом в изображениях\n'
+        '• Улучшенная детализация\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Professional product photo on marble, studio lighting\n'
+        '• Portrait of young woman, natural sunlight, bokeh\n'
+        '• Modern architecture, minimalist, golden hour</i>'
+    ),
+    'txt-seedream-45': (
+        '🌱 <b>Seedream v4.5 (ByteDance)</b>\n\n'
+        '<b>Режим:</b> Генерация по тексту\n'
+        '<b>Язык:</b> Английский\n'
+        '<b>Скорость:</b> Средняя (15-30 сек)\n\n'
+        '<b>Что умеет:</b>\n'
+        '• Улучшенная художественная генерация\n'
+        '• Лучшая детализация лиц и текста\n'
+        '• Стилизация: акварель, масло, аниме\n'
+        '• Улучшенная консистентность цветов\n\n'
+        '<b>Ограничения:</b>\n'
+        '⚠️ Не работает с загруженными фото\n'
+        '⚠️ Только английские промпты\n\n'
+        '<b>Примеры:</b>\n'
+        '<i>• Impressionist painting of Paris street, rainy evening\n'
+        '• Anime character in cherry blossom garden\n'
+        '• Photorealistic landscape, mountain lake at dawn</i>'
     ),
 }
 
@@ -915,10 +1017,36 @@ def current_model_text(model_key):
     return f"{info['name']}"
 
 
+def build_pricing_text():
+    lines = [
+        '💰 <b>Тарифы и стоимость генераций</b>\n',
+        '<b>📸 Редактирование фото (img2img):</b>',
+    ]
+    for key, info in MODELS.items():
+        if info.get('mode') in ('img2img', 'both'):
+            price = MODEL_PRICING.get(key, {})
+            label = price.get('label', '—')
+            lines.append(f'  • {info["name"]} — <b>{label}</b>')
+    lines.append('')
+    lines.append('<b>✍️ Генерация по тексту (text2img):</b>')
+    for key, info in MODELS.items():
+        if info.get('mode') in ('text2img', 'both'):
+            price = MODEL_PRICING.get(key, {})
+            label = price.get('label', '—')
+            lines.append(f'  • {info["name"]} — <b>{label}</b>')
+    lines.append('')
+    lines.append(
+        '💡 <i>Стоимость за 1 генерацию. Gemini — бесплатно.\n'
+        'Цены включают наценку 20% за работу сервиса.</i>'
+    )
+    return '\n'.join(lines)
+
+
 def start_keyboard():
     return {'inline_keyboard': [
         [{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}],
-        [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}]
+        [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}],
+        [{'text': '💰 Тарифы и стоимость', 'callback_data': 'show_pricing'}],
     ]}
 
 
@@ -1212,6 +1340,11 @@ def handler(event, context):
             )
             return ok()
 
+        if text == '/pricing' or text == '/tariff':
+            pricing_text = build_pricing_text()
+            send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
+            return ok()
+
         photos = message.get('photo', [])
         if photos:
             if remaining(user) <= 0:
@@ -1468,6 +1601,23 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             'parse_mode': 'HTML',
             'reply_markup': prompt_keyboard()
         })
+        return ok()
+
+    if cb_data == 'show_pricing':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        pricing_text = build_pricing_text()
+        is_photo_msg = bool(callback.get('message', {}).get('photo'))
+        if is_photo_msg:
+            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
+        else:
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': pricing_text,
+                'parse_mode': 'HTML',
+                'reply_markup': start_keyboard()
+            })
         return ok()
 
     if cb_data.startswith('info:'):

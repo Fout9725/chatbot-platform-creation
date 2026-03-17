@@ -15,6 +15,7 @@ CORS_HEADERS = {
 
 AVAILABLE_MODELS = [
     'img2img-google/nano-banana-pro-edit-multi',
+    'img2img-google/nano-banana-2-edit-multi',
     'img2img-flux/flux-2-klein-4b',
     'img2img-bytedance/seedream-v4.5-edit-multi',
     'img2img-reve-fast-edit-multi',
