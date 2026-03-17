@@ -109,7 +109,7 @@ const Pricing = () => {
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               На главную
             </Button>
-            <Button type="button" variant="outline" size="sm">
+            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/')}>
               <Icon name="User" size={18} className="mr-2" />
               <span className="hidden sm:inline">Войти</span>
             </Button>
@@ -205,6 +205,7 @@ const Pricing = () => {
                       : ''
                   }`}
                   variant={plan.popular ? 'default' : 'outline'}
+                  onClick={() => navigate('/plan-selection')}
                 >
                   {plan.monthlyPrice === 0 ? 'Начать бесплатно' : 'Выбрать план'}
                 </Button>
@@ -260,7 +261,7 @@ const Pricing = () => {
                   Свяжитесь с нами для обсуждения корпоративных решений
                 </p>
               </div>
-              <Button size="lg" variant="secondary" className="whitespace-nowrap">
+              <Button size="lg" variant="secondary" className="whitespace-nowrap" onClick={() => window.open('https://t.me/+QgiLIa1gFRY4Y2Iy', '_blank')}>
                 <Icon name="Mail" size={18} className="mr-2" />
                 Связаться с нами
               </Button>

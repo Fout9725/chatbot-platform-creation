@@ -155,6 +155,9 @@ const AdminNew = () => {
                   <Icon name="ArrowLeft" size={18} />
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                Пароль можно изменить в настройках платформы (секрет ADMIN_PASSWORD)
+              </p>
             </form>
           </CardContent>
         </Card>

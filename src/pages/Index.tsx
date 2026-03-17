@@ -65,6 +65,9 @@ const Index = () => {
               <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={scrollToCatalog}>
                 Каталог
               </Button>
+              <Button data-tour="my-bots" variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/my-bots')}>
+                Мои боты
+              </Button>
               {user?.role === 'admin' && (
                 <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/admin')}>
                   Админ
@@ -195,7 +198,9 @@ const Index = () => {
 
       <HowItWorks />
 
-      <BotMarketplace />
+      <div data-tour="marketplace">
+        <BotMarketplace />
+      </div>
 
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4 text-center">
@@ -221,7 +226,9 @@ const Index = () => {
         </div>
       </section>
 
-      <CtaBlock onAuthOpen={() => setIsAuthOpen(true)} />
+      <div data-tour="constructor">
+        <CtaBlock onAuthOpen={() => setIsAuthOpen(true)} />
+      </div>
 
       <SiteFooter />
 

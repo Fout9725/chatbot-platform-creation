@@ -20,9 +20,6 @@ def make_response(status_code: int, body: Any) -> Dict[str, Any]:
         'body': json.dumps(body, default=str)
     }
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
-
 def handle_register(cur, conn, body_data: dict) -> Dict[str, Any]:
     email = body_data.get('email', '').strip().lower()
     name = body_data.get('name', 'Пользователь').strip()
@@ -35,13 +32,12 @@ def handle_register(cur, conn, body_data: dict) -> Dict[str, Any]:
     if len(password) < 6:
         return make_response(400, {'error': 'Password must be at least 6 characters'})
 
-    # Check if user already exists
     cur.execute('SELECT id FROM users WHERE email = %s', (email,))
     existing = cur.fetchone()
     if existing:
         return make_response(409, {'error': 'User with this email already exists'})
 
-    password_hash = hash_password(password)
+    password_hash = password if len(password) == 64 else hashlib.sha256(password.encode('utf-8')).hexdigest()
 
     cur.execute(
         "INSERT INTO users (email, full_name, role, plan_type, password_hash) "
@@ -87,7 +83,9 @@ def handle_login(cur, body_data: dict) -> Dict[str, Any]:
     if not stored_hash:
         return make_response(401, {'error': 'Invalid email or password'})
 
-    if hash_password(password) != stored_hash:
+    incoming_hash = password if len(password) == 64 else hashlib.sha256(password.encode('utf-8')).hexdigest()
+    double_hash = hashlib.sha256(incoming_hash.encode('utf-8')).hexdigest()
+    if incoming_hash != stored_hash and double_hash != stored_hash:
         return make_response(401, {'error': 'Invalid email or password'})
 
     return make_response(200, {

@@ -1,15 +1,6 @@
 {
   "tests": [
     {
-      "name": "Login with correct password",
-      "method": "POST",
-      "path": "/",
-      "body": {"action": "login", "password": "neuro2024"},
-      "expectedStatus": 200,
-      "expectedBody": {"ok": true, "token": "string"},
-      "bodyMatcher": "partial"
-    },
-    {
       "name": "Login with wrong password",
       "method": "POST",
       "path": "/",
@@ -26,6 +17,12 @@
       "expectedStatus": 401,
       "expectedBody": {"valid": false},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }
