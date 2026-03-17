@@ -665,6 +665,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
     body = {
         'model': api_model,
         'prompt': prompt,
+        'n': 1,
         'response_format': 'b64_json'
     }
 
@@ -683,28 +684,39 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
     payload = json.dumps(body).encode('utf-8')
     print(f'[VSEGPT] payload={len(payload)} bytes, model={api_model}, photos={len(cdn_urls) if cdn_urls else (1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0)}')
 
-    req = urllib.request.Request(
-        'https://api.vsegpt.ru/v1/images/generations',
-        data=payload,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {VSEGPT_KEY}'
-        },
-        method='POST'
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=100) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8') if e.fp else ''
-        print(f'[VSEGPT] HTTP error {e.code}: {err_body[:500]}')
-        return None, f'VseGPT error {e.code}: {err_body[:200]}'
-    except Exception as e:
-        err_str = str(e).lower()
-        print(f'[VSEGPT] Exception: {str(e)}')
-        if 'timed out' in err_str or 'timeout' in err_str:
-            return None, 'Таймаут: нейросеть не ответила за 100 секунд. Попробуйте ещё раз или выберите другую модель.'
-        return None, f'Ошибка соединения: {str(e)[:100]}'
+    max_retries = 2
+    result = None
+    last_err = None
+    for attempt in range(max_retries + 1):
+        req = urllib.request.Request(
+            'https://api.vsegpt.ru/v1/images/generations',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {VSEGPT_KEY}'
+            },
+            method='POST'
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+            break
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8') if e.fp else ''
+            print(f'[VSEGPT] HTTP error {e.code}: {err_body[:500]}')
+            return None, f'VseGPT error {e.code}: {err_body[:200]}'
+        except Exception as e:
+            err_str = str(e).lower()
+            print(f'[VSEGPT] Exception (attempt {attempt+1}/{max_retries+1}): {str(e)}')
+            last_err = str(e)
+            if 'timed out' in err_str or 'timeout' in err_str:
+                return None, 'Таймаут: нейросеть не ответила за 120 секунд. Попробуйте ещё раз или выберите другую модель.'
+            if attempt < max_retries:
+                time.sleep(2)
+                continue
+            return None, f'Ошибка соединения: {last_err[:100]}'
+    if result is None:
+        return None, f'Ошибка соединения после {max_retries+1} попыток'
 
     print(f'[VSEGPT] Response keys: {list(result.keys())}')
     data_list = result.get('data', [])
@@ -1125,7 +1137,7 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
             pass
 
 
-def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
+def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None, skip_status_msg=False):
     cur = conn.cursor()
     cur.execute(
         f"SELECT 1 FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s AND session_state = 'generating' AND session_updated_at > CURRENT_TIMESTAMP - INTERVAL '120 seconds'",
@@ -1144,14 +1156,15 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
 
     tg('sendChatAction', {'chat_id': chat_id, 'action': 'upload_photo'})
 
-    if photo_cdn_urls:
-        send_msg(chat_id, f'🎨 Генерирую из {len(photo_cdn_urls)} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
-    else:
-        photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
-        if photo_count > 1:
-            send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+    if not skip_status_msg:
+        if photo_cdn_urls:
+            send_msg(chat_id, f'🎨 Генерирую из {len(photo_cdn_urls)} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
         else:
-            send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
+            photo_count = 1 + (len(extra_photos) if extra_photos else 0) if photo_bytes else 0
+            if photo_count > 1:
+                send_msg(chat_id, f'🎨 Генерирую из {photo_count} фото через {model_info["name"]}...\nОбычно 15-60 секунд.')
+            else:
+                send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
 
     run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes, extra_photos, photo_cdn_urls)
 
@@ -1692,7 +1705,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                         send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
                         set_session(conn, tid, None)
                     else:
-                        do_generate(conn, chat_id, tid, user, saved_caption, photo_cdn_urls=cdn_urls)
+                        do_generate(conn, chat_id, tid, user, saved_caption, photo_cdn_urls=cdn_urls, skip_status_msg=True)
                 else:
                     set_session_album(conn, tid, 'waiting_album_prompt', mg)
                     tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
@@ -1717,7 +1730,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                     })
                     photo_bytes = download_url(saved_prompt)
                     if photo_bytes:
-                        do_generate(conn, chat_id, tid, user, saved_caption, photo_bytes)
+                        do_generate(conn, chat_id, tid, user, saved_caption, photo_bytes, skip_status_msg=True)
                     else:
                         send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
                         set_session(conn, tid, None)
@@ -1742,7 +1755,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                     'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
                     'parse_mode': 'HTML'
                 })
-                do_generate(conn, chat_id, tid, user, saved_prompt)
+                do_generate(conn, chat_id, tid, user, saved_prompt, skip_status_msg=True)
             elif state == 'waiting_prompt' and saved_prompt:
                 set_session(conn, tid, 'chosen_img_model', saved_prompt)
                 set_model(conn, tid, model_key)
