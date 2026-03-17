@@ -1,4 +1,4 @@
-"""Бот Нейрофотосессия PRO — генерация и редактирование фото через AI моделей + AI-промтер"""
+"""Бот Нейрофотосессия PRO — генерация и редактирование фото через AI-модели + AI-промтер"""
 
 import json
 import os
@@ -376,7 +376,10 @@ def ok(data=None):
 
 
 def get_db():
-    c = psycopg2.connect(os.environ['DATABASE_URL'])
+    dsn = os.environ.get('DATABASE_URL', '')
+    if not dsn:
+        raise RuntimeError('DATABASE_URL secret is not set. Please fill in the secret value in project settings.')
+    c = psycopg2.connect(dsn)
     c.autocommit = True
     return c
 
@@ -1078,7 +1081,16 @@ def handler(event, context):
     fname = message['from'].get('first_name', 'User')
     text = message.get('text', '').strip()
 
-    conn = get_db()
+    try:
+        conn = get_db()
+    except Exception as e:
+        print(f'[HANDLER] DB connection error: {e}')
+        try:
+            send_msg(chat_id, '⚠️ Бот временно недоступен. Попробуйте через минуту.')
+        except Exception:
+            pass
+        return ok({'ok': True, 'error': str(e)})
+
     try:
         if update_id and is_update_processed(conn, update_id):
             return ok()
@@ -1343,6 +1355,18 @@ def handle_callback(callback):
     msg_id = callback['message']['message_id']
     tid = callback['from']['id']
 
+    try:
+        return _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid)
+    except Exception as e:
+        print(f'[CALLBACK] Error: {e}')
+        try:
+            send_msg(chat_id, '⚠️ Произошла ошибка. Попробуйте ещё раз.')
+        except Exception:
+            pass
+        return ok()
+
+
+def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
     if cb_data == 'go_start':
         tg('answerCallbackQuery', {'callback_query_id': cb_id})
         conn = get_db()
