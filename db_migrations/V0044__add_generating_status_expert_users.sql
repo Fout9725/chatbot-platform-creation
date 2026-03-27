@@ -1,0 +1,2 @@
+ALTER TABLE expert_users DROP CONSTRAINT IF EXISTS expert_users_status_check;
+ALTER TABLE expert_users ADD CONSTRAINT expert_users_status_check CHECK (status IN ('new', 'completed', 'finished', 'generating'));

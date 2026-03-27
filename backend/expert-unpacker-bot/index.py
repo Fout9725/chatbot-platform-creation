@@ -358,7 +358,7 @@ def clean_markdown(text):
 def generate_unpacking(answers_text):
     url = "https://openrouter.ai/api/v1/chat/completions"
     payload = {
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4.1-mini",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
@@ -418,7 +418,27 @@ def handle_done(conn, chat_id, telegram_id):
             send_message(chat_id, "❌ Ошибка создания платежа. Попробуйте ещё раз через минуту — напишите /done")
         return
 
-    send_message(chat_id, "⏳ Генерирую вашу персональную распаковку экспертности... Это может занять 30-60 секунд.")
+    cur2 = conn.cursor()
+    cur2.execute("SELECT status FROM expert_users WHERE telegram_id = '%s'" % telegram_id.replace("'", "''"))
+    row2 = cur2.fetchone()
+    current_status = row2[0] if row2 else 'new'
+
+    if current_status == 'generating':
+        send_message(chat_id, "⏳ Генерация уже запущена. Пожалуйста, дождитесь результата.")
+        return
+
+    if current_status == 'finished':
+        send_message(chat_id, "✅ Ваша распаковка уже была сгенерирована. Чтобы пройти заново — напишите /start")
+        return
+
+    cur3 = conn.cursor()
+    cur3.execute(
+        "UPDATE expert_users SET status = 'generating', updated_at = NOW() WHERE telegram_id = '%s'"
+        % telegram_id.replace("'", "''")
+    )
+    conn.commit()
+
+    send_message(chat_id, "⏳ Генерирую вашу персональную распаковку экспертности... Это может занять 1-2 минуты.")
 
     answers_text = ""
     for q_num, q_text, answer in answers:
@@ -431,7 +451,13 @@ def handle_done(conn, chat_id, telegram_id):
         mark_finished(conn, telegram_id)
         send_message(chat_id, "\n🎉 Распаковка завершена! Чтобы пройти заново — напишите /start")
     else:
-        send_message(chat_id, "❌ Произошла ошибка при генерации. Попробуйте ещё раз через минуту — напишите /done")
+        cur4 = conn.cursor()
+        cur4.execute(
+            "UPDATE expert_users SET status = 'completed', updated_at = NOW() WHERE telegram_id = '%s'"
+            % telegram_id.replace("'", "''")
+        )
+        conn.commit()
+        send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
 
 
 def handle_answer(conn, chat_id, telegram_id, text, current_step):
