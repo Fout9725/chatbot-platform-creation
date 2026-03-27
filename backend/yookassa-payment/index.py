@@ -78,21 +78,21 @@ def create_payment(body_data: dict) -> Dict[str, Any]:
         'metadata': metadata
     }
 
-    if email:
-        payment_data['receipt'] = {
-            'customer': {'email': email},
-            'items': [{
-                'description': description[:128] if description else 'Оплата услуги',
-                'quantity': '1.00',
-                'amount': {
-                    'value': amount_str,
-                    'currency': 'RUB'
-                },
-                'vat_code': 1,
-                'payment_subject': 'service',
-                'payment_mode': 'full_payment'
-            }]
-        }
+    receipt_email = email or body_data.get('metadata', {}).get('email', 'noreply@poehali.dev')
+    payment_data['receipt'] = {
+        'customer': {'email': receipt_email},
+        'items': [{
+            'description': description[:128] if description else 'Оплата услуги',
+            'quantity': '1.00',
+            'amount': {
+                'value': amount_str,
+                'currency': 'RUB'
+            },
+            'vat_code': 1,
+            'payment_subject': 'service',
+            'payment_mode': 'full_payment'
+        }]
+    }
 
     resp = requests.post(
         'https://api.yookassa.ru/v3/payments',
