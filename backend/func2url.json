@@ -11,7 +11,5 @@
   "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
   "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
-  "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f",
-  "telegram-webhook": "https://functions.poehali.dev/28e4e6a0-60c6-42fa-9b4c-b40df0a1762e",
-  "bots-api": "https://functions.poehali.dev/96b3f1ab-3e6d-476d-9886-020600efada2"
+  "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f"
 }
