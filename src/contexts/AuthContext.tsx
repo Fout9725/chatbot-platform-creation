@@ -38,12 +38,12 @@ async function hashPassword(password: string): Promise<string> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = sessionStorage.getItem('user');
+    const saved = localStorage.getItem('user');
     if (saved) {
       const parsed = JSON.parse(saved);
       const now = Date.now();
       if (parsed.sessionExpiry && now > parsed.sessionExpiry) {
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('user');
         return null;
       }
       return {
@@ -85,9 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      sessionStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(user));
     } else {
-      sessionStorage.removeItem('user');
+      localStorage.removeItem('user');
     }
   }, [user]);
 

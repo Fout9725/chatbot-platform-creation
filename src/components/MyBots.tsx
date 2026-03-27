@@ -81,10 +81,10 @@ const MyBots = () => {
         status: activeBot.status === 'active' ? 'active' : 'paused',
         users: stats.users,
         messages: stats.messages,
-        lastActive: activeBot.status === 'active' ? stats.lastActive : 'Тестовый период истек',
+        lastActive: activeBot.status === 'active' ? stats.lastActive : (activeBot.purchased ? 'Неактивен' : 'Тестовый период истек'),
         performance,
-        testMode: true,
-        daysLeft
+        testMode: !activeBot.purchased,
+        daysLeft: activeBot.purchased ? undefined : daysLeft
       };
     });
     

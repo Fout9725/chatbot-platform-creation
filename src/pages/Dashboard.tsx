@@ -70,9 +70,9 @@ const Dashboard = () => {
     
     if (paymentStatus === 'success') {
       if (botId && botName) {
-        activateBot(parseInt(botId), decodeURIComponent(botName));
+        activateBot(parseInt(botId), decodeURIComponent(botName), true);
         toast({
-          title: 'Покупка успешна! 🎉',
+          title: 'Покупка успешна!',
           description: `Бот "${decodeURIComponent(botName)}" добавлен в ваш аккаунт`,
         });
       } else {

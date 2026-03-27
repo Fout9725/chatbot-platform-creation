@@ -6,11 +6,12 @@ interface ActiveBot {
   activatedAt: Date;
   expiresAt: Date;
   status: 'active' | 'expired';
+  purchased?: boolean;
 }
 
 interface ActiveBotsContextType {
   activeBots: ActiveBot[];
-  activateBot: (botId: number, botName: string) => void;
+  activateBot: (botId: number, botName: string, purchased?: boolean) => void;
   deactivateBot: (botId: number) => void;
   isBotActive: (botId: number) => boolean;
   getBotStatus: (botId: number) => ActiveBot | undefined;
@@ -23,25 +24,21 @@ export function ActiveBotsProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('activeBots_version');
     
     const saved = localStorage.getItem('activeBots');
-    console.log('🔄 Загрузка из localStorage:', saved);
     
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const bots = parsed.map((bot: any) => ({
+        const bots = parsed.map((bot: Record<string, unknown>) => ({
           ...bot,
-          activatedAt: new Date(bot.activatedAt),
-          expiresAt: new Date(bot.expiresAt)
+          activatedAt: new Date(bot.activatedAt as string),
+          expiresAt: new Date(bot.expiresAt as string)
         }));
-        console.log('✅ Загружено ботов:', bots.length);
         return bots;
-      } catch (error) {
-        console.error('❌ Ошибка парсинга activeBots:', error);
+      } catch {
         localStorage.removeItem('activeBots');
         return [];
       }
     }
-    console.log('⚠️ Нет сохранённых ботов');
     return [];
   });
 
@@ -51,7 +48,7 @@ export function ActiveBotsProvider({ children }: { children: ReactNode }) {
       setActiveBots(prev => 
         prev.map(bot => ({
           ...bot,
-          status: bot.expiresAt > now ? 'active' : 'expired'
+          status: bot.purchased || bot.expiresAt > now ? 'active' as const : 'expired' as const
         }))
       );
     };
@@ -65,23 +62,24 @@ export function ActiveBotsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const dataToSave = JSON.stringify(activeBots);
     localStorage.setItem('activeBots', dataToSave);
-    console.log('💾 Сохранено в localStorage:', activeBots.length, 'ботов');
   }, [activeBots]);
 
-  const activateBot = (botId: number, botName: string) => {
+  const activateBot = (botId: number, botName: string, purchased?: boolean) => {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const expiresAt = purchased
+      ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     
     setActiveBots(prev => {
       const existing = prev.find(bot => bot.botId === botId);
       if (existing) {
         return prev.map(bot => 
           bot.botId === botId 
-            ? { ...bot, activatedAt: now, expiresAt, status: 'active' as const }
+            ? { ...bot, activatedAt: now, expiresAt, status: 'active' as const, purchased: purchased || bot.purchased }
             : bot
         );
       }
-      return [...prev, { botId, botName, activatedAt: now, expiresAt, status: 'active' as const }];
+      return [...prev, { botId, botName, activatedAt: now, expiresAt, status: 'active' as const, purchased: !!purchased }];
     });
   };
 
