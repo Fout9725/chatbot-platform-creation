@@ -17,6 +17,13 @@ BOT_TOKEN = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
 OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
+
+PACKAGES = {
+    'pack_10': {'generations': 10, 'price': 199, 'label': '10 генераций — 199 ₽'},
+    'pack_50': {'generations': 50, 'price': 799, 'label': '50 генераций — 799 ₽'},
+    'pack_100': {'generations': 100, 'price': 1399, 'label': '100 генераций — 1399 ₽'},
+}
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -516,6 +523,7 @@ def setup_bot_commands():
             {'command': 'prompt', 'description': '✨ AI-генератор промптов'},
             {'command': 'balance', 'description': '💰 Мой баланс'},
             {'command': 'pricing', 'description': '💎 Тарифы'},
+            {'command': 'buy', 'description': '💳 Пополнить баланс'},
             {'command': 'help', 'description': '📖 Инструкция'},
         ]
     })
@@ -950,6 +958,54 @@ def remaining(u):
     return u['free'] + u['paid'] - u['used']
 
 
+def create_neurophoto_payment(telegram_id, package_key):
+    pkg = PACKAGES.get(package_key)
+    if not pkg:
+        return None
+    payload = {
+        "action": "create",
+        "amount": pkg['price'],
+        "description": f"Нейрофотосессия PRO — {pkg['generations']} генераций",
+        "return_url": "https://t.me/NeurPhotoSessionBot",
+        "metadata": {
+            "type": "neurophoto",
+            "telegram_id": str(telegram_id),
+            "generations": pkg['generations'],
+            "package": package_key
+        }
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        YOOKASSA_PAYMENT_URL,
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+            body = json.loads(result.get('body', '{}')) if isinstance(result.get('body'), str) else result
+            return body.get('confirmation_url')
+    except Exception as e:
+        print(f"Payment creation error: {e}")
+        return None
+
+
+def buy_keyboard():
+    buttons = []
+    for key, pkg in PACKAGES.items():
+        buttons.append([{'text': f"💳 {pkg['label']}", 'callback_data': f'buy:{key}'}])
+    buttons.append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
+def no_balance_text(user):
+    return (
+        f'❌ <b>Генерации закончились!</b>\n\n'
+        f'💎 Баланс: {remaining(user)} генераций\n\n'
+        f'Пополните баланс, чтобы продолжить:'
+    )
+
+
 def model_keyboard():
     buttons = []
     row = []
@@ -1060,6 +1116,7 @@ def start_keyboard():
         [{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}],
         [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}],
         [{'text': '💰 Тарифы и стоимость', 'callback_data': 'show_pricing'}],
+        [{'text': '💳 Пополнить баланс', 'callback_data': 'show_buy'}],
     ]}
 
 
@@ -1357,7 +1414,11 @@ def handler(event, context):
                 f'Оплаченных: {user["paid"]}\n'
                 f'Использовано: {user["used"]}\n'
                 f'<b>Осталось: {remaining(user)}</b>\n\n'
-                f'🤖 Модель: {model_name}'
+                f'🤖 Модель: {model_name}',
+                reply_markup={'inline_keyboard': [
+                    [{'text': '💳 Пополнить баланс', 'callback_data': 'show_buy'}],
+                    [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
+                ]}
             )
             return ok()
 
@@ -1366,10 +1427,19 @@ def handler(event, context):
             send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
             return ok()
 
+        if text == '/buy' or text == '/pay':
+            send_msg(chat_id,
+                f'💳 <b>Пополнить баланс</b>\n\n'
+                f'💎 Текущий баланс: <b>{remaining(user)}</b> генераций\n\n'
+                f'Выберите пакет:',
+                reply_markup=buy_keyboard()
+            )
+            return ok()
+
         photos = message.get('photo', [])
         if photos:
             if remaining(user) <= 0:
-                send_msg(chat_id, '❌ Генерации закончились. Обратитесь к администратору.')
+                send_msg(chat_id, no_balance_text(user), reply_markup=buy_keyboard())
                 return ok()
 
             largest = max(photos, key=lambda p: p.get('file_size', 0))
@@ -1441,7 +1511,7 @@ def handler(event, context):
                 return ok()
 
             if remaining(user) <= 0:
-                send_msg(chat_id, '❌ Генерации закончились.')
+                send_msg(chat_id, no_balance_text(user), reply_markup=buy_keyboard())
                 return ok()
 
             if state == 'waiting_album_prompt':
@@ -1639,6 +1709,64 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                 'parse_mode': 'HTML',
                 'reply_markup': start_keyboard()
             })
+        return ok()
+
+    if cb_data == 'show_buy':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            buy_text = (
+                f'💳 <b>Пополнить баланс</b>\n\n'
+                f'💎 Текущий баланс: <b>{remaining(user)}</b> генераций\n\n'
+                f'Выберите пакет:'
+            )
+            is_photo_msg = bool(callback.get('message', {}).get('photo'))
+            if is_photo_msg:
+                tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+                send_msg(chat_id, buy_text, reply_markup=buy_keyboard())
+            else:
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': buy_text,
+                    'parse_mode': 'HTML',
+                    'reply_markup': buy_keyboard()
+                })
+        finally:
+            conn.close()
+        return ok()
+
+    if cb_data.startswith('buy:'):
+        package_key = cb_data.split(':', 1)[1]
+        pkg = PACKAGES.get(package_key)
+        if not pkg:
+            tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': 'Неизвестный пакет'})
+            return ok()
+
+        tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': 'Создаю ссылку на оплату...'})
+
+        payment_url = create_neurophoto_payment(tid, package_key)
+        if payment_url:
+            tg('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': msg_id,
+                'text': (
+                    f'💳 <b>Оплата: {pkg["label"]}</b>\n\n'
+                    f'Нажмите кнопку ниже для перехода к оплате.\n'
+                    f'После оплаты генерации будут начислены автоматически.'
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': {'inline_keyboard': [
+                    [{'text': f'💳 Оплатить {pkg["price"]} ₽', 'url': payment_url}],
+                    [{'text': '◀️ Другой пакет', 'callback_data': 'show_buy'}],
+                    [{'text': '🏠 Главное меню', 'callback_data': 'go_start'}]
+                ]}
+            })
+        else:
+            send_msg(chat_id, '❌ Ошибка создания платежа. Попробуйте ещё раз.', reply_markup=buy_keyboard())
         return ok()
 
     if cb_data.startswith('info:'):

@@ -7,6 +7,8 @@ import psycopg2
 BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
+UNPACKING_PRICE = 990
 
 QUESTIONS = {
     1: "Как вас зовут?",
@@ -89,6 +91,52 @@ def send_long_message(chat_id, text, parse_mode=None):
         text = text[split_pos:].lstrip('\n')
     for part in parts:
         send_message(chat_id, part, parse_mode)
+
+
+def send_message_with_buttons(chat_id, text, buttons, parse_mode='HTML'):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "reply_markup": json.dumps({"inline_keyboard": buttons})
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        print(f"Error sending message with buttons: {e}")
+        return None
+
+
+def create_payment_link(telegram_id, chat_id):
+    payload = {
+        "action": "create",
+        "amount": UNPACKING_PRICE,
+        "description": "Распаковка экспертности — AI-анализ",
+        "return_url": f"https://t.me/ExpertUnpackerBot",
+        "metadata": {
+            "type": "expert_unpacker",
+            "telegram_id": str(telegram_id),
+            "chat_id": str(chat_id)
+        }
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        YOOKASSA_PAYMENT_URL,
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+            body = json.loads(result.get('body', '{}')) if isinstance(result.get('body'), str) else result
+            return body.get('confirmation_url')
+    except Exception as e:
+        print(f"Payment creation error: {e}")
+        return None
 
 
 def get_or_create_user(conn, telegram_id, username, first_name):
@@ -219,6 +267,26 @@ def handle_done(conn, chat_id, telegram_id):
         send_message(chat_id, f"⚠️ Вы ответили только на {answered} из 17 вопросов. Пожалуйста, завершите все вопросы перед получением распаковки.")
         return
 
+    cur = conn.cursor()
+    cur.execute("SELECT payment_status FROM expert_users WHERE telegram_id = '%s'" % telegram_id.replace("'", "''"))
+    row = cur.fetchone()
+    payment_status = row[0] if row else 'unpaid'
+
+    if payment_status != 'paid':
+        payment_url = create_payment_link(telegram_id, chat_id)
+        if payment_url:
+            send_message_with_buttons(
+                chat_id,
+                f"🎯 <b>Все 17 вопросов пройдены!</b>\n\n"
+                f"Для получения персональной AI-распаковки экспертности необходимо оплатить услугу.\n\n"
+                f"💰 <b>Стоимость: {UNPACKING_PRICE} ₽</b>\n\n"
+                f"После оплаты напишите /done — и я мгновенно сгенерирую вашу распаковку.",
+                [[{"text": f"💳 Оплатить {UNPACKING_PRICE} ₽", "url": payment_url}]]
+            )
+        else:
+            send_message(chat_id, "❌ Ошибка создания платежа. Попробуйте ещё раз через минуту — напишите /done")
+        return
+
     send_message(chat_id, "⏳ Генерирую вашу персональную распаковку экспертности... Это может занять 30-60 секунд.")
 
     answers_text = ""
@@ -252,7 +320,7 @@ def handle_answer(conn, chat_id, telegram_id, text, current_step):
         send_message(
             chat_id,
             "🎯 Отлично! Все 17 вопросов пройдены!\n\n"
-            "Все вопросы заданы. Напишите /done, чтобы получить готовую распаковку."
+            "Напишите /done — и я подготовлю вашу персональную распаковку экспертности."
         )
 
 

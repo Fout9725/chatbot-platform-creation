@@ -3,6 +3,7 @@ import os
 import uuid
 import hmac
 import hashlib
+import urllib.request
 from typing import Dict, Any
 import requests
 import psycopg2
@@ -30,6 +31,18 @@ def get_db_connection():
     conn = psycopg2.connect(dsn)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     return conn, cur
+
+def send_telegram_message(bot_token, chat_id, text):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = json.dumps({"chat_id": chat_id, "text": text, "parse_mode": "HTML"}).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        print(f"Telegram send error: {e}")
+        return None
+
 
 def create_payment(body_data: dict) -> Dict[str, Any]:
     """Создание платежа через ЮKassa API"""
@@ -172,7 +185,8 @@ def handle_webhook(body_data: dict) -> Dict[str, Any]:
         conn.close()
         return make_response(200, {'status': 'logged', 'event': event_type})
 
-    if not user_id:
+    telegram_id_check = metadata.get('telegram_id')
+    if not user_id and not telegram_id_check:
         cur.close()
         conn.close()
         return make_response(200, {'status': 'no_user_id'})
@@ -197,6 +211,37 @@ def handle_webhook(body_data: dict) -> Dict[str, Any]:
             )
         )
         conn.commit()
+
+    telegram_id = metadata.get('telegram_id')
+
+    if payment_type == 'expert_unpacker' and telegram_id:
+        cur.execute(
+            "UPDATE expert_users SET payment_status = 'paid', updated_at = NOW() WHERE telegram_id = %s",
+            (str(telegram_id),)
+        )
+        conn.commit()
+        bot_token = os.environ.get('EXPERT_BOT_TOKEN', '')
+        if bot_token:
+            send_telegram_message(bot_token, telegram_id,
+                "✅ <b>Оплата получена!</b>\n\n"
+                "Теперь напишите /done — и я сгенерирую вашу персональную распаковку экспертности."
+            )
+
+    if payment_type == 'neurophoto' and telegram_id:
+        generations = int(metadata.get('generations', 0))
+        if generations > 0:
+            cur.execute(
+                "UPDATE neurophoto_users SET paid_generations = paid_generations + %s WHERE telegram_id = %s",
+                (generations, int(telegram_id))
+            )
+            conn.commit()
+        bot_token = os.environ.get('NEUROPHOTO_BOT_TOKEN', '')
+        if bot_token:
+            send_telegram_message(bot_token, telegram_id,
+                f"✅ <b>Оплата получена!</b>\n\n"
+                f"💎 Начислено <b>{generations}</b> генераций.\n"
+                f"Отправьте фото или текст для генерации!"
+            )
 
     cur.close()
     conn.close()
