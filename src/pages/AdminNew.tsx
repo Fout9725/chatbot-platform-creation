@@ -18,7 +18,7 @@ import AdminBotBuilderTab from '@/components/admin/AdminBotBuilderTab';
 const AdminNew = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isAuthenticated: isLoggedIn } = useAuth();
+  const { user, isAuthenticated: isLoggedIn, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('stats');
 
   const isAuthenticated = isLoggedIn && user?.role === 'admin';
@@ -31,6 +31,7 @@ const AdminNew = () => {
   }, [isLoggedIn, user]);
 
   const handleLogout = () => {
+    logout();
     navigate('/');
   };
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

@@ -46,7 +46,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       await login(email, password);
       
-      const savedUser = localStorage.getItem('user');
+      const savedUser = sessionStorage.getItem('user');
       const userData = savedUser ? JSON.parse(savedUser) : null;
       
       toast({
