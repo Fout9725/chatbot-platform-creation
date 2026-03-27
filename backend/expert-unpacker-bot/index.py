@@ -8,7 +8,7 @@ BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
-UNPACKING_PRICE = 990
+UNPACKING_PRICE = 1
 
 QUESTIONS = {
     1: "Как вас зовут?",
