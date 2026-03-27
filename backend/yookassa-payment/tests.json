@@ -1,0 +1,51 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Create payment without amount",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "create",
+        "description": "Test"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET not allowed",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 405
+    },
+    {
+      "name": "Unknown action",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "unknown"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Webhook ignored event",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "event": "payment.canceled",
+        "object": {}
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"status": "ignored"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

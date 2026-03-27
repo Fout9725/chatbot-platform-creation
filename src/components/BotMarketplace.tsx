@@ -323,6 +323,8 @@ const BotMarketplace = () => {
           isOpen={detailsModal.isOpen}
           onClose={() => setDetailsModal({ ...detailsModal, isOpen: false })}
           bot={mockBots.find(b => b.id === detailsModal.botId)}
+          onBuy={handleBuy}
+          onRent={handleRent}
         />
 
         <AuthModal

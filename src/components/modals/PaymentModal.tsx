@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-import { useActiveBots } from '@/contexts/ActiveBotsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { AI_MODELS } from '@/config/aiModels';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const PAYMENT_API = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -23,12 +23,9 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ isOpen, onClose, botName, botId, mode, price }: PaymentModalProps) {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { activateBot } = useActiveBots();
   const { user } = useAuth();
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(user?.email || '');
   const [selectedModel, setSelectedModel] = useState('google/gemini-2.0-flash-exp:free');
   const [processing, setProcessing] = useState(false);
 
@@ -45,28 +42,38 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
     setProcessing(true);
 
     try {
-      const paymentUrl = `https://intellectpro.pay.prodamus.ru/pl/pay`;
-      const params = new URLSearchParams({
-        products: `${botName} (${mode === 'buy' ? 'Покупка' : 'Аренда'})`,
-        order_sum: price.toString(),
-        customer_email: email,
-        customer_extra: JSON.stringify({
-          user_id: user?.id || '',
-          bot_id: botId,
-          bot_name: botName,
-          purchase_mode: mode,
-          ai_model: selectedModel
-        }),
-        urlReturn: `${window.location.origin}/dashboard?payment=success&bot_id=${botId}&bot_name=${encodeURIComponent(botName)}`,
-        urlNotification: `https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4`
+      const response = await fetch(PAYMENT_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          amount: price,
+          description: `${botName} (${mode === 'buy' ? 'Покупка' : 'Аренда'})`,
+          email,
+          return_url: `${window.location.origin}/dashboard?payment=success&bot_id=${botId}&bot_name=${encodeURIComponent(botName)}`,
+          metadata: {
+            user_id: user?.id || '',
+            bot_id: String(botId),
+            bot_name: botName,
+            type: 'bot',
+            purchase_mode: mode,
+            ai_model: selectedModel
+          }
+        })
       });
-      
-      window.location.href = `${paymentUrl}?${params.toString()}`;
-    } catch (error: any) {
+
+      const data = await response.json();
+
+      if (data.success && data.confirmation_url) {
+        window.location.href = data.confirmation_url;
+      } else {
+        throw new Error(data.error || 'Не удалось создать платёж');
+      }
+    } catch (error) {
       setProcessing(false);
       toast({
         title: 'Ошибка оплаты',
-        description: error.message || 'Попробуйте позже',
+        description: error instanceof Error ? error.message : 'Попробуйте позже',
         variant: 'destructive',
       });
     }
@@ -85,7 +92,14 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <Alert className="bg-blue-50 border-blue-200">
+          <Icon name="Shield" size={16} className="text-blue-600" />
+          <AlertDescription className="text-sm text-blue-800">
+            Безопасная оплата через ЮKassa. Мы не храним данные вашей карты.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Сумма к оплате</Label>
             <div className="text-3xl font-bold text-primary">
@@ -95,7 +109,7 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email для чека</Label>
+            <Label htmlFor="email">Email для чека *</Label>
             <Input
               id="email"
               type="email"
@@ -138,43 +152,14 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
               </p>
             )}
           </div>
-
-          <div className="space-y-2">
-            <Label>Способ оплаты</Label>
-            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-              <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
-                <RadioGroupItem value="card" id="card" />
-                <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Icon name="CreditCard" size={20} />
-                  Банковская карта
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
-                <RadioGroupItem value="yoomoney" id="yoomoney" />
-                <Label htmlFor="yoomoney" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Icon name="Wallet" size={20} />
-                  ЮMoney
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
-                <RadioGroupItem value="sbp" id="sbp" />
-                <Label htmlFor="sbp" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Icon name="Smartphone" size={20} />
-                  Система быстрых платежей
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
         </div>
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} className="flex-1">
             Отмена
           </Button>
-          <Button 
-            onClick={handlePayment} 
+          <Button
+            onClick={handlePayment}
             disabled={!email || processing}
             className="flex-1"
           >
@@ -185,7 +170,7 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
               </>
             ) : (
               <>
-                <Icon name="Lock" size={16} className="mr-2" />
+                <Icon name="CreditCard" size={16} className="mr-2" />
                 Оплатить {price.toLocaleString()} ₽
               </>
             )}
@@ -193,7 +178,7 @@ export default function PaymentModal({ isOpen, onClose, botName, botId, mode, pr
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Защищённая оплата через ЮКасса. Ваши данные в безопасности.
+          Оплата обрабатывается через ЮKassa. Ваши данные в безопасности.
         </p>
       </DialogContent>
     </Dialog>

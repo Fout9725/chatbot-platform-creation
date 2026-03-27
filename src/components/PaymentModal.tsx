@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+
+const PAYMENT_API = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -24,11 +25,8 @@ interface PaymentModalProps {
 export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [paymentMethod, setPaymentMethod] = useState<'prodamus'>('prodamus');
   const [email, setEmail] = useState(user?.email || '');
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const PRODAMUS_PROJECT_ID = 'intellectpro';
 
   const handlePayment = async () => {
     if (!email) {
@@ -43,25 +41,35 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
     setIsProcessing(true);
 
     try {
-      const paymentUrl = `https://intellectpro.pay.prodamus.ru/pl/pay`;
-      const params = new URLSearchParams({
-        products: `${plan.name}`,
-        order_sum: plan.price.toString(),
-        customer_email: email,
-        customer_extra: JSON.stringify({
-          user_id: user?.id || '',
-          plan_id: plan.id
-        }),
-        urlReturn: `${window.location.origin}/dashboard?payment=success`,
-        urlNotification: `https://functions.poehali.dev/1ea69390-f6ab-40d3-9797-8c2171d272b4`
+      const response = await fetch(PAYMENT_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          amount: plan.price,
+          description: `Тариф "${plan.name}" — ${plan.period}`,
+          email,
+          return_url: `${window.location.origin}/dashboard?payment=success`,
+          metadata: {
+            user_id: user?.id || '',
+            type: 'plan',
+            plan_id: plan.id
+          }
+        })
       });
-      
-      window.location.href = `${paymentUrl}?${params.toString()}`;
-    } catch (error: any) {
+
+      const data = await response.json();
+
+      if (data.success && data.confirmation_url) {
+        window.location.href = data.confirmation_url;
+      } else {
+        throw new Error(data.error || 'Не удалось создать платёж');
+      }
+    } catch (error) {
       setIsProcessing(false);
       toast({
         title: 'Ошибка оплаты',
-        description: error.message || 'Попробуйте позже',
+        description: error instanceof Error ? error.message : 'Попробуйте позже',
         variant: 'destructive',
       });
     }
@@ -69,7 +77,7 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             Оплата тарифа "{plan.name}"
@@ -82,7 +90,7 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
         <Alert className="bg-blue-50 border-blue-200">
           <Icon name="Shield" size={16} className="text-blue-600" />
           <AlertDescription className="text-sm text-blue-800">
-            Платежи обрабатываются через защищённое соединение. Мы не храним данные вашей карты.
+            Безопасная оплата через ЮKassa. Мы не храним данные вашей карты.
           </AlertDescription>
         </Alert>
 
@@ -99,51 +107,24 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
             />
           </div>
 
-          <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
-            <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="prodamus">
-                <Icon name="CreditCard" size={16} className="mr-2" />
-                Prodamus
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="prodamus" className="space-y-4 pt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Оплата через Prodamus</CardTitle>
-                  <CardDescription>
-                    Банковские карты, СБП, Apple Pay, Google Pay
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="CreditCard" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">Карты</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="Smartphone" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">СБП</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="Apple" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">Apple Pay</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-                      <Icon name="Wallet" size={24} className="mb-1 text-primary" />
-                      <span className="text-xs text-center">Google Pay</span>
-                    </div>
-                  </div>
-                  <Alert>
-                    <Icon name="Info" size={14} />
-                    <AlertDescription className="text-xs">
-                      После нажатия "Оплатить" вы будете перенаправлены на безопасную страницу Prodamus
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+              <Icon name="CreditCard" size={24} className="mb-1 text-primary" />
+              <span className="text-xs text-center">Карты</span>
+            </div>
+            <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+              <Icon name="Smartphone" size={24} className="mb-1 text-primary" />
+              <span className="text-xs text-center">СБП</span>
+            </div>
+            <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+              <Icon name="Apple" size={24} className="mb-1 text-primary" />
+              <span className="text-xs text-center">Apple Pay</span>
+            </div>
+            <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+              <Icon name="Wallet" size={24} className="mb-1 text-primary" />
+              <span className="text-xs text-center">Google Pay</span>
+            </div>
+          </div>
 
           <Card className="bg-gray-50">
             <CardContent className="pt-4">
@@ -177,7 +158,7 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
           </Button>
           <Button
             type="button"
-            disabled={isProcessing}
+            disabled={isProcessing || !email}
             onClick={handlePayment}
             className="flex-1"
           >

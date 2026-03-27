@@ -9,9 +9,11 @@ interface BotDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   bot?: Bot;
+  onBuy?: (id: number) => void;
+  onRent?: (id: number) => void;
 }
 
-export default function BotDetailsModal({ isOpen, onClose, bot }: BotDetailsModalProps) {
+export default function BotDetailsModal({ isOpen, onClose, bot, onBuy, onRent }: BotDetailsModalProps) {
   if (!bot) return null;
 
   const details = getBotDetails(bot.id);
@@ -103,11 +105,11 @@ export default function BotDetailsModal({ isOpen, onClose, bot }: BotDetailsModa
             <Button variant="outline" onClick={onClose} className="flex-1" size="sm">
               Закрыть
             </Button>
-            <Button variant="outline" className="flex-1" size="sm">
+            <Button variant="outline" className="flex-1" size="sm" onClick={() => { onRent?.(bot.id); onClose(); }}>
               <Icon name="Clock" size={14} className="mr-1.5" />
               Аренда
             </Button>
-            <Button className="flex-1 bg-gradient-to-r from-primary to-secondary" size="sm">
+            <Button className="flex-1 bg-gradient-to-r from-primary to-secondary" size="sm" onClick={() => { onBuy?.(bot.id); onClose(); }}>
               <Icon name="ShoppingCart" size={14} className="mr-1.5" />
               Купить
             </Button>

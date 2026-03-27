@@ -71,7 +71,7 @@ const Oferta = () => {
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
                   3.2. Оплата производится путем безналичного перевода денежных средств через платежную систему 
-                  Prodamus с использованием банковских карт, СБП, Apple Pay, Google Pay.
+                  ЮKassa с использованием банковских карт, СБП, Apple Pay, Google Pay.
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
                   3.3. Услуги считаются оплаченными с момента зачисления денежных средств на расчетный счет 
