@@ -6,7 +6,7 @@ import psycopg2
 
 BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+VSEGPT_API_KEY = os.environ.get('VSEGPT_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
 UNPACKING_PRICE = 1
 
@@ -356,9 +356,9 @@ def clean_markdown(text):
 
 
 def generate_unpacking(answers_text):
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://api.vsegpt.ru/v1/chat/completions"
     payload = {
-        "model": "openai/gpt-4.1-mini",
+        "model": "openai/gpt-5.4-pro-high",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
@@ -372,16 +372,16 @@ def generate_unpacking(answers_text):
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}"
+            "Authorization": f"Bearer {VSEGPT_API_KEY}"
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             result = json.loads(resp.read())
             content = result['choices'][0]['message']['content']
             return clean_markdown(content)
     except Exception as e:
-        print(f"OpenRouter error: {e}")
+        print(f"VseGPT error: {e}")
         return None
 
 
