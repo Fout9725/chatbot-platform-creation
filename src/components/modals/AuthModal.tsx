@@ -25,7 +25,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
-  const [isAdminMode, setIsAdminMode] = useState(false);
 
   const handleAuth = (method: string) => {
     toast({
@@ -56,7 +55,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       });
       onClose();
       
-      if (userData && userData.plan && userData.plan !== 'free') {
+      if (userData && userData.role === 'admin') {
+        navigate('/admin');
+      } else if (userData && userData.plan && userData.plan !== 'free') {
         navigate('/dashboard');
       } else {
         navigate('/plan-selection');
@@ -164,25 +165,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </Button>
               </div>
               
-              <Button
-                type="button"
-                variant={isAdminMode ? 'default' : 'outline'}
-                onClick={() => setIsAdminMode(!isAdminMode)}
-                className="w-full"
-                size="sm"
-              >
-                <Icon name="ShieldCheck" size={16} className="mr-2" />
-                {isAdminMode ? 'Режим администратора активен' : 'Войти как администратор'}
-              </Button>
-
               {authMethod === 'email' ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">{isAdminMode ? 'Логин администратора' : 'Email'}</Label>
+                    <Label htmlFor="login-email">Логин или Email</Label>
                     <Input
                       id="login-email"
-                      type={isAdminMode ? 'text' : 'email'}
-                      placeholder={isAdminMode ? 'A/V admin' : 'your@email.com'}
+                      type="text"
+                      placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
@@ -197,12 +187,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
-                  {isAdminMode && (
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <Icon name="ShieldAlert" size={16} className="text-amber-600" />
-                      <p className="text-xs text-amber-700">Вход с правами администратора</p>
-                    </div>
-                  )}
                 </>
               ) : (
                 <>

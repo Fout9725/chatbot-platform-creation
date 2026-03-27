@@ -62,17 +62,17 @@ def handle_register(cur, conn, body_data: dict) -> Dict[str, Any]:
     })
 
 def handle_login(cur, body_data: dict) -> Dict[str, Any]:
-    email = body_data.get('email', '').strip().lower()
+    login_id = body_data.get('email', '').strip()
     password = body_data.get('password', '')
 
-    if not email:
-        return make_response(400, {'error': 'Email is required'})
+    if not login_id:
+        return make_response(400, {'error': 'Login is required'})
     if not password:
         return make_response(400, {'error': 'Password is required'})
 
     cur.execute(
         'SELECT id, email, full_name, role, plan_type, avatar_url, password_hash, created_at FROM users WHERE email = %s',
-        (email,)
+        (login_id,)
     )
     user_row = cur.fetchone()
 

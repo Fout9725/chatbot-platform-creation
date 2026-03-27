@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,84 +15,22 @@ import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
 import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminBotBuilderTab from '@/components/admin/AdminBotBuilderTab';
-import funcUrls from '../../backend/func2url.json';
-
-const ADMIN_AUTH_API = funcUrls['admin-auth'] || '';
-
 const AdminNew = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAuthenticated: isLoggedIn } = useAuth();
   const [activeTab, setActiveTab] = useState('stats');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [adminToken, setAdminToken] = useState('');
+
+  const isAuthenticated = isLoggedIn && user?.role === 'admin';
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('adminToken');
-    if (saved && ADMIN_AUTH_API) {
-      fetch(ADMIN_AUTH_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', token: saved })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.valid) {
-            setIsAuthenticated(true);
-            setAdminToken(saved);
-          } else {
-            sessionStorage.removeItem('adminToken');
-          }
-        })
-        .catch(() => sessionStorage.removeItem('adminToken'));
+    if (isLoggedIn && user?.role !== 'admin') {
+      toast({ title: 'Доступ запрещён', description: 'У вас нет прав администратора', variant: 'destructive' });
+      navigate('/');
     }
-  }, []);
+  }, [isLoggedIn, user]);
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const res = await fetch(ADMIN_AUTH_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', password })
-      });
-      const data = await res.json();
-      if (data.ok && data.token) {
-        setIsAuthenticated(true);
-        setAdminToken(data.token);
-        sessionStorage.setItem('adminToken', data.token);
-        toast({ title: 'Доступ разрешён', description: 'Добро пожаловать в административную панель' });
-      } else {
-        toast({ title: 'Неверный пароль', description: 'Попробуйте ещё раз', variant: 'destructive' });
-        setPassword('');
-      }
-    } catch {
-      toast({ title: 'Ошибка сервера', description: 'Попробуйте позже', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    if (adminToken && ADMIN_AUTH_API) {
-      try {
-        await fetch(ADMIN_AUTH_API, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'logout', token: adminToken })
-        });
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
-    }
-    sessionStorage.removeItem('adminToken');
-    setIsAuthenticated(false);
-    setAdminToken('');
-    toast({ title: 'Выход выполнен', description: 'Вы вышли из административной панели' });
+  const handleLogout = () => {
     navigate('/');
   };
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -120,45 +56,17 @@ const AdminNew = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Icon name="Lock" />
-              Вход в административную панель
+              Доступ ограничен
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="password">Пароль</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Введите пароль"
-                    className="pr-10"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" className="flex-1" disabled={isLoading}>
-                  {isLoading ? <Icon name="Loader2" size={18} className="mr-2 animate-spin" /> : <Icon name="LogIn" size={18} className="mr-2" />}
-                  {isLoading ? 'Проверка...' : 'Войти'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => navigate('/')}>
-                  <Icon name="ArrowLeft" size={18} />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                Пароль можно изменить в настройках платформы (секрет ADMIN_PASSWORD)
-              </p>
-            </form>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Для доступа к административной панели войдите в систему с учётной записью администратора.
+            </p>
+            <Button onClick={() => navigate('/')} className="w-full">
+              <Icon name="ArrowLeft" size={18} className="mr-2" />
+              На главную
+            </Button>
           </CardContent>
         </Card>
       </div>
