@@ -365,9 +365,11 @@ def generate_unpacking(answers_text):
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
         ],
         "max_tokens": 16000,
-        "temperature": 0.7
+        "temperature": 0.7,
+        "stream": False
     }
     data = json.dumps(payload).encode('utf-8')
+    print(f"[VSEGPT] Sending request, payload size: {len(data)} bytes, model: openai/gpt-5.4-pro-high")
     req = urllib.request.Request(
         url,
         data=data,
@@ -377,12 +379,22 @@ def generate_unpacking(answers_text):
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            result = json.loads(resp.read())
+        with urllib.request.urlopen(req, timeout=500) as resp:
+            raw = resp.read()
+            print(f"[VSEGPT] Response received, size: {len(raw)} bytes")
+            result = json.loads(raw)
+            if 'error' in result:
+                print(f"[VSEGPT] API error: {result['error']}")
+                return None
             content = result['choices'][0]['message']['content']
+            print(f"[VSEGPT] Success, content length: {len(content)}")
             return clean_markdown(content)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        print(f"[VSEGPT] HTTP error {e.code}: {body[:500]}")
+        return None
     except Exception as e:
-        print(f"VseGPT error: {e}")
+        print(f"[VSEGPT] Error: {type(e).__name__}: {e}")
         return None
 
 
