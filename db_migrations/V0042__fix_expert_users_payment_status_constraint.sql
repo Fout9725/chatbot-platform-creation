@@ -1,0 +1,2 @@
+ALTER TABLE expert_users DROP CONSTRAINT IF EXISTS expert_users_payment_status_check;
+ALTER TABLE expert_users ADD CONSTRAINT expert_users_payment_status_check CHECK (payment_status IN ('unpaid', 'pay', 'paid'));

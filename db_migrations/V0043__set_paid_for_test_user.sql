@@ -1,0 +1,1 @@
+UPDATE expert_users SET payment_status = 'paid' WHERE telegram_id = '285675692';
