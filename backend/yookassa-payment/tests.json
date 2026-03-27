@@ -19,12 +19,6 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "GET not allowed",
-      "method": "GET",
-      "path": "/",
-      "expectedStatus": 405
-    },
-    {
       "name": "Unknown action",
       "method": "POST",
       "path": "/",
@@ -36,15 +30,31 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Webhook ignored event",
+      "name": "Webhook canceled event",
       "method": "POST",
       "path": "/",
       "body": {
         "event": "payment.canceled",
-        "object": {}
+        "object": {"id": "test-cancel-123", "status": "canceled", "amount": {"value": "100.00"}, "metadata": {}}
       },
       "expectedStatus": 200,
-      "expectedBody": {"status": "ignored"},
+      "expectedBody": {"status": "logged"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get payments without user_id",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get payments for user",
+      "method": "GET",
+      "path": "/?user_id=1",
+      "expectedStatus": 200,
+      "expectedBody": {"total": 0},
       "bodyMatcher": "partial"
     }
   ]
