@@ -8,6 +8,7 @@ BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 VSEGPT_API_KEY = os.environ.get('VSEGPT_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
+SELF_URL = 'https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f'
 UNPACKING_PRICE = 1
 
 QUESTIONS = {
@@ -438,26 +439,18 @@ def handle_done(conn, chat_id, telegram_id):
     )
     conn.commit()
 
-    send_message(chat_id, "⏳ Генерирую вашу персональную распаковку экспертности... Это может занять 1-2 минуты.")
+    send_message(chat_id, "⏳ Генерирую вашу персональную распаковку экспертности... Это может занять 2-4 минуты. Я напишу, когда будет готово.")
 
-    answers_text = ""
-    for q_num, q_text, answer in answers:
-        answers_text += f"Вопрос {q_num}: {q_text}\nОтвет: {answer}\n\n"
-
-    result = generate_unpacking(answers_text)
-    if result:
-        send_message(chat_id, "✅ Ваша распаковка экспертности готова!\n\n" + "=" * 30)
-        send_long_message(chat_id, result)
-        mark_finished(conn, telegram_id)
-        send_message(chat_id, "\n🎉 Распаковка завершена! Чтобы пройти заново — напишите /start")
-    else:
-        cur4 = conn.cursor()
-        cur4.execute(
-            "UPDATE expert_users SET status = 'completed', updated_at = NOW() WHERE telegram_id = '%s'"
-            % telegram_id.replace("'", "''")
-        )
-        conn.commit()
-        send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
+    import threading
+    def fire_async():
+        payload = json.dumps({"_internal": "generate", "chat_id": chat_id, "telegram_id": telegram_id}).encode('utf-8')
+        req = urllib.request.Request(SELF_URL, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=3)
+        except:
+            pass
+    t = threading.Thread(target=fire_async)
+    t.start()
 
 
 def handle_answer(conn, chat_id, telegram_id, text, current_step):
@@ -507,6 +500,36 @@ def handler(event, context):
     try:
         body = json.loads(event.get('body', '{}'))
     except:
+        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
+
+    if body.get('_internal') == 'generate':
+        chat_id = body['chat_id']
+        telegram_id = body['telegram_id']
+        conn = get_db_connection()
+        try:
+            answers = get_all_answers(conn, telegram_id)
+            answers_text = ""
+            for q_num, q_text, answer in answers:
+                answers_text += f"Вопрос {q_num}: {q_text}\nОтвет: {answer}\n\n"
+            print(f"[GENERATE] Starting VseGPT call for {telegram_id}")
+            result = generate_unpacking(answers_text)
+            if result:
+                print(f"[GENERATE] Success for {telegram_id}, length={len(result)}")
+                send_message(chat_id, "✅ Ваша распаковка экспертности готова!\n\n" + "=" * 30)
+                send_long_message(chat_id, result)
+                mark_finished(conn, telegram_id)
+                send_message(chat_id, "\n🎉 Распаковка завершена! Чтобы пройти заново — напишите /start")
+            else:
+                print(f"[GENERATE] Failed for {telegram_id}")
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE expert_users SET status = 'completed', updated_at = NOW() WHERE telegram_id = '%s'"
+                    % telegram_id.replace("'", "''")
+                )
+                conn.commit()
+                send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
+        finally:
+            conn.close()
         return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
 
     message = body.get('message')
