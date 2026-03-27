@@ -6,7 +6,7 @@ import psycopg2
 
 BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-VSEGPT_API_KEY = os.environ.get('VSEGPT_API_KEY', '')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
 SELF_URL = 'https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f'
 UNPACKING_PRICE = 1
@@ -357,9 +357,9 @@ def clean_markdown(text):
 
 
 def generate_unpacking(answers_text):
-    url = "https://api.vsegpt.ru/v1/chat/completions"
+    url = "https://openrouter.ai/api/v1/chat/completions"
     payload = {
-        "model": "openai/gpt-5.4-pro-high",
+        "model": "qwen/qwen3-next-80b-a3b-instruct:free",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
@@ -369,32 +369,32 @@ def generate_unpacking(answers_text):
         "stream": False
     }
     data = json.dumps(payload).encode('utf-8')
-    print(f"[VSEGPT] Sending request, payload size: {len(data)} bytes, model: openai/gpt-5.4-pro-high")
+    print(f"[OPENROUTER] Sending request, payload size: {len(data)} bytes, model: qwen/qwen3-next-80b-a3b-instruct:free")
     req = urllib.request.Request(
         url,
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {VSEGPT_API_KEY}"
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}"
         }
     )
     try:
         with urllib.request.urlopen(req, timeout=500) as resp:
             raw = resp.read()
-            print(f"[VSEGPT] Response received, size: {len(raw)} bytes")
+            print(f"[OPENROUTER] Response received, size: {len(raw)} bytes")
             result = json.loads(raw)
             if 'error' in result:
-                print(f"[VSEGPT] API error: {result['error']}")
+                print(f"[OPENROUTER] API error: {result['error']}")
                 return None
             content = result['choices'][0]['message']['content']
-            print(f"[VSEGPT] Success, content length: {len(content)}")
+            print(f"[OPENROUTER] Success, content length: {len(content)}")
             return clean_markdown(content)
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
-        print(f"[VSEGPT] HTTP error {e.code}: {body[:500]}")
+        print(f"[OPENROUTER] HTTP error {e.code}: {body[:500]}")
         return None
     except Exception as e:
-        print(f"[VSEGPT] Error: {type(e).__name__}: {e}")
+        print(f"[OPENROUTER] Error: {type(e).__name__}: {e}")
         return None
 
 
