@@ -49,10 +49,11 @@ def create_payment(body_data: dict) -> Dict[str, Any]:
         return make_response(400, {'error': 'amount and return_url are required'})
 
     idempotence_key = str(uuid.uuid4())
+    amount_str = f"{float(amount):.2f}"
 
     payment_data = {
         'amount': {
-            'value': str(amount),
+            'value': amount_str,
             'currency': 'RUB'
         },
         'confirmation': {
@@ -71,7 +72,7 @@ def create_payment(body_data: dict) -> Dict[str, Any]:
                 'description': description[:128] if description else 'Оплата услуги',
                 'quantity': '1.00',
                 'amount': {
-                    'value': str(amount),
+                    'value': amount_str,
                     'currency': 'RUB'
                 },
                 'vat_code': 1,
@@ -91,6 +92,7 @@ def create_payment(body_data: dict) -> Dict[str, Any]:
     )
 
     if resp.status_code not in (200, 201):
+        print(f"YooKassa error: status={resp.status_code}, body={resp.text}")
         return make_response(502, {'error': 'Payment creation failed', 'details': resp.text})
 
     result = resp.json()
