@@ -6,7 +6,7 @@ import psycopg2
 
 BOT_TOKEN = os.environ.get('EXPERT_BOT_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+VSEGPT_API_KEY = os.environ.get('VSEGPT_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
 SELF_URL = 'https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f'
 UNPACKING_PRICE = 1
@@ -358,7 +358,7 @@ def clean_markdown(text):
 
 def generate_unpacking(answers_text):
     import time as _time
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://api.vsegpt.ru/v1/chat/completions"
     payload = {
         "model": "openai/gpt-5.4-xhigh",
         "messages": [
@@ -379,7 +379,7 @@ def generate_unpacking(answers_text):
             data=data,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}"
+                "Authorization": f"Bearer {VSEGPT_API_KEY}"
             }
         )
         try:
