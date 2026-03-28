@@ -360,7 +360,7 @@ def generate_unpacking(answers_text):
     import time as _time
     url = "https://openrouter.ai/api/v1/chat/completions"
     payload = {
-        "model": "qwen/qwen3-next-80b-a3b-instruct:free",
+        "model": "openai/gpt-5.4-xhigh",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
