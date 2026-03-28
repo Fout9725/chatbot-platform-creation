@@ -361,7 +361,7 @@ def clean_markdown(text):
 def generate_unpacking(answers_text):
     url = "https://api.vsegpt.ru/v1/chat/completions"
     payload = {
-        "model": "openai/gpt-5.4-xhigh",
+        "model": "deepseek/deepseek-chat-3.1-alt-fast",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
