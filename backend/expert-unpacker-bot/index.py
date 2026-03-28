@@ -388,9 +388,21 @@ def generate_unpacking(answers_text):
             if 'error' in result:
                 print(f"[VSEGPT] API error: {result['error']}")
                 return None
-            content = result['choices'][0]['message'].get('content')
+            choices = result.get('choices', [])
+            if not choices:
+                print(f"[VSEGPT] Error: no choices in response. Keys: {list(result.keys())}")
+                print(f"[VSEGPT] Response preview: {json.dumps(result, ensure_ascii=False)[:2000]}")
+                return None
+            message = choices[0].get('message', {})
+            print(f"[VSEGPT] Message keys: {list(message.keys())}, finish_reason: {choices[0].get('finish_reason')}")
+            content = message.get('content')
             if not content:
-                print(f"[VSEGPT] Error: content is empty or None")
+                print(f"[VSEGPT] Message object: {json.dumps(message, ensure_ascii=False)[:1000]}")
+                if message.get('reasoning_content'):
+                    content = message.get('reasoning_content')
+                    print(f"[VSEGPT] Using reasoning_content instead, length: {len(content)}")
+            if not content:
+                print(f"[VSEGPT] Error: no usable content found")
                 return None
             print(f"[VSEGPT] Success, content length: {len(content)}")
             return clean_markdown(content)
