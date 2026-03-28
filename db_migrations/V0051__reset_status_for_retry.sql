@@ -1,0 +1,1 @@
+UPDATE expert_users SET status = 'completed' WHERE telegram_id = '285675692';

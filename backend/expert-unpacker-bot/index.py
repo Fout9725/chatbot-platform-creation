@@ -344,6 +344,8 @@ def mark_finished(conn, telegram_id):
 
 
 def clean_markdown(text):
+    if not text:
+        return None
     import re
     text = re.sub(r'#{1,6}\s*', '', text)
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
@@ -386,7 +388,10 @@ def generate_unpacking(answers_text):
             if 'error' in result:
                 print(f"[VSEGPT] API error: {result['error']}")
                 return None
-            content = result['choices'][0]['message']['content']
+            content = result['choices'][0]['message'].get('content')
+            if not content:
+                print(f"[VSEGPT] Error: content is empty or None")
+                return None
             print(f"[VSEGPT] Success, content length: {len(content)}")
             return clean_markdown(content)
     except urllib.error.HTTPError as e:
@@ -518,30 +523,32 @@ def handler(event, context):
         chat_id = body['chat_id']
         telegram_id = body['telegram_id']
         conn = get_db_connection()
-        try:
-            answers = get_all_answers(conn, telegram_id)
-            answers_text = ""
-            for q_num, q_text, answer in answers:
-                answers_text += f"Вопрос {q_num}: {q_text}\nОтвет: {answer}\n\n"
-            print(f"[GENERATE] Starting VseGPT call for {telegram_id}")
-            result = generate_unpacking(answers_text)
-            if result:
-                print(f"[GENERATE] Success for {telegram_id}, length={len(result)}")
-                send_message(chat_id, "✅ Ваша распаковка экспертности готова!\n\n" + "=" * 30)
-                send_long_message(chat_id, result)
-                mark_finished(conn, telegram_id)
-                send_message(chat_id, "\n🎉 Распаковка завершена! Чтобы пройти заново — напишите /start")
-            else:
-                print(f"[GENERATE] Failed for {telegram_id}")
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE expert_users SET status = 'completed', updated_at = NOW() WHERE telegram_id = '%s'"
-                    % telegram_id.replace("'", "''")
-                )
-                conn.commit()
-                send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
-        finally:
-            conn.close()
+        answers = get_all_answers(conn, telegram_id)
+        conn.close()
+        answers_text = ""
+        for q_num, q_text, answer in answers:
+            answers_text += f"Вопрос {q_num}: {q_text}\nОтвет: {answer}\n\n"
+        print(f"[GENERATE] Starting VseGPT call for {telegram_id}")
+        result = generate_unpacking(answers_text)
+        if result:
+            print(f"[GENERATE] Success for {telegram_id}, length={len(result)}")
+            send_message(chat_id, "✅ Ваша распаковка экспертности готова!\n\n" + "=" * 30)
+            send_long_message(chat_id, result)
+            conn2 = get_db_connection()
+            mark_finished(conn2, telegram_id)
+            conn2.close()
+            send_message(chat_id, "\n🎉 Распаковка завершена! Чтобы пройти заново — напишите /start")
+        else:
+            print(f"[GENERATE] Failed for {telegram_id}")
+            conn2 = get_db_connection()
+            cur = conn2.cursor()
+            cur.execute(
+                "UPDATE expert_users SET status = 'completed', updated_at = NOW() WHERE telegram_id = '%s'"
+                % telegram_id.replace("'", "''")
+            )
+            conn2.commit()
+            conn2.close()
+            send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
         return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
 
     message = body.get('message')
