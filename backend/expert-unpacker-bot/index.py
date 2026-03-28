@@ -366,7 +366,7 @@ def generate_unpacking(answers_text):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
         ],
-        "max_tokens": 10000,
+        "max_tokens": 16000,
         "temperature": 0.7,
         "stream": False
     }
@@ -381,7 +381,7 @@ def generate_unpacking(answers_text):
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=240) as resp:
+        with urllib.request.urlopen(req, timeout=280) as resp:
             raw = resp.read()
             print(f"[VSEGPT] Response received, size: {len(raw)} bytes")
             result = json.loads(raw)
@@ -390,19 +390,29 @@ def generate_unpacking(answers_text):
                 return None
             choices = result.get('choices', [])
             if not choices:
-                print(f"[VSEGPT] Error: no choices in response. Keys: {list(result.keys())}")
-                print(f"[VSEGPT] Response preview: {json.dumps(result, ensure_ascii=False)[:2000]}")
+                print(f"[VSEGPT] Error: no choices. Keys: {list(result.keys())}")
                 return None
             message = choices[0].get('message', {})
-            print(f"[VSEGPT] Message keys: {list(message.keys())}, finish_reason: {choices[0].get('finish_reason')}")
+            finish_reason = choices[0].get('finish_reason')
+            msg_keys = list(message.keys())
+            print(f"[VSEGPT] Message keys: {msg_keys}, finish_reason: {finish_reason}")
             content = message.get('content')
+            if not content and message.get('reasoning'):
+                content = message.get('reasoning')
+                print(f"[VSEGPT] Using 'reasoning' field, length: {len(content)}")
+            if not content and message.get('reasoning_content'):
+                content = message.get('reasoning_content')
+                print(f"[VSEGPT] Using 'reasoning_content' field, length: {len(content)}")
+            if not content and message.get('reasoning_details'):
+                details = message.get('reasoning_details')
+                if isinstance(details, list):
+                    content = "\n".join(d.get('content', '') if isinstance(d, dict) else str(d) for d in details)
+                elif isinstance(details, str):
+                    content = details
+                if content:
+                    print(f"[VSEGPT] Using 'reasoning_details' field, length: {len(content)}")
             if not content:
-                print(f"[VSEGPT] Message object: {json.dumps(message, ensure_ascii=False)[:1000]}")
-                if message.get('reasoning_content'):
-                    content = message.get('reasoning_content')
-                    print(f"[VSEGPT] Using reasoning_content instead, length: {len(content)}")
-            if not content:
-                print(f"[VSEGPT] Error: no usable content found")
+                print(f"[VSEGPT] Error: no usable content. Message preview: {json.dumps(message, ensure_ascii=False)[:500]}")
                 return None
             print(f"[VSEGPT] Success, content length: {len(content)}")
             return clean_markdown(content)
