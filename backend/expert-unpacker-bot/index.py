@@ -366,7 +366,7 @@ def generate_unpacking(answers_text):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Вот ответы эксперта на 17 вопросов распаковки:\n\n{answers_text}\n\nСоздай полную профессиональную распаковку по всем 5 разделам структуры."}
         ],
-        "max_tokens": 16000,
+        "max_tokens": 50000,
         "temperature": 0.7,
         "stream": False
     }
@@ -381,7 +381,7 @@ def generate_unpacking(answers_text):
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=280) as resp:
+        with urllib.request.urlopen(req, timeout=290) as resp:
             raw = resp.read()
             print(f"[VSEGPT] Response received, size: {len(raw)} bytes")
             result = json.loads(raw)
@@ -397,22 +397,36 @@ def generate_unpacking(answers_text):
             msg_keys = list(message.keys())
             print(f"[VSEGPT] Message keys: {msg_keys}, finish_reason: {finish_reason}")
             content = message.get('content')
-            if not content and message.get('reasoning'):
-                content = message.get('reasoning')
-                print(f"[VSEGPT] Using 'reasoning' field, length: {len(content)}")
-            if not content and message.get('reasoning_content'):
-                content = message.get('reasoning_content')
-                print(f"[VSEGPT] Using 'reasoning_content' field, length: {len(content)}")
+            if content:
+                print(f"[VSEGPT] Got content field, length: {len(content)}")
+            if not content:
+                print(f"[VSEGPT] content is empty/null, checking alternative fields...")
+                for field_name in ['reasoning', 'reasoning_content']:
+                    val = message.get(field_name)
+                    if val and isinstance(val, str) and len(val) > 100:
+                        content = val
+                        print(f"[VSEGPT] Using '{field_name}' field as fallback, length: {len(content)}")
+                        break
             if not content and message.get('reasoning_details'):
                 details = message.get('reasoning_details')
                 if isinstance(details, list):
-                    content = "\n".join(d.get('content', '') if isinstance(d, dict) else str(d) for d in details)
+                    parts = []
+                    for d in details:
+                        if isinstance(d, dict):
+                            parts.append(d.get('content', ''))
+                        else:
+                            parts.append(str(d))
+                    content = "\n".join(p for p in parts if p)
                 elif isinstance(details, str):
                     content = details
-                if content:
-                    print(f"[VSEGPT] Using 'reasoning_details' field, length: {len(content)}")
+                if content and len(content) > 100:
+                    print(f"[VSEGPT] Using 'reasoning_details' as fallback, length: {len(content)}")
+                else:
+                    content = None
             if not content:
-                print(f"[VSEGPT] Error: no usable content. Message preview: {json.dumps(message, ensure_ascii=False)[:500]}")
+                print(f"[VSEGPT] Error: no usable content. Keys: {msg_keys}")
+                raw_preview = json.dumps(message, ensure_ascii=False)[:800]
+                print(f"[VSEGPT] Message preview: {raw_preview}")
                 return None
             print(f"[VSEGPT] Success, content length: {len(content)}")
             return clean_markdown(content)
