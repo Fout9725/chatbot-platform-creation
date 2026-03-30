@@ -626,7 +626,7 @@ def handler(event, context):
             user = get_or_create_user(conn, telegram_id, username, first_name)
             current_step = user['question_step']
             if current_step == 0:
-                send_message(chat_id, "👋 Напишите /start чтобы начать распаковку экспертности!")
+                send_message(chat_id, "👋 Нажмите на /start чтобы начать распаковку экспертности!")
             elif current_step > 17:
                 send_message(chat_id, "✅ Вы уже ответили на все вопросы! Напишите /done для получения распаковки.")
             else:
