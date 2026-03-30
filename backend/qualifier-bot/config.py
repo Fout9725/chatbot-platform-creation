@@ -350,3 +350,55 @@ OBJECTIONS = {
     "дорого": "ℹ️ Посчитайте: сколько стоит SMM-щик (30К/мес), таргетолог (25К/мес), монтажёр (15К/мес)? Автоматизация окупается за 2-3 месяца и работает годами.",
     "деньги впустую": "ℹ️ Можно начать с пилотного проекта — одна автоматизация, минимальный бюджет. Увидите результат — масштабируем. Нет результата — не теряете много.",
 }
+
+# Short callback keys mapped to full text values.
+# Telegram limits callback_data to 64 bytes, so we use short ASCII keys.
+CALLBACK_MAP = {
+    "go": "Поехали 🚀",
+    "examples": "Примеры автоматизаций",
+    "diag_yes": "Да, пройти диагностику",
+    "consult_now": "Сразу на консультацию",
+    # Question 1 options
+    "q1_1": QUESTION_1_OPTIONS[0],
+    "q1_2": QUESTION_1_OPTIONS[1],
+    "q1_3": QUESTION_1_OPTIONS[2],
+    "q1_4": QUESTION_1_OPTIONS[3],
+    "q1_5": QUESTION_1_OPTIONS[4],
+    # Question 2 options
+    "q2_1": QUESTION_2_OPTIONS[0],
+    "q2_2": QUESTION_2_OPTIONS[1],
+    "q2_3": QUESTION_2_OPTIONS[2],
+    "q2_4": QUESTION_2_OPTIONS[3],
+    "q2_5": QUESTION_2_OPTIONS[4],
+    # Question 3 options
+    "q3_1": QUESTION_3_OPTIONS[0],
+    "q3_2": QUESTION_3_OPTIONS[1],
+    "q3_3": QUESTION_3_OPTIONS[2],
+    # Question 4 options
+    "q4_1": QUESTION_4_OPTIONS[0],
+    "q4_2": QUESTION_4_OPTIONS[1],
+    "q4_3": QUESTION_4_OPTIONS[2],
+    "q4_4": QUESTION_4_OPTIONS[3],
+    "q4_5": QUESTION_4_OPTIONS[4],
+    "q4_6": QUESTION_4_OPTIONS[5],
+    # Format options
+    "fmt_1": FORMAT_OPTIONS[0],
+    "fmt_2": FORMAT_OPTIONS[1],
+    "fmt_3": FORMAT_OPTIONS[2],
+    "fmt_4": FORMAT_OPTIONS[3],
+    # Time options
+    "time_1": TIME_OPTIONS[0],
+    "time_2": TIME_OPTIONS[1],
+    "time_3": TIME_OPTIONS[2],
+    "time_4": TIME_OPTIONS[3],
+    # Result/case/lead buttons
+    "show_case": "Покажите пример из реального бизнеса",
+    "want_consult": "Хочу разобрать это на консультации",
+    "want_same": "Хочу так же — обсудить на консультации",
+    "sign_consult": "Записаться на консультацию",
+    "go_channel": "Перейти в канал",
+    "go_start": "Вернуться в начало",
+}
+
+# Reverse map: full text -> short key
+REVERSE_CALLBACK_MAP = {v: k for k, v in CALLBACK_MAP.items()}

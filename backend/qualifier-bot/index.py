@@ -1,4 +1,4 @@
-"""Telegram бот-квалификатор для предпринимателей. Задаёт 4 вопроса, подбирает решения по автоматизации и собирает заявки на консультацию."""
+"""Telegram бот-квалификатор для предпринимателей. Задаёт вопросы, подбирает решения по автоматизации и собирает заявки на консультацию."""
 
 import json
 import os
@@ -19,6 +19,7 @@ from config import (
     LEAD_SENT_TEXT, CHANNEL_LINK,
     HELP_TEXT, ABOUT_TEXT, BUTTON_INCORRECT_TEXT,
     FREE_TEXT_RESPONSES, SOLUTIONS, CASES, OBJECTIONS,
+    CALLBACK_MAP, REVERSE_CALLBACK_MAP,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -98,9 +99,11 @@ def send_message_inline(chat_id, text, buttons):
     keyboard = []
     for btn in buttons:
         if isinstance(btn, dict):
+            # Already has explicit text/callback_data or url
             keyboard.append([btn])
         else:
-            keyboard.append([{"text": btn, "callback_data": btn[:64]}])
+            cb_key = REVERSE_CALLBACK_MAP.get(btn, btn[:64])
+            keyboard.append([{"text": btn, "callback_data": cb_key}])
     reply_markup = {"inline_keyboard": keyboard}
     return send_message(chat_id, text, reply_markup)
 
@@ -352,7 +355,10 @@ def handle_callback(chat_id, user_id, username, callback_data, callback_query_id
     answer_callback(callback_query_id)
     state = get_state(user_id)
 
-    if callback_data == "Поехали 🚀" or callback_data == "Да, пройти диагностику":
+    # Resolve short callback key to full text via CALLBACK_MAP
+    full_text = CALLBACK_MAP.get(callback_data, callback_data)
+
+    if callback_data == "go" or callback_data == "diag_yes":
         db_execute(
             f"DELETE FROM {DB_SCHEMA}.qualifier_answers WHERE user_id = %s AND completed_at IS NULL",
             [user_id],
@@ -361,14 +367,14 @@ def handle_callback(chat_id, user_id, username, callback_data, callback_query_id
         set_state(user_id, STATES["q1"])
         return
 
-    if callback_data == "Примеры автоматизаций":
+    if callback_data == "examples":
         send_message_inline(chat_id, EXAMPLES_TEXT, [
             "Да, пройти диагностику",
             "Сразу на консультацию",
         ])
         return
 
-    if callback_data == "Сразу на консультацию":
+    if callback_data == "consult_now":
         db_execute(
             f"DELETE FROM {DB_SCHEMA}.qualifier_answers WHERE user_id = %s AND completed_at IS NULL",
             [user_id],
@@ -382,35 +388,35 @@ def handle_callback(chat_id, user_id, username, callback_data, callback_query_id
         set_state(user_id, STATES["ask_name"])
         return
 
-    if callback_data in QUESTION_1_OPTIONS:
-        if callback_data == "Другое (напишите свой вариант)":
+    if callback_data in ["q1_1", "q1_2", "q1_3", "q1_4", "q1_5"]:
+        if callback_data == "q1_5":
             send_message(chat_id, "Напишите вашу нишу в 1-2 словах:")
             set_state(user_id, STATES["q1_custom"])
             return
-        save_answer(user_id, "niche", callback_data)
+        save_answer(user_id, "niche", full_text)
         send_message_inline(chat_id, QUESTION_2_TEXT, QUESTION_2_OPTIONS)
         set_state(user_id, STATES["q2"])
         return
 
-    if callback_data in QUESTION_2_OPTIONS:
-        save_answer(user_id, "pain", callback_data)
+    if callback_data in ["q2_1", "q2_2", "q2_3", "q2_4", "q2_5"]:
+        save_answer(user_id, "pain", full_text)
         send_message_inline(chat_id, QUESTION_3_TEXT, QUESTION_3_OPTIONS)
         set_state(user_id, STATES["q3"])
         return
 
-    if callback_data in QUESTION_3_OPTIONS:
-        save_answer(user_id, "automation_level", callback_data)
+    if callback_data in ["q3_1", "q3_2", "q3_3"]:
+        save_answer(user_id, "automation_level", full_text)
         send_message_inline(chat_id, QUESTION_4_TEXT, QUESTION_4_OPTIONS)
         set_state(user_id, STATES["q4"])
         return
 
-    if callback_data in QUESTION_4_OPTIONS:
-        save_answer(user_id, "sales_channel", callback_data)
+    if callback_data in ["q4_1", "q4_2", "q4_3", "q4_4", "q4_5", "q4_6"]:
+        save_answer(user_id, "sales_channel", full_text)
         complete_answers(user_id)
         show_results(chat_id, user_id)
         return
 
-    if callback_data == "Покажите пример из реального" or callback_data.startswith("Покажите пример"):
+    if callback_data == "show_case":
         answers = get_answers(user_id)
         niche = answers.get("niche", "")
         case_text = get_case_for_niche(niche)
@@ -420,31 +426,31 @@ def handle_callback(chat_id, user_id, username, callback_data, callback_query_id
         set_state(user_id, STATES["case"])
         return
 
-    if callback_data.startswith("Хочу разобрать это") or callback_data.startswith("Хочу так же"):
+    if callback_data == "want_consult" or callback_data == "want_same":
         send_message(chat_id, CONSULTATION_TEXT)
         send_message(chat_id, ASK_NAME_TEXT)
         set_state(user_id, STATES["ask_name"])
         return
 
-    if callback_data in FORMAT_OPTIONS:
-        save_lead(user_id, "preferred_format", callback_data)
+    if callback_data in ["fmt_1", "fmt_2", "fmt_3", "fmt_4"]:
+        save_lead(user_id, "preferred_format", full_text)
         send_message_inline(chat_id, ASK_TIME_TEXT, TIME_OPTIONS)
         set_state(user_id, STATES["ask_time"])
         return
 
-    if callback_data in TIME_OPTIONS:
-        if callback_data == "Напишу конкретное время":
+    if callback_data in ["time_1", "time_2", "time_3", "time_4"]:
+        if callback_data == "time_4":
             send_message(chat_id, "Напишите удобное время (по МСК):")
             set_state(user_id, STATES["ask_time_custom"])
             return
-        save_lead(user_id, "preferred_time", callback_data)
+        save_lead(user_id, "preferred_time", full_text)
         finalize_lead(chat_id, user_id, username)
         return
 
-    if callback_data == "Перейти в канал":
+    if callback_data == "go_channel":
         return
 
-    if callback_data == "Вернуться в начало":
+    if callback_data == "go_start":
         first_name_rows = db_execute(
             f"SELECT first_name FROM {DB_SCHEMA}.qualifier_users WHERE user_id = %s",
             [user_id],
@@ -453,7 +459,7 @@ def handle_callback(chat_id, user_id, username, callback_data, callback_query_id
         handle_start(chat_id, user_id, username, fn)
         return
 
-    if callback_data == "Записаться на консультацию":
+    if callback_data == "sign_consult":
         send_message(chat_id, CONSULTATION_TEXT)
         send_message(chat_id, ASK_NAME_TEXT)
         set_state(user_id, STATES["ask_name"])
@@ -472,8 +478,8 @@ def show_results(chat_id, user_id):
         send_message(chat_id, f"💡 <b>Персональная рекомендация:</b>\n\n{ai_addition}")
 
     send_message_inline(chat_id, "Что дальше?", [
-        {"text": "Покажите пример из реального бизнеса", "callback_data": "Покажите пример из реального"},
-        {"text": "Хочу разобрать это на консультации", "callback_data": "Хочу разобрать это на консульт"},
+        {"text": "Покажите пример из реального бизнеса", "callback_data": "show_case"},
+        {"text": "Хочу разобрать это на консультации", "callback_data": "want_consult"},
     ])
     set_state(user_id, STATES["results"])
 
@@ -488,7 +494,7 @@ def finalize_lead(chat_id, user_id, username):
 
     buttons = {
         "inline_keyboard": [
-            [{"text": "Вернуться в начало", "callback_data": "Вернуться в начало"}],
+            [{"text": "Вернуться в начало", "callback_data": "go_start"}],
         ]
     }
 
