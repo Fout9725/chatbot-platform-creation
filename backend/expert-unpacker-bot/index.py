@@ -587,6 +587,21 @@ def handler(event, context):
             send_message(chat_id, "❌ Не удалось получить ответ от нейросети. Попробуйте позже — напишите /done")
         return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
 
+    update_id = body.get('update_id')
+    if update_id:
+        conn_dedup = get_db_connection()
+        cur_dedup = conn_dedup.cursor()
+        cur_dedup.execute("SELECT 1 FROM expert_processed_updates WHERE update_id = %d" % int(update_id))
+        if cur_dedup.fetchone():
+            print(f"[DEDUP] Skipping duplicate update_id={update_id}")
+            conn_dedup.close()
+            return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
+        cur_dedup.execute("INSERT INTO expert_processed_updates (update_id) VALUES (%d)" % int(update_id))
+        conn_dedup.commit()
+        cur_dedup.execute("DELETE FROM expert_processed_updates WHERE created_at < NOW() - INTERVAL '1 hour'")
+        conn_dedup.commit()
+        conn_dedup.close()
+
     message = body.get('message')
     if not message:
         return {'statusCode': 200, 'headers': headers, 'body': json.dumps({"ok": True})}
