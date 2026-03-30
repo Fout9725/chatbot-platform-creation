@@ -1,4 +1,6 @@
 {
+  "qualifier-bot": "https://functions.poehali.dev/ee384e88-64f8-4252-a912-e2c64046d296",
+  "set-qualifier-webhook": "https://functions.poehali.dev/9826be3e-01ce-41b1-9415-f66f42835d79",
   "expert-unpacker-bot": "https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f",
   "set-expert-webhook": "https://functions.poehali.dev/4de1eadb-d0bd-43f0-b62d-40ade547655f",
   "yookassa-payment": "https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3",
