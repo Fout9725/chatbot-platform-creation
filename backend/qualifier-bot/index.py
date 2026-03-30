@@ -31,6 +31,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DB_SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "public")
 VSEGPT_API_KEY = os.environ.get("VSEGPT_API_KEY", "")
 
+print(f"[INIT] ADMIN_CHAT_ID loaded: '{ADMIN_CHAT_ID}' (len={len(ADMIN_CHAT_ID)})")
+
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 STATES = {
@@ -333,7 +335,8 @@ def send_admin_notification(user_id, username, answers, lead):
         ]
     }
 
-    send_message(ADMIN_CHAT_ID, text, buttons)
+    result = send_message(ADMIN_CHAT_ID, text, buttons)
+    print(f"[ADMIN] send_message result: {result}")
 
 
 def handle_start(chat_id, user_id, username, first_name, start_param=None):
@@ -487,8 +490,10 @@ def show_results(chat_id, user_id):
 
 
 def finalize_lead(chat_id, user_id, username):
+    print(f"[FINALIZE] Starting finalize_lead for user {user_id}, username={username}")
     answers = get_answers(user_id)
     lead = get_lead(user_id)
+    print(f"[FINALIZE] answers={answers}, lead={lead}")
 
     send_admin_notification(user_id, username, answers, lead)
 
