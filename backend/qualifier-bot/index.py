@@ -301,7 +301,9 @@ def generate_ai_solutions(answers):
 
 def send_admin_notification(user_id, username, answers, lead):
     if not ADMIN_CHAT_ID:
+        logger.warning(f"[ADMIN] QUALIFIER_ADMIN_CHAT_ID not set, skipping notification for user {user_id}")
         return
+    logger.info(f"[ADMIN] Sending notification to {ADMIN_CHAT_ID} about user {user_id}")
 
     now = datetime.now().strftime("%d.%m.%Y %H:%M")
     contact = lead.get("contact_phone") or lead.get("contact_telegram") or "не указан"
