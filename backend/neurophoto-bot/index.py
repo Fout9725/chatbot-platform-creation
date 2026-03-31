@@ -180,6 +180,15 @@ MODEL_PRICING = {
     'txt-flash-25': {'cost_rub': 13.0, 'label': '13 ₽'},
 }
 
+ASPECT_RATIOS = {
+    'square': {'size': '1024x1024', 'label': '1:1 Квадрат', 'icon': '⬜'},
+    'portrait': {'size': '768x1344', 'label': '9:16 Портрет', 'icon': '📱'},
+    'landscape': {'size': '1344x768', 'label': '16:9 Ландшафт', 'icon': '🖼'},
+    'portrait_43': {'size': '896x1152', 'label': '3:4 Портрет', 'icon': '📷'},
+    'landscape_43': {'size': '1152x896', 'label': '4:3 Ландшафт', 'icon': '🏞'},
+}
+DEFAULT_RATIO = 'square'
+
 MODEL_INSTRUCTIONS = {
     'nano-banana': (
         '🍌 <b>Nano Banana Pro Edit</b>\n\n'
@@ -677,7 +686,7 @@ def compress_photo(photo_bytes, max_size=512):
         return photo_bytes
 
 
-def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None):
+def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None, aspect_ratio=None):
     if not VSEGPT_KEY:
         return None, 'VSEGPT_API_KEY не настроен'
 
@@ -690,6 +699,9 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
         'n': 1,
         'response_format': 'b64_json'
     }
+
+    if aspect_ratio and aspect_ratio in ASPECT_RATIOS:
+        body['size'] = ASPECT_RATIOS[aspect_ratio]['size']
 
     if cdn_urls:
         body['image_url'] = cdn_urls[0]
@@ -765,7 +777,7 @@ def vsegpt_generate(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_
     return None, 'Модель не вернула изображение. Попробуйте другой промпт или модель.'
 
 
-def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None):
+def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_urls=None, aspect_ratio=None):
     model_info = MODELS.get(model_key)
     if not model_info:
         return None, f'Неизвестная модель: {model_key}'
@@ -773,7 +785,7 @@ def generate_image(model_key, prompt, photo_bytes=None, extra_photos=None, cdn_u
     if model_info['provider'] == 'gemini':
         return gemini_generate(prompt, photo_bytes)
     else:
-        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=cdn_urls)
+        return vsegpt_generate(model_key, prompt, photo_bytes, extra_photos=extra_photos, cdn_urls=cdn_urls, aspect_ratio=aspect_ratio)
 
 
 def openrouter_make_prompt(model_key, user_description):
@@ -1081,6 +1093,14 @@ def prompt_keyboard():
     return {'inline_keyboard': buttons}
 
 
+def ratio_keyboard(callback_prefix='ratio'):
+    buttons = []
+    for key, info in ASPECT_RATIOS.items():
+        buttons.append([{'text': f'{info["icon"]} {info["label"]}', 'callback_data': f'{callback_prefix}:{key}'}])
+    buttons.append([{'text': '🏠 Отмена', 'callback_data': 'go_start'}])
+    return {'inline_keyboard': buttons}
+
+
 def current_model_text(model_key):
     info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
     return f"{info['name']}"
@@ -1127,7 +1147,7 @@ def after_gen_keyboard():
     ]}
 
 
-def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None, photo_cdn_urls=None):
+def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None, extra_photos=None, photo_cdn_urls=None, aspect_ratio=None):
     model_info = MODELS.get(model_key, MODELS[DEFAULT_MODEL])
     print(f'[GEN] Starting inline: tid={tid}, model={model_key}, has_photo={photo_bytes is not None}, cdn_urls={len(photo_cdn_urls) if photo_cdn_urls else 0}')
 
@@ -1166,7 +1186,7 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
             gen_extra = None
             print(f'[GEN] Uploaded {len(vsegpt_cdn)} photos to CDN for VseGPT')
 
-        img_bytes_result, err = generate_image(model_key, prompt, gen_photo, extra_photos=gen_extra, cdn_urls=vsegpt_cdn)
+        img_bytes_result, err = generate_image(model_key, prompt, gen_photo, extra_photos=gen_extra, cdn_urls=vsegpt_cdn, aspect_ratio=aspect_ratio)
 
         conn = ensure_conn(conn)
 
@@ -1178,7 +1198,9 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
 
         user = get_user(conn, tid, '', '')
         left = remaining(user) - 1
-        caption = f'\u2728 \u0413\u043e\u0442\u043e\u0432\u043e! \u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}\n\ud83d\udc8e \u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c: <b>{left}</b>'
+        ratio_info = ASPECT_RATIOS.get(aspect_ratio, {})
+        ratio_label = f' | {ratio_info.get("icon", "")} {ratio_info.get("label", "")}' if ratio_info else ''
+        caption = f'\u2728 \u0413\u043e\u0442\u043e\u0432\u043e! \u041c\u043e\u0434\u0435\u043b\u044c: {model_info["name"]}{ratio_label}\n\ud83d\udc8e \u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c: <b>{left}</b>'
         kb = after_gen_keyboard()
 
         print(f'[GEN] Got {len(img_bytes_result)} bytes, sending to Telegram...')
@@ -1211,7 +1233,7 @@ def run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes=None,
             pass
 
 
-def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None, skip_status_msg=False):
+def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos=None, photo_cdn_urls=None, skip_status_msg=False, aspect_ratio=None):
     cur = conn.cursor()
     cur.execute(
         f"SELECT 1 FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s AND session_state = 'generating' AND session_updated_at > CURRENT_TIMESTAMP - INTERVAL '120 seconds'",
@@ -1240,7 +1262,7 @@ def do_generate(conn, chat_id, tid, user, prompt, photo_bytes=None, extra_photos
             else:
                 send_msg(chat_id, f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.')
 
-    run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes, extra_photos, photo_cdn_urls)
+    run_generate_inline(conn, chat_id, tid, prompt, model_key, photo_bytes, extra_photos, photo_cdn_urls, aspect_ratio=aspect_ratio)
 
 
 def handler(event, context):
@@ -1525,23 +1547,34 @@ def handler(event, context):
                     send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
                     set_session(conn, tid, None)
                     return ok()
-                do_generate(conn, chat_id, tid, user, text, photo_cdn_urls=cdn_urls)
+                cur_prompt = conn.cursor()
+                cur_prompt.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                    (text, tid)
+                )
+                cur_prompt.close()
+                set_session_album(conn, tid, 'choose_ratio_album', mg)
+                send_msg(chat_id, '📐 Выберите соотношение сторон:', reply_markup=ratio_keyboard())
                 return ok()
 
             if state == 'waiting_prompt' and user.get('photo'):
-                photo_bytes = download_url(user['photo'])
-                if not photo_bytes:
-                    send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
-                    set_session(conn, tid, None)
-                    return ok()
-                do_generate(conn, chat_id, tid, user, text, photo_bytes)
+                cur_pr = conn.cursor()
+                cur_pr.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_media_group = %s WHERE telegram_id = %s",
+                    (text, tid)
+                )
+                cur_pr.close()
+                set_session(conn, tid, 'choose_ratio_img', user['photo'])
+                send_msg(chat_id, '📐 Выберите соотношение сторон:', reply_markup=ratio_keyboard())
             elif state == 'chosen_img_model' and user.get('photo'):
-                photo_bytes = download_url(user['photo'])
-                if not photo_bytes:
-                    send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
-                    set_session(conn, tid, None)
-                    return ok()
-                do_generate(conn, chat_id, tid, user, text, photo_bytes)
+                cur_pr = conn.cursor()
+                cur_pr.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_media_group = %s WHERE telegram_id = %s",
+                    (text, tid)
+                )
+                cur_pr.close()
+                set_session(conn, tid, 'choose_ratio_img', user['photo'])
+                send_msg(chat_id, '📐 Выберите соотношение сторон:', reply_markup=ratio_keyboard())
             elif state == 'choosing_text_model':
                 send_msg(chat_id, '👆 Сначала выберите нейросеть из списка выше.')
             else:
@@ -1838,19 +1871,21 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                 set_model(conn, tid, model_key)
                 model_info = MODELS[model_key]
                 if saved_caption and mg:
-                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                    set_session_album(conn, tid, 'choose_ratio_album', mg)
+                    cur_cap = conn.cursor()
+                    cur_cap.execute(
+                        f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                        (saved_caption, tid)
+                    )
+                    cur_cap.close()
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
                     tg('editMessageText', {
                         'chat_id': chat_id,
                         'message_id': msg_id,
-                        'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
-                        'parse_mode': 'HTML'
+                        'text': f'🤖 Модель: <b>{model_info["name"]}</b>\n\n📐 Выберите соотношение сторон:',
+                        'parse_mode': 'HTML',
+                        'reply_markup': ratio_keyboard()
                     })
-                    cdn_urls = get_album_photos(conn, tid, mg)
-                    if len(cdn_urls) < 2:
-                        send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
-                        set_session(conn, tid, None)
-                    else:
-                        do_generate(conn, chat_id, tid, user, saved_caption, photo_cdn_urls=cdn_urls, skip_status_msg=True)
                 else:
                     set_session_album(conn, tid, 'waiting_album_prompt', mg)
                     tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
@@ -1866,19 +1901,15 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                 if saved_caption:
                     user['model'] = model_key
                     model_info = MODELS[model_key]
-                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                    set_session(conn, tid, 'choose_ratio_img', saved_prompt)
+                    tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
                     tg('editMessageText', {
                         'chat_id': chat_id,
                         'message_id': msg_id,
-                        'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
-                        'parse_mode': 'HTML'
+                        'text': f'🤖 Модель: <b>{model_info["name"]}</b>\n\n📐 Выберите соотношение сторон:',
+                        'parse_mode': 'HTML',
+                        'reply_markup': ratio_keyboard()
                     })
-                    photo_bytes = download_url(saved_prompt)
-                    if photo_bytes:
-                        do_generate(conn, chat_id, tid, user, saved_caption, photo_bytes, skip_status_msg=True)
-                    else:
-                        send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
-                        set_session(conn, tid, None)
                 else:
                     set_session(conn, tid, 'chosen_img_model', saved_prompt)
                     model_info = MODELS[model_key]
@@ -1893,14 +1924,15 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             elif state == 'choosing_text_model' and saved_prompt:
                 user['model'] = model_key
                 model_info = MODELS[model_key]
-                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Генерирую через {model_info["name"]}...'})
+                set_session(conn, tid, 'choose_ratio_text', saved_prompt)
+                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
                 tg('editMessageText', {
                     'chat_id': chat_id,
                     'message_id': msg_id,
-                    'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
-                    'parse_mode': 'HTML'
+                    'text': f'🤖 Модель: <b>{model_info["name"]}</b>\n\n📐 Выберите соотношение сторон:',
+                    'parse_mode': 'HTML',
+                    'reply_markup': ratio_keyboard()
                 })
-                do_generate(conn, chat_id, tid, user, saved_prompt, skip_status_msg=True)
             elif state == 'waiting_prompt' and saved_prompt:
                 set_session(conn, tid, 'chosen_img_model', saved_prompt)
                 set_model(conn, tid, model_key)
@@ -2012,6 +2044,84 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                     [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
                 ]}
             })
+        finally:
+            conn.close()
+        return ok()
+
+    if cb_data.startswith('ratio:'):
+        ratio_key = cb_data.split(':', 1)[1]
+        if ratio_key not in ASPECT_RATIOS:
+            tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': 'Неизвестный размер'})
+            return ok()
+
+        tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'{ASPECT_RATIOS[ratio_key]["icon"]} {ASPECT_RATIOS[ratio_key]["label"]}'})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            state = user.get('state', '') or ''
+
+            if state == 'choose_ratio_text':
+                saved_prompt = user.get('photo', '')
+                if not saved_prompt:
+                    send_msg(chat_id, '❌ Промпт не найден. Начните заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                model_info = MODELS.get(user['model'], MODELS[DEFAULT_MODEL])
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                    'parse_mode': 'HTML'
+                })
+                do_generate(conn, chat_id, tid, user, saved_prompt, skip_status_msg=True, aspect_ratio=ratio_key)
+
+            elif state == 'choose_ratio_img':
+                photo_url = user.get('photo', '')
+                saved_caption = user.get('media_group', '') or ''
+                if not photo_url or not saved_caption:
+                    send_msg(chat_id, '❌ Данные устарели. Отправьте фото заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                model_info = MODELS.get(user['model'], MODELS[DEFAULT_MODEL])
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                    'parse_mode': 'HTML'
+                })
+                photo_bytes = download_url(photo_url)
+                if not photo_bytes:
+                    send_msg(chat_id, '❌ Фото устарело. Отправьте его ещё раз.')
+                    set_session(conn, tid, None)
+                    return ok()
+                do_generate(conn, chat_id, tid, user, saved_caption, photo_bytes, skip_status_msg=True, aspect_ratio=ratio_key)
+
+            elif state == 'choose_ratio_album':
+                mg = get_user_media_group(conn, tid)
+                saved_caption = user.get('photo', '')
+                if not mg or not saved_caption:
+                    send_msg(chat_id, '❌ Данные устарели. Отправьте фото заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                cdn_urls = get_album_photos(conn, tid, mg)
+                if len(cdn_urls) < 2:
+                    send_msg(chat_id, '❌ Фото не найдены. Отправьте альбом заново.')
+                    set_session(conn, tid, None)
+                    return ok()
+                model_info = MODELS.get(user['model'], MODELS[DEFAULT_MODEL])
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'🎨 Генерирую через {model_info["name"]}...\nОбычно 15-60 секунд.',
+                    'parse_mode': 'HTML'
+                })
+                do_generate(conn, chat_id, tid, user, saved_caption, photo_cdn_urls=cdn_urls, skip_status_msg=True, aspect_ratio=ratio_key)
+
+            else:
+                send_msg(chat_id, '❌ Сессия устарела. Начните заново.')
+                set_session(conn, tid, None)
         finally:
             conn.close()
         return ok()
