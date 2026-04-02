@@ -27,11 +27,13 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("QUALIFIER_BOT_TOKEN", "")
 ADMIN_CHAT_ID = os.environ.get("QUALIFIER_ADMIN_CHAT_ID", "")
+NOTIFY_CHAT_ID = os.environ.get("QUALIFIER_NOTIFY_CHAT_ID", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DB_SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "public")
 VSEGPT_API_KEY = os.environ.get("VSEGPT_API_KEY", "")
 
 print(f"[INIT] ADMIN_CHAT_ID loaded: '{ADMIN_CHAT_ID}' (len={len(ADMIN_CHAT_ID)})")
+print(f"[INIT] NOTIFY_CHAT_ID loaded: '{NOTIFY_CHAT_ID}' (len={len(NOTIFY_CHAT_ID)})")
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -302,10 +304,11 @@ def generate_ai_solutions(answers):
 
 
 def send_admin_notification(user_id, username, answers, lead):
-    if not ADMIN_CHAT_ID:
-        logger.warning(f"[ADMIN] QUALIFIER_ADMIN_CHAT_ID not set, skipping notification for user {user_id}")
+    target_chat = NOTIFY_CHAT_ID or ADMIN_CHAT_ID
+    if not target_chat:
+        logger.warning(f"[ADMIN] No notification chat configured, skipping for user {user_id}")
         return
-    logger.info(f"[ADMIN] Sending notification to {ADMIN_CHAT_ID} about user {user_id}")
+    logger.info(f"[ADMIN] Sending notification to {target_chat} about user {user_id}")
 
     now = datetime.now().strftime("%d.%m.%Y %H:%M")
     contact = lead.get("contact_phone") or lead.get("contact_telegram") or "не указан"
@@ -335,8 +338,8 @@ def send_admin_notification(user_id, username, answers, lead):
         ]
     }
 
-    result = send_message(ADMIN_CHAT_ID, text, buttons)
-    print(f"[ADMIN] send_message result: {result}")
+    result = send_message(target_chat, text, buttons)
+    print(f"[ADMIN] send_message to {target_chat} result: {result}")
 
 
 def handle_start(chat_id, user_id, username, first_name, start_param=None):
