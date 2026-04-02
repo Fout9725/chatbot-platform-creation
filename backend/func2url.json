@@ -4,17 +4,12 @@
   "expert-unpacker-bot": "https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f",
   "set-expert-webhook": "https://functions.poehali.dev/4de1eadb-d0bd-43f0-b62d-40ade547655f",
   "yookassa-payment": "https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3",
-  "procurement-agent": "https://functions.poehali.dev/3d3dea39-efc8-43ac-a7fa-26bb2c1f94dd",
   "prompt-engineer": "https://functions.poehali.dev/6b952156-c637-4843-9ac7-f3f8ebe94378",
   "neurophoto-bot": "https://functions.poehali.dev/1be088c2-be07-4761-a09f-12486000897f",
   "img2img-generate": "https://functions.poehali.dev/bb0c4f2d-f5c7-40b4-bc72-9e0757dfac0e",
   "knowledge-base": "https://functions.poehali.dev/236ece2b-8750-483b-b84f-5d1e118c869e",
   "admin-auth": "https://functions.poehali.dev/715c66ff-a69d-45f5-aedd-57906976f30b",
-  "instagram-workflow": "https://functions.poehali.dev/a0badc6a-7e0c-48cd-8b5e-a5985f0d8b92",
-  "bot-builder": "https://functions.poehali.dev/f74c949b-7d94-4880-aedd-ac4442889227",
   "poll-cron-trigger": "https://functions.poehali.dev/3f3ec925-eb26-4cb8-b957-7c54490ccc71",
-  "poll-scheduler-bot": "https://functions.poehali.dev/dee8fe93-01c0-4f74-92c1-a23ec5c6c5f7",
-  "poll-scheduler-worker": "https://functions.poehali.dev/6937f818-f5ef-4075-afb4-48594cb1a442",
   "users-sync": "https://functions.poehali.dev/28a8e1f1-0c2b-4802-8fbe-0a098fc29bec",
   "assistant": "https://functions.poehali.dev/0c4d58dc-8846-49a9-a38c-7b6a5a8e124f"
 }

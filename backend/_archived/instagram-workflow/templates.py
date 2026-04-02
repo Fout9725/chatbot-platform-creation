@@ -182,7 +182,7 @@ TEMPLATES = {
                     "type": "n8n-nodes-base.code",
                     "typeVersion": 2,
                     "position": [920, 300],
-                    "id": "format"
+                    "id": "format-digest"
                 },
                 {
                     "parameters": {

@@ -873,7 +873,7 @@ def openrouter_make_prompt(model_key, user_description):
 def get_user(conn, tid, uname, fname):
     cur = conn.cursor()
     cur.execute(
-        f"SELECT telegram_id, free_generations, paid_generations, total_used, preferred_model, session_state, session_photo_url, session_media_group FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+        f"SELECT telegram_id, free_generations, paid_generations, total_used, preferred_model, session_state, session_photo_url, session_media_group, original_photo_url FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
         (tid,)
     )
     row = cur.fetchone()
@@ -882,14 +882,14 @@ def get_user(conn, tid, uname, fname):
         model = row[4] or DEFAULT_MODEL
         if model not in MODELS:
             model = DEFAULT_MODEL
-        return {'tid': row[0], 'free': row[1], 'paid': row[2], 'used': row[3], 'model': model, 'state': row[5], 'photo': row[6], 'media_group': row[7]}
+        return {'tid': row[0], 'free': row[1], 'paid': row[2], 'used': row[3], 'model': model, 'state': row[5], 'photo': row[6], 'media_group': row[7], 'original_photo': row[8]}
 
     cur.execute(
         f"INSERT INTO {SCHEMA}.neurophoto_users (telegram_id, username, first_name, free_generations, paid_generations, preferred_model) VALUES (%s, %s, %s, 3, 0, %s)",
         (tid, uname or '', fname or 'User', DEFAULT_MODEL)
     )
     cur.close()
-    return {'tid': tid, 'free': 3, 'paid': 0, 'used': 0, 'model': DEFAULT_MODEL, 'state': None, 'photo': None, 'media_group': None}
+    return {'tid': tid, 'free': 3, 'paid': 0, 'used': 0, 'model': DEFAULT_MODEL, 'state': None, 'photo': None, 'media_group': None, 'original_photo': None}
 
 
 def set_session(conn, tid, state, photo=None):
@@ -1474,6 +1474,13 @@ def handler(event, context):
             fp = r['result']['file_path']
             photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}'
 
+            cur_orig = conn.cursor()
+            cur_orig.execute(
+                f"UPDATE {SCHEMA}.neurophoto_users SET original_photo_url = %s WHERE telegram_id = %s",
+                (photo_url, tid)
+            )
+            cur_orig.close()
+
             if caption:
                 cur_cap = conn.cursor()
                 cur_cap.execute(
@@ -1995,12 +2002,12 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             uname = callback['from'].get('username', '')
             fname = callback['from'].get('first_name', 'User')
             user = get_user(conn, tid, uname, fname)
-            photo_url = user.get('photo')
-            if photo_url and user.get('state') == 'after_gen':
-                set_session(conn, tid, 'waiting_prompt', photo_url)
+            original_url = user.get('original_photo') or user.get('photo')
+            if original_url and user.get('state') == 'after_gen':
+                set_session(conn, tid, 'waiting_prompt', original_url)
                 send_msg(chat_id,
                     '🎨 <b>Сменить дизайн</b>\n\n'
-                    'Опишите новый стиль для этой картинки.\n\n'
+                    'Опишите новый стиль для вашего исходного фото.\n\n'
                     '<i>Например: В стиле аниме, Как масляная картина, В стиле киберпанк, Акварель</i>',
                     reply_markup={'inline_keyboard': [
                         [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
