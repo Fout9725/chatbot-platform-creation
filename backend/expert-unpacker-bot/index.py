@@ -41,6 +41,9 @@ WELCOME_MESSAGE = (
     "Поехали! 🚀"
 )
 
+WELCOME_VIDEO_YANDEX_URL = "https://disk.yandex.ru/i/Ga2vfizEeiNgYQ"
+_welcome_video_file_id = None
+
 SYSTEM_PROMPT = """Ты — топовый маркетолог, бренд-стратег и продюсер экспертов с 10-летним опытом. Твоя задача — проанализировать ответы эксперта на вопросы глубокой распаковки и выдать готовую, структурированную стратегию для его позиционирования, продвижения и продаж. Твой тон: профессиональный, вдохновляющий, структурный, без "воды", говоришь по делу, как наставник.
 Ты работаешь по методологии, которая объединяет:
 - Психологический анализ
@@ -227,6 +230,59 @@ def send_message_with_buttons(chat_id, text, buttons, parse_mode='HTML'):
     except Exception as e:
         print(f"Error sending message with buttons: {e}")
         return None
+
+
+def get_yandex_download_url(public_url):
+    try:
+        api_url = f"https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key={urllib.parse.quote(public_url, safe='')}"
+        req = urllib.request.Request(api_url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data.get("href")
+    except Exception as e:
+        print(f"[YANDEX] Failed to get download URL: {e}")
+        return None
+
+
+def send_video(chat_id, video, caption=None):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
+    payload = {"chat_id": chat_id, "video": video}
+    if caption:
+        payload["caption"] = caption
+        payload["parse_mode"] = "HTML"
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        print(f"[VIDEO] Error sending video: {e}")
+        return None
+
+
+def send_welcome_video(chat_id):
+    global _welcome_video_file_id
+
+    if _welcome_video_file_id:
+        result = send_video(chat_id, _welcome_video_file_id, WELCOME_MESSAGE)
+        if result and result.get("ok"):
+            return result
+        _welcome_video_file_id = None
+
+    download_url = get_yandex_download_url(WELCOME_VIDEO_YANDEX_URL)
+    if not download_url:
+        return None
+
+    result = send_video(chat_id, download_url, WELCOME_MESSAGE)
+    if result and result.get("ok"):
+        video_obj = result.get("result", {}).get("video")
+        if video_obj and video_obj.get("file_id"):
+            _welcome_video_file_id = video_obj["file_id"]
+            print(f"[VIDEO] Cached file_id: {_welcome_video_file_id[:20]}...")
+    else:
+        print(f"[VIDEO] Failed to send video: {result}")
+
+    return result
 
 
 def create_payment_link(telegram_id, chat_id):
@@ -441,7 +497,9 @@ def generate_unpacking(answers_text):
 
 def handle_start(conn, chat_id, telegram_id, username, first_name):
     reset_user(conn, telegram_id, username, first_name)
-    send_message(chat_id, WELCOME_MESSAGE)
+    video_result = send_welcome_video(chat_id)
+    if not video_result or not video_result.get("ok"):
+        send_message(chat_id, WELCOME_MESSAGE)
     send_message(chat_id, f"📌 Вопрос 1 из 17:\n\n{QUESTIONS[1]}")
 
 
