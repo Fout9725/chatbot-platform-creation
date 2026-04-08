@@ -20,6 +20,7 @@ from config import (
     HELP_TEXT, ABOUT_TEXT, BUTTON_INCORRECT_TEXT,
     FREE_TEXT_RESPONSES, SOLUTIONS, CASES, OBJECTIONS,
     CALLBACK_MAP, REVERSE_CALLBACK_MAP,
+    WELCOME_VIDEO_YANDEX_PUBLIC_URL,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,83 @@ print(f"[INIT] ADMIN_CHAT_ID loaded: '{ADMIN_CHAT_ID}' (len={len(ADMIN_CHAT_ID)}
 print(f"[INIT] NOTIFY_CHAT_ID loaded: '{NOTIFY_CHAT_ID}' (len={len(NOTIFY_CHAT_ID)})")
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+# Кэш file_id приветственного видео (чтобы не скачивать каждый раз)
+_welcome_video_file_id = None
+
+
+def get_yandex_download_url(public_url):
+    """Получить прямую ссылку на скачивание с Яндекс.Диска по публичной ссылке."""
+    try:
+        api_url = f"https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key={public_url}"
+        resp = requests.get(api_url, timeout=10)
+        data = resp.json()
+        return data.get("href")
+    except Exception as e:
+        logger.error(f"[YANDEX] Failed to get download URL: {e}")
+        return None
+
+
+def send_video(chat_id, video, caption=None, reply_markup=None):
+    """Отправить видео через Telegram Bot API. video — URL или file_id."""
+    payload = {
+        "chat_id": chat_id,
+        "video": video,
+    }
+    if caption:
+        payload["caption"] = caption
+        payload["parse_mode"] = "HTML"
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    resp = requests.post(f"{TELEGRAM_API}/sendVideo", json=payload, timeout=60)
+    return resp.json()
+
+
+def send_welcome_video(chat_id, caption=None, buttons=None):
+    """Отправить приветственное видео с Яндекс.Диска. Кэширует file_id после первой отправки."""
+    global _welcome_video_file_id
+
+    reply_markup = None
+    if buttons:
+        keyboard = []
+        for btn in buttons:
+            if isinstance(btn, dict):
+                keyboard.append([btn])
+            else:
+                cb_key = REVERSE_CALLBACK_MAP.get(btn, btn[:64])
+                keyboard.append([{"text": btn, "callback_data": cb_key}])
+        reply_markup = {"inline_keyboard": keyboard}
+
+    # Если уже есть закэшированный file_id — используем его
+    if _welcome_video_file_id:
+        logger.info(f"[VIDEO] Sending with cached file_id: {_welcome_video_file_id[:20]}...")
+        result = send_video(chat_id, _welcome_video_file_id, caption, reply_markup)
+        if result.get("ok"):
+            return result
+        else:
+            logger.warning(f"[VIDEO] Cached file_id failed, re-downloading: {result}")
+            _welcome_video_file_id = None
+
+    # Получаем прямую ссылку с Яндекс.Диска
+    download_url = get_yandex_download_url(WELCOME_VIDEO_YANDEX_PUBLIC_URL)
+    if not download_url:
+        logger.error("[VIDEO] Could not get download URL from Yandex Disk")
+        return None
+
+    logger.info("[VIDEO] Sending video from Yandex Disk URL...")
+    result = send_video(chat_id, download_url, caption, reply_markup)
+
+    # Кэшируем file_id для следующих отправок
+    if result.get("ok"):
+        video_obj = result.get("result", {}).get("video")
+        if video_obj and video_obj.get("file_id"):
+            _welcome_video_file_id = video_obj["file_id"]
+            logger.info(f"[VIDEO] Cached file_id: {_welcome_video_file_id[:20]}...")
+    else:
+        logger.error(f"[VIDEO] Failed to send video: {result}")
+
+    return result
+
 
 STATES = {
     "start": "start",
@@ -352,10 +430,24 @@ def handle_start(chat_id, user_id, username, first_name, start_param=None):
         [user_id],
     )
 
-    send_message_inline(chat_id, WELCOME_TEXT, [
-        "Поехали 🚀",
-        "Примеры автоматизаций",
-    ])
+    # Отправляем приветственное видео с текстом и кнопками
+    video_result = send_welcome_video(
+        chat_id,
+        caption=WELCOME_TEXT,
+        buttons=[
+            "Поехали 🚀",
+            "Примеры автоматизаций",
+        ],
+    )
+
+    # Если видео не удалось отправить — отправляем текст как раньше
+    if not video_result or not video_result.get("ok"):
+        logger.warning("[START] Video send failed, falling back to text message")
+        send_message_inline(chat_id, WELCOME_TEXT, [
+            "Поехали 🚀",
+            "Примеры автоматизаций",
+        ])
+
     set_state(user_id, STATES["q1"])
 
 
