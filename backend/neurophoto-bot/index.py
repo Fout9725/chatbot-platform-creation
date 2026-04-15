@@ -1952,6 +1952,18 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                     'parse_mode': 'HTML',
                     'reply_markup': {'inline_keyboard': [[{'text': '🏠 Отмена', 'callback_data': 'go_start'}]]}
                 })
+            elif state == 'chosen_img_model' and saved_prompt:
+                set_session(conn, tid, 'chosen_img_model', saved_prompt)
+                set_model(conn, tid, model_key)
+                model_info = MODELS[model_key]
+                tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
+                tg('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': msg_id,
+                    'text': f'✅ Модель: <b>{model_info["name"]}</b>\n\nТеперь напишите, что изменить на фото.\n\n<i>Например: Сделай фон осенним, Add sunglasses</i>',
+                    'parse_mode': 'HTML',
+                    'reply_markup': {'inline_keyboard': [[{'text': '🏠 Отмена', 'callback_data': 'go_start'}]]}
+                })
             else:
                 model_info = MODELS[model_key]
                 tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': f'Выбрана: {model_info["name"]}'})
@@ -1975,12 +1987,17 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             user = get_user(conn, tid, uname, fname)
             photo_url = user.get('photo')
             if photo_url and user.get('state') == 'after_gen':
-                set_session(conn, tid, 'waiting_prompt', photo_url)
+                current_model = user.get('model', DEFAULT_MODEL)
+                model_info = MODELS.get(current_model, MODELS[DEFAULT_MODEL])
+                if model_info.get('mode') == 'text2img':
+                    set_model(conn, tid, DEFAULT_MODEL)
+                set_session(conn, tid, 'chosen_img_model', photo_url)
                 send_msg(chat_id,
                     '✏️ <b>Редактирование</b>\n\n'
                     'Напишите, что изменить на этой картинке.\n\n'
                     '<i>Например: Добавь закат на фоне, Сделай ярче, Убери фон</i>',
                     reply_markup={'inline_keyboard': [
+                        [{'text': '🤖 Сменить модель', 'callback_data': 'show_img_models'}],
                         [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
                     ]}
                 )
@@ -2004,12 +2021,17 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             user = get_user(conn, tid, uname, fname)
             original_url = user.get('original_photo') or user.get('photo')
             if original_url and user.get('state') == 'after_gen':
-                set_session(conn, tid, 'waiting_prompt', original_url)
+                current_model = user.get('model', DEFAULT_MODEL)
+                model_info = MODELS.get(current_model, MODELS[DEFAULT_MODEL])
+                if model_info.get('mode') == 'text2img':
+                    set_model(conn, tid, DEFAULT_MODEL)
+                set_session(conn, tid, 'chosen_img_model', original_url)
                 send_msg(chat_id,
                     '🎨 <b>Сменить дизайн</b>\n\n'
                     'Опишите новый стиль для вашего исходного фото.\n\n'
                     '<i>Например: В стиле аниме, Как масляная картина, В стиле киберпанк, Акварель</i>',
                     reply_markup={'inline_keyboard': [
+                        [{'text': '🤖 Сменить модель', 'callback_data': 'show_img_models'}],
                         [{'text': '🏠 Отмена', 'callback_data': 'go_start'}]
                     ]}
                 )
