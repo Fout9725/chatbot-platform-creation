@@ -1647,7 +1647,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             )
             is_photo_msg = bool(callback.get('message', {}).get('photo'))
             if is_photo_msg:
-                tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+                tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
                 send_msg(chat_id, menu_text, reply_markup=start_keyboard())
             else:
                 tg('editMessageText', {
@@ -1667,7 +1667,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
         kb['inline_keyboard'].append([{'text': '🏠 Назад', 'callback_data': 'go_start'}])
         is_photo_msg = bool(callback.get('message', {}).get('photo'))
         if is_photo_msg:
-            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
             send_msg(chat_id, '🤖 <b>Все модели:</b>', reply_markup=kb)
         else:
             tg('editMessageText', {
@@ -1684,7 +1684,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
         kb = img_model_keyboard()
         is_photo_msg = bool(callback.get('message', {}).get('photo'))
         if is_photo_msg:
-            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
             send_msg(chat_id, '🤖 <b>Выберите модель для редактирования фото:</b>', reply_markup=kb)
         else:
             tg('editMessageText', {
@@ -1739,7 +1739,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
         pricing_text = build_pricing_text()
         is_photo_msg = bool(callback.get('message', {}).get('photo'))
         if is_photo_msg:
-            tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+            tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
             send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
         else:
             tg('editMessageText', {
@@ -1765,7 +1765,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             )
             is_photo_msg = bool(callback.get('message', {}).get('photo'))
             if is_photo_msg:
-                tg('deleteMessage', {'chat_id': chat_id, 'message_id': msg_id})
+                tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
                 send_msg(chat_id, buy_text, reply_markup=buy_keyboard())
             else:
                 tg('editMessageText', {
