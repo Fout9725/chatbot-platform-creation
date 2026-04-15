@@ -966,6 +966,19 @@ def record_gen(conn, tid, prompt, model_key, url, is_paid):
     cur.close()
 
 
+def get_last_generation(conn, tid):
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT image_url, prompt, model FROM {SCHEMA}.neurophoto_generations WHERE telegram_id = %s AND image_url IS NOT NULL AND image_url != '' ORDER BY created_at DESC LIMIT 1",
+        (tid,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    if row:
+        return {'url': row[0], 'prompt': row[1], 'model': row[2]}
+    return None
+
+
 def remaining(u):
     return u['free'] + u['paid'] - u['used']
 
@@ -1131,13 +1144,15 @@ def build_pricing_text():
     return '\n'.join(lines)
 
 
-def start_keyboard():
-    return {'inline_keyboard': [
-        [{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}],
-        [{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}],
-        [{'text': '💰 Тарифы и стоимость', 'callback_data': 'show_pricing'}],
-        [{'text': '💳 Пополнить баланс', 'callback_data': 'show_buy'}],
-    ]}
+def start_keyboard(has_last_result=False):
+    buttons = []
+    if has_last_result:
+        buttons.append([{'text': '🖼 Последний результат', 'callback_data': 'last_result'}])
+    buttons.append([{'text': '📖 Инструкция по моделям', 'callback_data': 'show_info'}])
+    buttons.append([{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}])
+    buttons.append([{'text': '💰 Тарифы и стоимость', 'callback_data': 'show_pricing'}])
+    buttons.append([{'text': '💳 Пополнить баланс', 'callback_data': 'show_buy'}])
+    return {'inline_keyboard': buttons}
 
 
 def after_gen_keyboard():
@@ -1379,6 +1394,7 @@ def handler(event, context):
 
         if text == '/start':
             set_session(conn, tid, None)
+            last_gen = get_last_generation(conn, tid)
             send_msg(chat_id,
                 f'👋 Привет, <b>{fname}</b>!\n\n'
                 f'Я — <b>Нейрофотосессия PRO</b>, твой AI-ассистент для работы с изображениями.\n\n'
@@ -1390,7 +1406,7 @@ def handler(event, context):
                 f'✍️ Напишите текст — я предложу нейросети для генерации\n'
                 f'📸 Отправьте фото — я предложу нейросети для редактирования\n\n'
                 f'💎 Доступно генераций: <b>{remaining(user)}</b>',
-                reply_markup=start_keyboard()
+                reply_markup=start_keyboard(has_last_result=bool(last_gen))
             )
             return ok()
 
@@ -1639,23 +1655,25 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             fname = callback['from'].get('first_name', 'User')
             user = get_user(conn, tid, uname, fname)
             set_session(conn, tid, None)
+            last_gen = get_last_generation(conn, tid)
             menu_text = (
                 f'👋 <b>Главное меню</b>\n\n'
                 f'✍️ Напишите текст — предложу нейросети для генерации\n'
                 f'📸 Отправьте фото — предложу нейросети для редактирования\n\n'
                 f'💎 Генераций: <b>{remaining(user)}</b>'
             )
+            kb = start_keyboard(has_last_result=bool(last_gen))
             is_photo_msg = bool(callback.get('message', {}).get('photo'))
             if is_photo_msg:
                 tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
-                send_msg(chat_id, menu_text, reply_markup=start_keyboard())
+                send_msg(chat_id, menu_text, reply_markup=kb)
             else:
                 tg('editMessageText', {
                     'chat_id': chat_id,
                     'message_id': msg_id,
                     'text': menu_text,
                     'parse_mode': 'HTML',
-                    'reply_markup': start_keyboard()
+                    'reply_markup': kb
                 })
         finally:
             conn.close()
@@ -1775,6 +1793,30 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                     'parse_mode': 'HTML',
                     'reply_markup': buy_keyboard()
                 })
+        finally:
+            conn.close()
+        return ok()
+
+    if cb_data == 'last_result':
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            uname = callback['from'].get('username', '')
+            fname = callback['from'].get('first_name', 'User')
+            user = get_user(conn, tid, uname, fname)
+            last_gen = get_last_generation(conn, tid)
+            if last_gen and last_gen['url']:
+                model_info = MODELS.get(last_gen['model'], {})
+                model_name = model_info.get('name', last_gen['model'])
+                caption = f'🖼 <b>Последний результат</b>\nМодель: {model_name}\n💎 Генераций: <b>{remaining(user)}</b>'
+                set_session(conn, tid, 'after_gen', last_gen['url'])
+                res = send_photo_url(chat_id, last_gen['url'], caption, reply_markup=after_gen_keyboard())
+                if not res.get('ok'):
+                    send_msg(chat_id, '❌ Не удалось загрузить последний результат. Возможно, изображение устарело.',
+                        reply_markup=start_keyboard())
+            else:
+                send_msg(chat_id, 'У вас пока нет сгенерированных изображений.\n\nОтправьте фото или текст для генерации!',
+                    reply_markup=start_keyboard())
         finally:
             conn.close()
         return ok()
