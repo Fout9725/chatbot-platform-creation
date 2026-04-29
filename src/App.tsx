@@ -12,6 +12,7 @@ import SessionExpiryNotification from "./components/SessionExpiryNotification";
 import CosmicBackground from "./components/global/CosmicBackground";
 import Index from "./pages/Index";
 import Catalog from "./pages/Catalog";
+import BotShowcasePage from "./pages/BotShowcasePage";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
 import Profile from "./pages/Profile";
@@ -77,6 +78,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/catalog" element={<Catalog />} />
+                <Route path="/catalog/:id" element={<BotShowcasePage />} />
                 <Route path="/bot/:id" element={<BotDetails />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/profile" element={<Profile />} />

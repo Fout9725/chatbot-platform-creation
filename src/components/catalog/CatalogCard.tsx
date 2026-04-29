@@ -179,7 +179,7 @@ const CatalogCard = ({ bot, flipped, onFlip, onTest }: CatalogCardProps) => {
                 Попробовать
               </Button>
               <Link
-                to={`/bot/${bot.id}`}
+                to={`/catalog/${bot.id}`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-xs text-center font-medium hover:underline"
                 style={{ color: accent }}
