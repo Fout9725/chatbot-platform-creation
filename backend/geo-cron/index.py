@@ -18,9 +18,9 @@ from psycopg2.extras import RealDictCursor
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
 PROVIDERS = {
-    'openai_search': 'openai/gpt-4o-search-preview',
-    'perplexity': 'perplexity/sonar',
+    'openai_gpt4o': 'openai/gpt-4o-mini',
 }
+MAX_QUERIES_PER_RUN = 3
 POSITIVE = {'лучший', 'рекоменд', 'надёжн', 'качествен', 'удобн', 'выгодн',
             'best', 'recommended', 'great', 'excellent', 'top'}
 NEGATIVE = {'плохой', 'не рекоменд', 'слабый', 'проблем', 'дорог', 'устарел',
@@ -43,12 +43,7 @@ def resp(status, body):
 
 
 def get_db():
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    schema = os.environ.get('MAIN_DB_SCHEMA') or 't_p60354232_chatbot_platform_cre'
-    with conn.cursor() as cur:
-        cur.execute(f'SET search_path TO {schema}, public')
-    conn.commit()
-    return conn
+    return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
 def call_vsegpt(provider, query, language='ru', timeout=60):
@@ -68,7 +63,7 @@ def call_vsegpt(provider, query, language='ru', timeout=60):
             {'role': 'user', 'content': query},
         ],
         'temperature': 0.3,
-        'max_tokens': 1500,
+        'max_tokens': 700,
     }
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(
@@ -200,8 +195,14 @@ def poll_tenant(conn, tenant_id):
     polled, total_resp, total_ment = 0, 0, 0
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            'SELECT id, text, language FROM geo_tracked_queries '
-            'WHERE tenant_id = %s AND is_active = TRUE',
+            """
+            SELECT q.id, q.text, q.language,
+                   (SELECT MAX(polled_at) FROM geo_llm_responses r
+                    WHERE r.query_id = q.id AND r.tenant_id = q.tenant_id) AS last_polled
+            FROM geo_tracked_queries q
+            WHERE q.tenant_id = %s AND q.is_active = TRUE
+            ORDER BY last_polled NULLS FIRST, q.created_at ASC
+            """,
             (tenant_id,)
         )
         queries = cur.fetchall()
@@ -212,7 +213,7 @@ def poll_tenant(conn, tenant_id):
         brands = [{'id': str(r['id']), 'name': r['name'], 'aliases': r['aliases'] or []}
                   for r in cur.fetchall()]
 
-    for q in queries:
+    for q in queries[:MAX_QUERIES_PER_RUN]:
         qid = str(q['id'])
         for provider in PROVIDERS:
             try:

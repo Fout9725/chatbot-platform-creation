@@ -18,8 +18,8 @@ from psycopg2.extras import RealDictCursor
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
 PROVIDERS = {
-    'openai_search': 'openai/gpt-4o-search-preview',
-    'perplexity': 'perplexity/sonar',
+    'openai_gpt4o': 'openai/gpt-4o-mini',
+    'openai_gpt4': 'openai/gpt-4o',
 }
 
 
@@ -71,12 +71,7 @@ def get_tenant(headers: dict):
 
 
 def get_db():
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    schema = os.environ.get('MAIN_DB_SCHEMA') or 't_p60354232_chatbot_platform_cre'
-    with conn.cursor() as cur:
-        cur.execute(f'SET search_path TO {schema}, public')
-    conn.commit()
-    return conn
+    return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
 def extract_domain(url: str) -> str:
@@ -222,7 +217,7 @@ def create_publication(tenant_id: str, body: dict):
                 row = cur.fetchone()
                 if draft_id:
                     cur.execute(
-                        "UPDATE geo_content_drafts SET status = 'published', updated_at = NOW() "
+                        "UPDATE geo_drafts SET status = 'published', updated_at = NOW() "
                         "WHERE tenant_id = %s AND id = %s",
                         (tenant_id, draft_id)
                     )

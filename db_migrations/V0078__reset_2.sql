@@ -1,0 +1,1 @@
+UPDATE geo_tenants SET last_auto_poll_at = NULL;

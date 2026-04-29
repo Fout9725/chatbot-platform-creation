@@ -1,0 +1,1 @@
+UPDATE geo_tenants SET last_auto_poll_at = NULL WHERE id = '43cc704b-baa2-41b1-a947-782f855b6a66';

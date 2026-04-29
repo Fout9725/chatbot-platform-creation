@@ -68,12 +68,7 @@ def get_tenant(headers: dict):
 
 
 def get_db():
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    schema = os.environ.get('MAIN_DB_SCHEMA') or 't_p60354232_chatbot_platform_cre'
-    with conn.cursor() as cur:
-        cur.execute(f'SET search_path TO {schema}, public')
-    conn.commit()
-    return conn
+    return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
 def call_llm(prompt: str, system: str, model: str = DEFAULT_MODEL, timeout: int = 90):
@@ -150,7 +145,7 @@ def list_drafts(tenant_id: str):
                 SELECT d.id, d.title, d.status, d.word_count, d.target_keywords,
                        d.model, d.created_at, d.updated_at,
                        d.query_id, q.text AS query_text
-                FROM geo_content_drafts d
+                FROM geo_drafts d
                 LEFT JOIN geo_tracked_queries q ON q.id = d.query_id AND q.tenant_id = d.tenant_id
                 WHERE d.tenant_id = %s
                 ORDER BY d.updated_at DESC
@@ -177,7 +172,7 @@ def get_draft(tenant_id: str, draft_id: str):
             cur.execute(
                 """
                 SELECT d.*, q.text AS query_text
-                FROM geo_content_drafts d
+                FROM geo_drafts d
                 LEFT JOIN geo_tracked_queries q ON q.id = d.query_id AND q.tenant_id = d.tenant_id
                 WHERE d.tenant_id = %s AND d.id = %s
                 """,
@@ -212,7 +207,7 @@ def create_draft(tenant_id: str, body: dict):
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    'INSERT INTO geo_content_drafts (tenant_id, query_id, title, content_md, target_keywords, word_count) '
+                    'INSERT INTO geo_drafts (tenant_id, query_id, title, content_md, target_keywords, word_count) '
                     'VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at',
                     (tenant_id, query_id, title, content, keywords, word_count(content))
                 )
@@ -256,7 +251,7 @@ def update_draft(tenant_id: str, draft_id: str, body: dict):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"UPDATE geo_content_drafts SET {', '.join(fields)} WHERE tenant_id = %s AND id = %s",
+                    f"UPDATE geo_drafts SET {', '.join(fields)} WHERE tenant_id = %s AND id = %s",
                     values
                 )
                 if cur.rowcount == 0:
@@ -274,7 +269,7 @@ def delete_draft(tenant_id: str, draft_id: str):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    'DELETE FROM geo_content_drafts WHERE tenant_id = %s AND id = %s',
+                    'DELETE FROM geo_drafts WHERE tenant_id = %s AND id = %s',
                     (tenant_id, draft_id)
                 )
                 if cur.rowcount == 0:
@@ -353,7 +348,7 @@ def generate_draft(tenant_id: str, body: dict):
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    'INSERT INTO geo_content_drafts '
+                    'INSERT INTO geo_drafts '
                     '(tenant_id, query_id, title, content_md, target_keywords, model, word_count) '
                     'VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at',
                     (tenant_id, query_id, title, text, keywords, model, word_count(text))

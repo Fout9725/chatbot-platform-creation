@@ -20,8 +20,7 @@ from psycopg2.extras import RealDictCursor
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
 
 PROVIDERS = {
-    'openai_search': 'openai/gpt-4o-search-preview',
-    'perplexity': 'perplexity/sonar',
+    'openai_gpt4o': 'openai/gpt-4o-mini',
 }
 
 POSITIVE = {'лучший', 'рекоменд', 'надёжн', 'качествен', 'удобн', 'выгодн',
@@ -102,7 +101,7 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
             {'role': 'user', 'content': query},
         ],
         'temperature': 0.3,
-        'max_tokens': 1500,
+        'max_tokens': 700,
     }
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(

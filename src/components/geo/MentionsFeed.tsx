@@ -8,6 +8,8 @@ const SENTIMENT_STYLE: Record<string, { bg: string; text: string; label: string;
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
+  openai_gpt4o: 'GPT-4o mini',
+  openai_gpt4: 'GPT-4o',
   openai_search: 'ChatGPT Search',
   perplexity: 'Perplexity',
 };

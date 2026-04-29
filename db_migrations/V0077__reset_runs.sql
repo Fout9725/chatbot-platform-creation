@@ -1,0 +1,1 @@
+UPDATE geo_schedule_runs SET status = 'error', error = 'gateway timeout', finished_at = NOW() WHERE status = 'running'; UPDATE geo_tenants SET last_auto_poll_at = NULL;
