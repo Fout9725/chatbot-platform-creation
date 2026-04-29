@@ -289,7 +289,7 @@ def check_tenant_pubs(conn, tenant_id):
         cur.execute(
             """
             SELECT p.id, p.url, p.title, q.text AS query_text
-            FROM geo_publications p
+            FROM geo_publications_v2 p
             LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
             WHERE p.tenant_id = %s AND p.status = 'live'
             """,
@@ -324,7 +324,7 @@ def check_tenant_pubs(conn, tenant_id):
             with conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        'INSERT INTO geo_publication_checks '
+                        'INSERT INTO geo_publication_checks_v2 '
                         '(tenant_id, publication_id, provider, found, snippet, raw_response) '
                         'VALUES (%s, %s, %s, %s, %s, %s)',
                         (tenant_id, str(pub['id']), provider, f, snippet[:1024], r['text'][:5000])
@@ -334,7 +334,7 @@ def check_tenant_pubs(conn, tenant_id):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    'UPDATE geo_publications SET last_check_at = NOW(), last_check_found = %s, '
+                    'UPDATE geo_publications_v2 SET last_check_at = NOW(), last_check_found = %s, '
                     'updated_at = NOW() WHERE tenant_id = %s AND id = %s',
                     (any_found, tenant_id, str(pub['id']))
                 )
