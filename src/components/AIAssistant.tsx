@@ -58,7 +58,7 @@ const AIAssistant = () => {
     }
   }, [messages]);
 
-  const trackAction = async (actionType: string, actionData: any) => {
+  const trackAction = async (actionType: string, actionData: Record<string, unknown>) => {
     try {
       const apiUrl = localStorage.getItem('api-url') || '/api';
       await fetch(`${apiUrl}/assistant/track`, {
@@ -172,90 +172,197 @@ const AIAssistant = () => {
     trackAction('assistant_opened', {});
   };
 
+  const Avatar3D = ({ size = 56 }: { size?: number }) => (
+    <div
+      className="relative"
+      style={{ width: size, height: size, perspective: '600px' }}
+    >
+      <span
+        className="absolute inset-0 rounded-full"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)',
+          filter: 'blur(8px)',
+          animation: 'aiGlowPulse 2.4s ease-in-out infinite',
+        }}
+      />
+      <span
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          border: '1px dashed rgba(168,85,247,0.6)',
+          animation: 'aiOrbit 10s linear infinite',
+        }}
+      />
+      <span
+        className="absolute -inset-2 rounded-full pointer-events-none"
+        style={{
+          border: '1px dashed rgba(99,102,241,0.4)',
+          animation: 'aiOrbit 14s linear infinite reverse',
+        }}
+      />
+      <span
+        className="relative z-10 flex items-center justify-center w-full h-full rounded-full"
+        style={{
+          background: 'linear-gradient(135deg, #A855F7 0%, #6366F1 100%)',
+          boxShadow:
+            '0 12px 30px -8px rgba(168,85,247,0.7), inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -4px 12px rgba(99,102,241,0.5)',
+          animation: 'aiBob 3.5s ease-in-out infinite',
+        }}
+      >
+        <Icon
+          name="Bot"
+          className="text-white"
+          size={Math.round(size * 0.5)}
+          style={{ filter: 'drop-shadow(0 2px 8px rgba(168,85,247,0.8))' }}
+        />
+      </span>
+    </div>
+  );
+
+  const aiKeyframes = (
+    <style>{`
+      @keyframes aiGlowPulse {
+        0%, 100% { transform: scale(1); opacity: 0.7; }
+        50%      { transform: scale(1.25); opacity: 1; }
+      }
+      @keyframes aiOrbit {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      @keyframes aiBob {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-3px); }
+      }
+      @keyframes aiPing {
+        0%   { transform: scale(0.8); opacity: 0.9; }
+        100% { transform: scale(2.2); opacity: 0; }
+      }
+    `}</style>
+  );
+
   if (!isOpen && showGreeting) {
     return (
-      <div className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-5">
-        <Card className="w-80 shadow-2xl border-2 border-primary/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-primary to-secondary p-2 rounded-full">
-                <Icon name="Bot" className="text-white" size={24} />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-base">Есть вопросы?</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  ИИ-помощник ответит на всё о платформе
+      <>
+        {aiKeyframes}
+        <div className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-5">
+          <div
+            className="w-80 rounded-2xl p-5 relative"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(168,85,247,0.18) 0%, rgba(10,14,39,0.92) 100%)',
+              border: '1px solid rgba(168,85,247,0.4)',
+              backdropFilter: 'blur(28px)',
+              WebkitBackdropFilter: 'blur(28px)',
+              boxShadow: '0 30px 80px -20px rgba(168,85,247,0.6)',
+            }}
+          >
+            <button
+              onClick={handleDismiss}
+              aria-label="Закрыть"
+              className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <Icon name="X" size={14} />
+            </button>
+            <div className="flex items-start gap-3 mb-4">
+              <Avatar3D size={52} />
+              <div className="flex-1 pt-1">
+                <p className="text-sm font-semibold text-white">
+                  Привет! Нужна помощь?
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Расскажу про платформу и подскажу тариф
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDismiss}
-              >
-                <Icon name="X" size={16} />
-              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleOpen} 
-                className="flex-1"
-              >
-                <Icon name="MessageCircle" size={16} className="mr-2" />
-                Открыть чат
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleDismiss}
-              >
-                <Icon name="X" size={16} />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Button
+              onClick={handleOpen}
+              className="w-full h-10 text-white border-0"
+              style={{
+                background:
+                  'linear-gradient(135deg, #A855F7 0%, #6366F1 100%)',
+                boxShadow: '0 8px 24px -6px rgba(168,85,247,0.7)',
+              }}
+            >
+              <Icon name="Sparkles" size={15} className="mr-2" />
+              Спросить помощника
+            </Button>
+          </div>
+        </div>
+      </>
     );
   }
 
   if (!isOpen) {
     return (
-      <Button
-        onClick={handleOpen}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl"
-        size="icon"
-      >
-        <Icon name="Bot" size={24} />
-      </Button>
+      <>
+        {aiKeyframes}
+        <button
+          onClick={handleOpen}
+          aria-label="Открыть ИИ-помощника"
+          className="fixed bottom-6 right-6 z-50"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(168,85,247,0.5) 0%, transparent 70%)',
+              animation: 'aiPing 2.5s ease-out infinite',
+            }}
+          />
+          <Avatar3D size={64} />
+        </button>
+      </>
     );
   }
 
   if (isMinimized) {
     return (
-      <Button
-        onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 z-50 h-14 rounded-full shadow-2xl px-4"
-      >
-        <Icon name="Bot" size={20} className="mr-2" />
-        <span className="text-sm font-medium">Помощник</span>
-        <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
-          {messages.length}
-        </Badge>
-      </Button>
+      <>
+        {aiKeyframes}
+        <button
+          onClick={() => setIsMinimized(false)}
+          aria-label="Развернуть помощника"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 pl-2 pr-4 h-14 rounded-full"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(168,85,247,0.4) 0%, rgba(99,102,241,0.25) 100%)',
+            border: '1px solid rgba(168,85,247,0.5)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: '0 20px 50px -16px rgba(168,85,247,0.7)',
+          }}
+        >
+          <Avatar3D size={40} />
+          <span className="text-sm font-semibold text-white">Помощник</span>
+          {messages.length > 0 && (
+            <span
+              className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
+              style={{
+                background: '#22C55E',
+                boxShadow: '0 0 12px rgba(34,197,94,0.7)',
+              }}
+            >
+              {messages.length}
+            </span>
+          )}
+        </button>
+      </>
     );
   }
 
   return (
-    <Card className="fixed bottom-6 right-6 z-50 w-96 h-[600px] shadow-2xl flex flex-col">
+    <>
+      {aiKeyframes}
+      <Card className="fixed bottom-6 right-6 z-50 w-96 h-[600px] shadow-2xl flex flex-col">
       <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-gradient-to-br from-primary to-secondary p-2 rounded-full">
-              <Icon name="Bot" className="text-white" size={20} />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Avatar3D size={36} />
             <div>
               <CardTitle className="text-base">ИИ-Помощник</CardTitle>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Всегда готов помочь
               </p>
             </div>
@@ -397,6 +504,7 @@ const AIAssistant = () => {
         </div>
       </CardContent>
     </Card>
+    </>
   );
 };
 

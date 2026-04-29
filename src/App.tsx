@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Catalog from "./pages/Catalog";
 import Industries from "./pages/Industries";
 import Faq from "./pages/Faq";
+import Contacts from "./pages/Contacts";
 import BotShowcasePage from "./pages/BotShowcasePage";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
@@ -83,6 +84,7 @@ const App = () => (
                 <Route path="/catalog/:id" element={<BotShowcasePage />} />
                 <Route path="/industries" element={<Industries />} />
                 <Route path="/faq" element={<Faq />} />
+                <Route path="/contacts" element={<Contacts />} />
                 <Route path="/bot/:id" element={<BotDetails />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/profile" element={<Profile />} />

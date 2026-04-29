@@ -230,13 +230,6 @@ const Index = () => {
         className="relative py-12 md:py-16 overflow-hidden"
         style={{ background: 'transparent' }}
       >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse at 30% 50%, rgba(59,130,246,0.10) 0%, rgba(10,14,39,0) 60%), radial-gradient(ellipse at 70% 50%, rgba(139,92,246,0.10) 0%, rgba(10,14,39,0) 60%)',
-          }}
-        />
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 max-w-5xl mx-auto">
             {[
@@ -291,7 +284,7 @@ const Index = () => {
 
       <HowItWorks />
 
-      <section className="relative py-12 md:py-16">
+      <section className="relative py-12 md:py-16" data-tour="catalog-cta">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -354,13 +347,6 @@ const Index = () => {
         className="relative py-20 md:py-24 overflow-hidden"
         style={{ background: 'transparent' }}
       >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.10) 0%, rgba(10,14,39,0) 60%)',
-          }}
-        />
         <div className="container mx-auto px-4 text-center relative z-10">
           <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"

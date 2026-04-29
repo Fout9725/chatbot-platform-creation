@@ -62,14 +62,6 @@ export default function Hero3D() {
         background: 'transparent',
       }}
     >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.22) 0%, rgba(10,14,39,0) 60%), radial-gradient(ellipse at 80% 70%, rgba(139,92,246,0.18) 0%, rgba(10,14,39,0) 60%)',
-        }}
-      />
-
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
         viewBox="0 0 100 100"

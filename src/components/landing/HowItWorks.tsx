@@ -31,14 +31,6 @@ const HowItWorks = () => {
       className="relative py-20 md:py-28 overflow-hidden"
       style={{ background: 'transparent' }}
     >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse at 20% 0%, rgba(59,130,246,0.18) 0%, rgba(10,14,39,0) 55%), radial-gradient(ellipse at 80% 100%, rgba(139,92,246,0.18) 0%, rgba(10,14,39,0) 55%)',
-        }}
-      />
-
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
