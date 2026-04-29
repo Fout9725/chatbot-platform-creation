@@ -226,23 +226,73 @@ const Index = () => {
 
       <Hero3D />
 
-      <section className="py-10 bg-white border-b border-gray-100">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center gap-8 text-sm text-gray-500 flex-wrap">
-            {totalUsers > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Icon name="Users" size={16} className="text-violet-500" />
-                <span><b className="text-gray-800">{totalUsers.toLocaleString()}+</b> пользователей</span>
+      <section
+        className="relative py-12 md:py-16 overflow-hidden"
+        style={{ background: '#0A0E27' }}
+      >
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse at 30% 50%, rgba(59,130,246,0.15) 0%, rgba(10,14,39,0) 60%), radial-gradient(ellipse at 70% 50%, rgba(139,92,246,0.15) 0%, rgba(10,14,39,0) 60%)',
+          }}
+        />
+        <div
+          className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 0%, rgba(139,92,246,0.5) 50%, transparent 100%)',
+          }}
+        />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 max-w-5xl mx-auto">
+            {[
+              { icon: 'Users', label: 'пользователей', value: totalUsers > 0 ? `${totalUsers.toLocaleString()}+` : '5 000+', accent: '#3B82F6', show: true },
+              { icon: 'Bot', label: 'готовых ботов', value: '85', accent: '#8B5CF6', show: true },
+              { icon: 'Clock', label: 'бесплатно', value: '3 дня', accent: '#A855F7', show: true },
+              { icon: 'Zap', label: 'до запуска', value: '5 мин', accent: '#6366F1', show: true },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="relative rounded-2xl p-4 md:p-5 transition-all duration-300 hover:-translate-y-1 group"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  boxShadow:
+                    '0 10px 40px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
+                }}
+              >
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{
+                    background: `radial-gradient(circle at 50% 0%, ${item.accent}22 0%, transparent 60%)`,
+                  }}
+                />
+                <div className="flex items-center gap-3 relative">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.accent}33 0%, ${item.accent}11 100%)`,
+                      border: `1px solid ${item.accent}55`,
+                      boxShadow: `0 0 18px ${item.accent}33`,
+                    }}
+                  >
+                    <Icon name={item.icon} size={20} style={{ color: item.accent }} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xl md:text-2xl font-bold text-white leading-none">
+                      {item.value}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1 truncate">
+                      {item.label}
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              <Icon name="Bot" size={16} className="text-violet-500" />
-              <span><b className="text-gray-800">85</b> готовых ботов</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Icon name="Clock" size={16} className="text-violet-500" />
-              <span><b className="text-gray-800">3 дня</b> бесплатно</span>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -255,26 +305,97 @@ const Index = () => {
 
       <GeoPromo />
 
-      <section className="py-16 md:py-20 bg-gray-50">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-8">Работает с популярными мессенджерами</h2>
-          <div className="flex items-center justify-center gap-8 md:gap-16 opacity-60">
-            <div className="flex flex-col items-center gap-2">
-              <Icon name="MessageCircle" size={36} className="text-blue-500" />
-              <span className="text-sm text-gray-500">Telegram</span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <Icon name="Phone" size={36} className="text-green-500" />
-              <span className="text-sm text-gray-500">WhatsApp</span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <Icon name="Users" size={36} className="text-blue-600" />
-              <span className="text-sm text-gray-500">ВКонтакте</span>
-            </div>
-            <div className="hidden md:flex flex-col items-center gap-2">
-              <Icon name="Globe" size={36} className="text-gray-500" />
-              <span className="text-sm text-gray-500">Веб-сайт</span>
-            </div>
+      <section
+        className="relative py-20 md:py-24 overflow-hidden"
+        style={{ background: '#0A0E27' }}
+      >
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.18) 0%, rgba(10,14,39,0) 60%)',
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none opacity-25"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px)',
+            backgroundSize: '70px 70px',
+            maskImage: 'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
+          }}
+        />
+
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <div
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"
+            style={{
+              background: 'rgba(59,130,246,0.12)',
+              border: '1px solid rgba(59,130,246,0.35)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+          >
+            <Icon name="Plug" size={14} className="text-indigo-300" />
+            <span className="text-xs uppercase tracking-widest text-indigo-200">
+              Интеграции
+            </span>
+          </div>
+          <h2
+            className="text-3xl md:text-5xl font-bold mb-10"
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            Работает в популярных мессенджерах
+          </h2>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 max-w-4xl mx-auto">
+            {[
+              { name: 'Telegram', icon: 'Send', accent: '#3B82F6' },
+              { name: 'WhatsApp', icon: 'Phone', accent: '#22C55E' },
+              { name: 'ВКонтакте', icon: 'Users', accent: '#6366F1' },
+              { name: 'Веб-сайт', icon: 'Globe', accent: '#A855F7' },
+            ].map((item) => (
+              <div
+                key={item.name}
+                className="relative rounded-2xl p-5 md:p-6 transition-all duration-300 hover:-translate-y-1 group"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  boxShadow:
+                    '0 10px 40px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
+                }}
+              >
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{
+                    background: `radial-gradient(circle at 50% 0%, ${item.accent}22 0%, transparent 70%)`,
+                  }}
+                />
+                <div className="flex flex-col items-center gap-3 relative">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.accent}33 0%, ${item.accent}11 100%)`,
+                      border: `1px solid ${item.accent}55`,
+                      boxShadow: `0 0 24px ${item.accent}33`,
+                    }}
+                  >
+                    <Icon name={item.icon} size={26} style={{ color: item.accent }} />
+                  </div>
+                  <span className="text-sm md:text-base font-medium text-white">
+                    {item.name}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
