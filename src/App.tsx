@@ -44,12 +44,19 @@ import PromptEngineer from "./pages/PromptEngineer";
 import ProcurementDashboard from "./pages/ProcurementDashboard";
 import ProcurementCreate from "./pages/ProcurementCreate";
 import ProcurementTender from "./pages/ProcurementTender";
+import { GeoAuthProvider } from "./contexts/GeoAuthContext";
+import GeoProtectedRoute from "./components/geo/GeoProtectedRoute";
+import GeoLogin from "./pages/geo/GeoLogin";
+import GeoRegister from "./pages/geo/GeoRegister";
+import GeoDashboard from "./pages/geo/GeoDashboard";
+import GeoStub from "./pages/geo/GeoStub";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+     <GeoAuthProvider>
       <ActiveBotsProvider>
         <BotStatsProvider>
           <TooltipProvider>
@@ -92,6 +99,16 @@ const App = () => (
                 <Route path="/procurement" element={<ProcurementDashboard />} />
                 <Route path="/procurement/create" element={<ProcurementCreate />} />
                 <Route path="/procurement/:id" element={<ProcurementTender />} />
+
+                {/* GEO Factory */}
+                <Route path="/geo/login" element={<GeoLogin />} />
+                <Route path="/geo/register" element={<GeoRegister />} />
+                <Route path="/geo" element={<GeoProtectedRoute><GeoDashboard /></GeoProtectedRoute>} />
+                <Route path="/geo/queries" element={<GeoProtectedRoute><GeoStub title="Запросы" icon="Search" sprint="Спринт 2" /></GeoProtectedRoute>} />
+                <Route path="/geo/brands" element={<GeoProtectedRoute><GeoStub title="Бренды" icon="Tag" sprint="Спринт 2" /></GeoProtectedRoute>} />
+                <Route path="/geo/content" element={<GeoProtectedRoute><GeoStub title="Контент" icon="FileText" sprint="Спринт 4" /></GeoProtectedRoute>} />
+                <Route path="/geo/publications" element={<GeoProtectedRoute><GeoStub title="Публикации" icon="Send" sprint="Спринт 5" /></GeoProtectedRoute>} />
+
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -100,6 +117,7 @@ const App = () => (
           </TooltipProvider>
         </BotStatsProvider>
       </ActiveBotsProvider>
+     </GeoAuthProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

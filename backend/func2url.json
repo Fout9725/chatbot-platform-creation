@@ -1,4 +1,5 @@
 {
+  "geo-auth": "https://functions.poehali.dev/b2ade571-5b3b-4742-90d9-ad6f58cd89c5",
   "qualifier-bot": "https://functions.poehali.dev/ee384e88-64f8-4252-a912-e2c64046d296",
   "set-qualifier-webhook": "https://functions.poehali.dev/9826be3e-01ce-41b1-9415-f66f42835d79",
   "expert-unpacker-bot": "https://functions.poehali.dev/a795746d-3812-4427-898e-b756ff0edc4f",
