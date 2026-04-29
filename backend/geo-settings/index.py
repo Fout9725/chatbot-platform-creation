@@ -61,7 +61,12 @@ def get_tenant(headers):
 
 
 def get_db():
-    return psycopg2.connect(os.environ['DATABASE_URL'])
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    schema = os.environ.get('MAIN_DB_SCHEMA') or 't_p60354232_chatbot_platform_cre'
+    with conn.cursor() as cur:
+        cur.execute(f'SET search_path TO {schema}, public')
+    conn.commit()
+    return conn
 
 
 def handler(event, context):
