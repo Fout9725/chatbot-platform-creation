@@ -10,7 +10,7 @@ interface CatalogGridProps {
   setFlippedId: (id: number | null) => void;
   handleTest: (id: number) => void;
   resetFilters: () => void;
-  isMobile: boolean;
+  isMobile?: boolean;
 }
 
 const CatalogGrid = ({
@@ -19,7 +19,6 @@ const CatalogGrid = ({
   setFlippedId,
   handleTest,
   resetFilters,
-  isMobile,
 }: CatalogGridProps) => {
   return (
     <section className="relative pb-20 md:pb-28">
@@ -32,21 +31,9 @@ const CatalogGrid = ({
             </span>{' '}
             ботов
           </p>
-          <span className="text-xs text-slate-500 hidden md:flex items-center gap-1.5">
-            <Icon name="MousePointer2" size={12} />
-            Клик по карточке — детали
-          </span>
         </div>
 
-        <div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6"
-          style={{
-            transformStyle: 'preserve-3d',
-            transform: isMobile
-              ? 'none'
-              : 'perspective(2400px) rotateX(4deg)',
-          }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6 items-stretch">
           <AnimatePresence mode="popLayout">
             {filteredBots.map((bot, idx) => (
               <motion.div
@@ -59,6 +46,7 @@ const CatalogGrid = ({
                   duration: 0.35,
                   delay: Math.min(idx * 0.02, 0.3),
                 }}
+                className="h-full"
               >
                 <CatalogCard
                   bot={bot}

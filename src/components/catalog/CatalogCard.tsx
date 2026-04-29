@@ -12,185 +12,160 @@ interface CatalogCardProps {
   onTest: (id: number) => void;
 }
 
-const CatalogCard = ({ bot, flipped, onFlip, onTest }: CatalogCardProps) => {
+const CatalogCard = ({ bot, onTest }: CatalogCardProps) => {
   const accent = CATEGORY_COLORS[bot.category] || '#8B5CF6';
+
   return (
-    <div
-      className="catalog-card-wrap"
-      style={{ perspective: '1400px' }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onFlip();
-        }
+    <motion.article
+      whileHover={{ y: -6 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+      className="group relative rounded-2xl overflow-hidden flex flex-col h-full"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: `0 18px 40px -18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`,
       }}
-      tabIndex={0}
-      role="button"
-      aria-label={`Бот ${bot.name}`}
     >
-      <motion.div
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 16 }}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
         style={{
-          position: 'relative',
-          transformStyle: 'preserve-3d',
-          width: '100%',
-          height: '100%',
+          background: `radial-gradient(circle at 50% 0%, ${accent}33 0%, transparent 60%)`,
         }}
-        className="group h-[320px] cursor-pointer"
-      >
+      />
+
+      <div
+        aria-hidden
+        className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${accent}88 50%, transparent 100%)`,
+          opacity: 0.6,
+        }}
+      />
+
+      <div className="relative p-5 pb-4 flex items-start justify-between gap-3">
         <div
-          onClick={onFlip}
-          className="absolute inset-0 rounded-2xl p-5 md:p-6 transition-transform duration-300 group-hover:-translate-y-1.5"
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
           style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            boxShadow: `0 20px 50px -20px ${accent}55, 0 10px 30px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`,
-          }}
-        >
-          <div
-            className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style={{
-              background: `radial-gradient(circle at 50% 0%, ${accent}30 0%, transparent 60%)`,
-            }}
-          />
-          <div className="relative h-full flex flex-col">
-            <div className="flex items-start justify-between mb-4">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{
-                  background: `linear-gradient(135deg, ${accent}33 0%, ${accent}11 100%)`,
-                  border: `1px solid ${accent}55`,
-                  boxShadow: `0 0 24px ${accent}33`,
-                }}
-              >
-                <Icon
-                  name={bot.icon as string}
-                  fallback="Bot"
-                  size={22}
-                  style={{ color: accent }}
-                />
-              </div>
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
-                style={{
-                  background: 'rgba(251,191,36,0.12)',
-                  border: '1px solid rgba(251,191,36,0.3)',
-                  color: '#FCD34D',
-                }}
-              >
-                <Icon name="Star" size={11} className="fill-amber-300" />
-                {bot.rating}
-              </div>
-            </div>
-
-            <span
-              className="inline-flex items-center text-xs font-semibold uppercase tracking-wider mb-2"
-              style={{ color: accent }}
-            >
-              {bot.category}
-            </span>
-
-            <h3 className="text-lg font-semibold text-white line-clamp-1 mb-2">
-              {bot.name}
-            </h3>
-
-            <p className="text-sm text-slate-400 line-clamp-3 leading-relaxed flex-1">
-              {bot.description}
-            </p>
-
-            <div className="flex items-end justify-between mt-4 pt-4 border-t border-white/10">
-              <div>
-                <div
-                  className="text-xl font-bold leading-none"
-                  style={{
-                    background: `linear-gradient(135deg, #ffffff 0%, ${accent} 100%)`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >
-                  {bot.rentPrice.toLocaleString()} ₽
-                </div>
-                <div className="text-xs text-slate-500 mt-0.5">в месяц</div>
-              </div>
-              <div className="text-xs text-slate-400 inline-flex items-center gap-1">
-                Перевернуть
-                <Icon name="RotateCw" size={12} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          onClick={onFlip}
-          className="absolute inset-0 rounded-2xl p-5 md:p-6"
-          style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-            background: `linear-gradient(180deg, ${accent}22 0%, rgba(10,14,39,0.6) 100%)`,
+            background: `linear-gradient(135deg, ${accent}33 0%, ${accent}11 100%)`,
             border: `1px solid ${accent}55`,
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            boxShadow: `0 20px 50px -20px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.08)`,
+            boxShadow: `0 0 20px ${accent}33`,
           }}
         >
-          <div className="relative h-full flex flex-col">
-            <h3 className="text-base font-semibold text-white mb-3">
-              {bot.name}
-            </h3>
-            <ul className="space-y-2 mb-4 flex-1">
-              {(bot.features || []).slice(0, 4).map((f, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-xs text-slate-200"
-                >
-                  <Icon
-                    name="Check"
-                    size={12}
-                    style={{ color: accent, marginTop: 3 }}
-                  />
-                  <span className="line-clamp-2">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-col gap-2 mt-auto">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (bot.demoUrl) {
-                    window.location.href = bot.demoUrl;
-                  } else {
-                    onTest(bot.id);
-                  }
-                }}
-                className="w-full h-10 text-sm text-white border-0"
-                style={{
-                  background: `linear-gradient(135deg, ${accent} 0%, ${accent}99 100%)`,
-                  boxShadow: `0 6px 20px -6px ${accent}99`,
-                }}
-              >
-                <Icon name="PlayCircle" size={14} className="mr-1.5" />
-                Попробовать
-              </Button>
-              <Link
-                to={`/catalog/${bot.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="text-xs text-center font-medium hover:underline"
-                style={{ color: accent }}
-              >
-                Подробнее →
-              </Link>
-            </div>
-          </div>
+          <Icon
+            name={bot.icon as string}
+            fallback="Bot"
+            size={22}
+            style={{ color: accent }}
+          />
         </div>
-      </motion.div>
-    </div>
+
+        <div
+          className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shrink-0"
+          style={{
+            background: 'rgba(251,191,36,0.12)',
+            border: '1px solid rgba(251,191,36,0.3)',
+            color: '#FCD34D',
+          }}
+        >
+          <Icon name="Star" size={11} className="fill-amber-300" />
+          {bot.rating}
+        </div>
+      </div>
+
+      <div className="relative px-5 pb-2">
+        <span
+          className="inline-block text-[10px] font-semibold uppercase tracking-widest mb-2"
+          style={{ color: accent }}
+        >
+          {bot.category}
+        </span>
+
+        <h3 className="text-base md:text-lg font-semibold text-white leading-snug line-clamp-2 mb-2 min-h-[2.6em]">
+          {bot.name}
+        </h3>
+
+        <p className="text-xs md:text-sm text-slate-400 leading-relaxed line-clamp-3 min-h-[3.6em]">
+          {bot.description}
+        </p>
+      </div>
+
+      <div className="relative px-5 pt-3">
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Icon name="Users" size={11} />
+          <span>{bot.users.toLocaleString()} активных</span>
+        </div>
+      </div>
+
+      <div className="relative mt-auto p-5 pt-4">
+        <div
+          className="h-px w-full mb-4"
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        />
+
+        <div className="flex items-end justify-between gap-3 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">
+              Аренда
+            </div>
+            <div
+              className="text-xl md:text-2xl font-bold leading-none"
+              style={{
+                background: `linear-gradient(135deg, #ffffff 0%, ${accent} 100%)`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              {bot.rentPrice.toLocaleString()} ₽
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">в месяц</div>
+          </div>
+
+          <span
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium"
+            style={{
+              background: 'rgba(34,197,94,0.1)',
+              border: '1px solid rgba(34,197,94,0.3)',
+              color: '#86EFAC',
+            }}
+          >
+            <Icon name="Sparkles" size={9} />3 дня free
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (bot.demoUrl) {
+                window.location.href = bot.demoUrl;
+              } else {
+                onTest(bot.id);
+              }
+            }}
+            className="w-full h-10 text-sm text-white border-0 font-medium"
+            style={{
+              background: `linear-gradient(135deg, ${accent} 0%, ${accent}AA 100%)`,
+              boxShadow: `0 8px 20px -6px ${accent}88`,
+            }}
+          >
+            <Icon name="PlayCircle" size={15} className="mr-1.5" />
+            Попробовать
+          </Button>
+          <Link
+            to={`/catalog/${bot.id}`}
+            className="text-xs text-center font-medium py-1.5 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: accent }}
+          >
+            Подробнее →
+          </Link>
+        </div>
+      </div>
+    </motion.article>
   );
 };
 
