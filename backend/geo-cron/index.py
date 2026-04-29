@@ -323,7 +323,7 @@ def check_tenant_pubs(conn, tenant_id):
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT p.id, p.url, p.title, q.text AS query_text
+            SELECT p.id, p.url, p.extra_urls, p.title, q.text AS query_text
             FROM geo_publications_v2 p
             LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
             WHERE p.tenant_id = %s AND p.status = 'live'
@@ -336,8 +336,14 @@ def check_tenant_pubs(conn, tenant_id):
         query_text = pub['query_text'] or pub['title']
         if not query_text:
             continue
-        domain = extract_domain(pub['url'])
-        url_lc = pub['url'].lower()
+        extra = pub.get('extra_urls') or []
+        if isinstance(extra, str):
+            try:
+                extra = json.loads(extra)
+            except Exception:
+                extra = []
+        all_urls = [pub['url']] + [u for u in extra if u]
+        url_pairs = [(u.lower(), extract_domain(u)) for u in all_urls]
         title_lc = (pub['title'] or '').lower()
         any_found = False
         for provider in PROVIDERS:
@@ -348,13 +354,17 @@ def check_tenant_pubs(conn, tenant_id):
                 continue
             text_lc = (r['text'] or '').lower()
             citations = r.get('citations') or []
-            in_cit = any(domain and domain in str(c).lower() for c in citations)
-            in_text = (domain and domain in text_lc) or url_lc in text_lc
+            in_cit = False; in_text = False; matched_dom = ''
+            for url_lc, dom in url_pairs:
+                if dom and any(dom in str(c).lower() for c in citations):
+                    in_cit = True; matched_dom = dom; break
+                if (dom and dom in text_lc) or url_lc in text_lc:
+                    in_text = True; matched_dom = dom; break
             by_title = title_lc and title_lc in text_lc and len(title_lc) > 15
             f = bool(in_cit or in_text or by_title)
             snippet = ''
-            if domain and domain in text_lc:
-                idx = text_lc.find(domain)
+            if matched_dom and matched_dom in text_lc:
+                idx = text_lc.find(matched_dom)
                 snippet = r['text'][max(0, idx - 100):idx + 200]
             with conn:
                 with conn.cursor() as cur:

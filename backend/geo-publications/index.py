@@ -186,7 +186,7 @@ def list_publications(tenant_id: str):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT p.id, p.title, p.url, p.platform, p.status, p.published_at,
+                SELECT p.id, p.title, p.url, p.extra_urls, p.platform, p.status, p.published_at,
                        p.last_check_at, p.last_check_found, p.notes,
                        p.draft_id, p.query_id, q.text AS query_text,
                        p.created_at, p.updated_at
@@ -225,8 +225,17 @@ def list_publications(tenant_id: str):
 
 
 def serialize(r):
+    extra = r.get('extra_urls') or []
+    if isinstance(extra, str):
+        try:
+            extra = json.loads(extra)
+        except Exception:
+            extra = []
+    urls = [r['url']] + [u for u in extra if u]
     return {
         'id': str(r['id']), 'title': r['title'], 'url': r['url'],
+        'urls': urls,
+        'extra_urls': extra,
         'platform': r['platform'], 'status': r['status'],
         'published_at': r['published_at'].isoformat() if r['published_at'] else None,
         'last_check_at': r['last_check_at'].isoformat() if r['last_check_at'] else None,
@@ -240,14 +249,32 @@ def serialize(r):
     }
 
 
+def normalize_urls(body: dict):
+    raw = body.get('urls')
+    out = []
+    if isinstance(raw, list):
+        for u in raw:
+            if isinstance(u, str) and u.strip():
+                out.append(u.strip())
+    single = (body.get('url') or '').strip()
+    if single and single not in out:
+        out.insert(0, single)
+    seen, dedup = set(), []
+    for u in out:
+        if u not in seen and (u.startswith('http://') or u.startswith('https://')):
+            seen.add(u)
+            dedup.append(u)
+    return dedup
+
+
 def create_publication(tenant_id: str, body: dict):
     title = (body.get('title') or '').strip()
-    url = (body.get('url') or '').strip()
-    if not title or not url:
+    urls = normalize_urls(body)
+    if not title or not urls:
         return resp(400, {'error': 'title_and_url_required'})
-    if not (url.startswith('http://') or url.startswith('https://')):
-        return resp(400, {'error': 'invalid_url'})
 
+    url = urls[0]
+    extra_urls = urls[1:]
     platform = (body.get('platform') or extract_domain(url) or '').strip() or None
     draft_id = body.get('draft_id') or None
     query_id = body.get('query_id') or None
@@ -262,11 +289,12 @@ def create_publication(tenant_id: str, body: dict):
                 cur.execute(
                     """
                     INSERT INTO geo_publications_v2
-                      (tenant_id, draft_id, query_id, title, url, platform, published_at, status, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                      (tenant_id, draft_id, query_id, title, url, extra_urls, platform, published_at, status, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
                     RETURNING id, created_at, updated_at, last_check_at, last_check_found, published_at
                     """,
-                    (tenant_id, draft_id, query_id, title, url, platform, published_at, status, notes)
+                    (tenant_id, draft_id, query_id, title, url, json.dumps(extra_urls),
+                     platform, published_at, status, notes)
                 )
                 row = cur.fetchone()
                 if draft_id:
@@ -276,7 +304,9 @@ def create_publication(tenant_id: str, body: dict):
                         (tenant_id, draft_id)
                     )
         return resp(200, {'publication': {
-            'id': str(row['id']), 'title': title, 'url': url, 'platform': platform,
+            'id': str(row['id']), 'title': title, 'url': url, 'urls': urls,
+            'extra_urls': extra_urls,
+            'platform': platform,
             'status': status, 'notes': notes,
             'draft_id': draft_id, 'query_id': query_id,
             'published_at': row['published_at'].isoformat() if row['published_at'] else None,
@@ -292,7 +322,13 @@ def update_publication(tenant_id: str, pub_id: str, body: dict):
     if not pub_id:
         return resp(400, {'error': 'id_required'})
     fields, values = [], []
-    for f in ('title', 'url', 'platform', 'status', 'notes'):
+
+    if 'urls' in body or ('url' in body and isinstance(body.get('urls'), list) is False):
+        urls = normalize_urls(body)
+        if urls:
+            fields.append('url = %s'); values.append(urls[0])
+            fields.append('extra_urls = %s::jsonb'); values.append(json.dumps(urls[1:]))
+    for f in ('title', 'platform', 'status', 'notes'):
         if f in body:
             fields.append(f'{f} = %s'); values.append(body[f])
     if 'published_at' in body:
@@ -365,7 +401,7 @@ def check_publication(tenant_id: str, pub_id: str):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT p.url, p.title, p.query_id, q.text AS query_text
+                SELECT p.url, p.extra_urls, p.title, p.query_id, q.text AS query_text
                 FROM geo_publications_v2 p
                 LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
                 WHERE p.tenant_id = %s AND p.id = %s
@@ -376,8 +412,14 @@ def check_publication(tenant_id: str, pub_id: str):
         if not pub:
             return resp(404, {'error': 'not_found'})
 
-        domain = extract_domain(pub['url'])
-        url_lower = pub['url'].lower()
+        extra = pub.get('extra_urls') or []
+        if isinstance(extra, str):
+            try:
+                extra = json.loads(extra)
+            except Exception:
+                extra = []
+        all_urls = [pub['url']] + [u for u in extra if u]
+        url_pairs = [(u.lower(), extract_domain(u)) for u in all_urls]
         title_words = (pub['title'] or '').lower()
         query_text = pub['query_text'] or pub['title'] or ''
         if not query_text:
@@ -395,14 +437,20 @@ def check_publication(tenant_id: str, pub_id: str):
 
             text_lc = (r['text'] or '').lower()
             citations = r.get('citations') or []
-            found_in_citations = any(domain and domain in str(c).lower() for c in citations)
-            found_in_text = (domain and domain in text_lc) or url_lower in text_lc
+            found_in_citations = False
+            found_in_text = False
+            matched_domain = ''
+            for url_lc, dom in url_pairs:
+                if dom and any(dom in str(c).lower() for c in citations):
+                    found_in_citations = True; matched_domain = dom; break
+                if (dom and dom in text_lc) or url_lc in text_lc:
+                    found_in_text = True; matched_domain = dom; break
             found_by_title = title_words and title_words in text_lc and len(title_words) > 15
             found = bool(found_in_citations or found_in_text or found_by_title)
 
             snippet = ''
-            if domain:
-                idx = text_lc.find(domain)
+            if matched_domain:
+                idx = text_lc.find(matched_domain)
                 if idx >= 0:
                     snippet = r['text'][max(0, idx - 100):idx + 200]
             if not snippet and citations:

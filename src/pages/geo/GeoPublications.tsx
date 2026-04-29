@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { geoApi, GeoPublication } from '@/lib/geo/api';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,15 @@ export default function GeoPublications() {
   const [historyFor, setHistoryFor] = useState<GeoPublication | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterId>('all');
+  const [urls, setUrls] = useState<string[]>(['']);
+
+  useEffect(() => {
+    if (open && !editing) setUrls(['']);
+    if (editing) {
+      const list = editing.urls && editing.urls.length ? editing.urls : [editing.url];
+      setUrls(list.length ? list : ['']);
+    }
+  }, [open, editing]);
 
   const pubsQ = useQuery({ queryKey: ['geo-publications'], queryFn: () => geoApi.publications.list() });
   const draftsQ = useQuery({ queryKey: ['geo-drafts'], queryFn: () => geoApi.content.list() });
@@ -126,21 +135,27 @@ export default function GeoPublications() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const title = String(fd.get('title') || '').trim();
-    const url = String(fd.get('url') || '').trim();
+    const cleanUrls = urls.map((u) => u.trim()).filter(Boolean);
     const draft_id = String(fd.get('draft_id') || '') || undefined;
     const query_id = String(fd.get('query_id') || '') || undefined;
     const platform = String(fd.get('platform') || '').trim() || undefined;
     const notes = String(fd.get('notes') || '').trim() || undefined;
-    if (!title || !url) {
-      toast({ title: 'Заполните название и URL', variant: 'destructive' });
+    if (!title || cleanUrls.length === 0) {
+      toast({ title: 'Заполните название и хотя бы один URL', variant: 'destructive' });
+      return;
+    }
+    const bad = cleanUrls.find((u) => !/^https?:\/\//i.test(u));
+    if (bad) {
+      toast({ title: 'Некорректный URL', description: bad, variant: 'destructive' });
       return;
     }
     if (editing) {
-      updateMut.mutate({ id: editing.id, title, url, platform, notes });
+      updateMut.mutate({ id: editing.id, title, urls: cleanUrls, platform, notes });
     } else {
-      createMut.mutate({ title, url, draft_id, query_id, platform, notes });
+      createMut.mutate({ title, urls: cleanUrls, draft_id, query_id, platform, notes });
     }
   };
+
 
   const allPubs = pubsQ.data?.publications || [];
 
@@ -273,8 +288,21 @@ export default function GeoPublications() {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500 truncate">{p.url}</div>
+                  <div className="text-xs text-slate-500 space-y-0.5">
+                    {(p.urls || [p.url]).map((u, i) => (
+                      <div key={i} className="flex items-center gap-1.5 truncate">
+                        <Icon name="Link" size={10} className="text-slate-400 flex-shrink-0" />
+                        <a href={u} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 truncate">{u}</a>
+                      </div>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-slate-400 flex-wrap">
+                    {(p.urls?.length || 0) > 1 && (
+                      <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 px-1.5 rounded">
+                        <Icon name="Layers" size={11} />
+                        {p.urls!.length} площадок
+                      </span>
+                    )}
                     {p.platform && <span><Icon name="Globe" size={11} className="inline mr-1" />{p.platform}</span>}
                     {p.query_text && <span className="truncate"><Icon name="Search" size={11} className="inline mr-1" />{p.query_text}</span>}
                     {p.last_check_at && <span>Проверено: {timeAgo(p.last_check_at)}</span>}
@@ -322,8 +350,40 @@ export default function GeoPublications() {
               <Input id="title" name="title" required defaultValue={editing?.title || ''} placeholder="Заголовок статьи" />
             </div>
             <div>
-              <Label htmlFor="url">URL</Label>
-              <Input id="url" name="url" required type="url" defaultValue={editing?.url || ''} placeholder="https://example.com/article" />
+              <Label>Ссылки на публикацию</Label>
+              <p className="text-xs text-slate-500 mb-2">Добавьте все площадки, где размещена статья — каждая ссылка проверяется в LLM</p>
+              <div className="space-y-2">
+                {urls.map((u, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      type="url"
+                      value={u}
+                      onChange={(e) => setUrls((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
+                      placeholder={i === 0 ? 'https://vc.ru/...' : 'https://habr.com/...'}
+                    />
+                    {urls.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                      >
+                        <Icon name="X" size={16} className="text-slate-400" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setUrls((prev) => [...prev, ''])}
+              >
+                <Icon name="Plus" size={14} className="mr-1" />
+                Ещё ссылка
+              </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

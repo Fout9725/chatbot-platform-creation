@@ -138,10 +138,10 @@ export const geoApi = {
   publications: {
     list: () => request<{ publications: GeoPublication[] }>(GEO_PUBS_URL, { method: 'GET' }),
     create: (data: {
-      title: string; url: string; platform?: string; draft_id?: string;
+      title: string; url?: string; urls?: string[]; platform?: string; draft_id?: string;
       query_id?: string; published_at?: string; notes?: string; status?: string;
     }) => request<{ publication: GeoPublication }>(GEO_PUBS_URL, { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<{ title: string; url: string; platform: string; status: string; notes: string }>) =>
+    update: (id: string, data: Partial<{ title: string; url: string; urls: string[]; platform: string; status: string; notes: string }>) =>
       request<{ ok: true }>(`${GEO_PUBS_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) =>
       request<{ ok: true }>(`${GEO_PUBS_URL}?id=${id}`, { method: 'DELETE' }),
@@ -204,6 +204,8 @@ export type GeoPublication = {
   id: string;
   title: string;
   url: string;
+  urls: string[];
+  extra_urls: string[];
   platform: string | null;
   status: string;
   notes: string | null;
