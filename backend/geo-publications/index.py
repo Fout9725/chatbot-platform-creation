@@ -198,7 +198,28 @@ def list_publications(tenant_id: str):
                 (tenant_id,)
             )
             rows = cur.fetchall()
-        return resp(200, {'publications': [serialize(r) for r in rows]})
+
+            cur.execute(
+                """
+                SELECT DISTINCT ON (publication_id, provider)
+                       publication_id, provider, found, checked_at
+                FROM geo_publication_checks_v2
+                WHERE tenant_id = %s
+                ORDER BY publication_id, provider, checked_at DESC
+                """,
+                (tenant_id,)
+            )
+            latest = cur.fetchall()
+        per_pub = {}
+        for c in latest:
+            pid = str(c['publication_id'])
+            per_pub.setdefault(pid, {})[c['provider']] = {
+                'found': bool(c['found']),
+                'checked_at': c['checked_at'].isoformat() if c['checked_at'] else None,
+            }
+        return resp(200, {'publications': [
+            {**serialize(r), 'providers': per_pub.get(str(r['id']), {})} for r in rows
+        ]})
     finally:
         conn.close()
 

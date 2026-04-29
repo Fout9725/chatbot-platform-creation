@@ -195,6 +195,11 @@ export type GeoScheduleRun = {
   finished_at: string | null;
 };
 
+export type GeoProviderResult = {
+  found: boolean;
+  checked_at: string | null;
+};
+
 export type GeoPublication = {
   id: string;
   title: string;
@@ -210,6 +215,7 @@ export type GeoPublication = {
   last_check_found: boolean | null;
   created_at: string;
   updated_at: string;
+  providers?: Record<string, GeoProviderResult>;
 };
 
 export type GeoDraftListItem = {

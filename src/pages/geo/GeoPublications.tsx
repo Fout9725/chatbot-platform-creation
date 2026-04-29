@@ -21,7 +21,27 @@ const PROVIDER_LABEL: Record<string, string> = {
   openai_gpt4: 'GPT-4o',
   openai_search: 'ChatGPT Search',
   perplexity: 'Perplexity',
+  yandex_gpt: 'YandexGPT',
 };
+
+const FILTER_OPTIONS = [
+  { id: 'all', label: 'Все', icon: 'List' },
+  { id: 'openai', label: 'В OpenAI', icon: 'Sparkles' },
+  { id: 'yandex', label: 'В Яндексе', icon: 'Search' },
+  { id: 'both', label: 'Везде', icon: 'CheckCircle2' },
+  { id: 'none', label: 'Не нашли', icon: 'XCircle' },
+  { id: 'unchecked', label: 'Не проверено', icon: 'CircleDashed' },
+] as const;
+
+type FilterId = typeof FILTER_OPTIONS[number]['id'];
+
+function isOpenAi(p: { providers?: Record<string, { found: boolean }> }) {
+  const pr = p.providers || {};
+  return Object.entries(pr).some(([k, v]) => k.startsWith('openai') && v.found);
+}
+function isYandex(p: { providers?: Record<string, { found: boolean }> }) {
+  return !!p.providers?.yandex_gpt?.found;
+}
 
 function formatDate(s: string | null) {
   if (!s) return '—';
@@ -44,6 +64,7 @@ export default function GeoPublications() {
   const [editing, setEditing] = useState<GeoPublication | null>(null);
   const [historyFor, setHistoryFor] = useState<GeoPublication | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterId>('all');
 
   const pubsQ = useQuery({ queryKey: ['geo-publications'], queryFn: () => geoApi.publications.list() });
   const draftsQ = useQuery({ queryKey: ['geo-drafts'], queryFn: () => geoApi.content.list() });
@@ -121,7 +142,26 @@ export default function GeoPublications() {
     }
   };
 
-  const pubs = pubsQ.data?.publications || [];
+  const allPubs = pubsQ.data?.publications || [];
+
+  const counts = {
+    all: allPubs.length,
+    openai: allPubs.filter(isOpenAi).length,
+    yandex: allPubs.filter(isYandex).length,
+    both: allPubs.filter((p) => isOpenAi(p) && isYandex(p)).length,
+    none: allPubs.filter((p) => p.last_check_at && !isOpenAi(p) && !isYandex(p)).length,
+    unchecked: allPubs.filter((p) => !p.last_check_at).length,
+  };
+
+  const pubs = allPubs.filter((p) => {
+    if (filter === 'all') return true;
+    if (filter === 'openai') return isOpenAi(p);
+    if (filter === 'yandex') return isYandex(p);
+    if (filter === 'both') return isOpenAi(p) && isYandex(p);
+    if (filter === 'none') return p.last_check_at && !isOpenAi(p) && !isYandex(p);
+    if (filter === 'unchecked') return !p.last_check_at;
+    return true;
+  });
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -136,31 +176,55 @@ export default function GeoPublications() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatBox label="Всего" value={pubs.length} icon="FileText" color="bg-indigo-100 text-indigo-600" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <StatBox label="Всего" value={allPubs.length} icon="FileText" color="bg-indigo-100 text-indigo-600" />
         <StatBox
-          label="Опубликовано"
-          value={pubs.filter((p) => p.status === 'live').length}
-          icon="CheckCircle"
-          color="bg-emerald-100 text-emerald-600"
-        />
-        <StatBox
-          label="В LLM"
-          value={pubs.filter((p) => p.last_check_found).length}
+          label="Найдено в OpenAI"
+          value={counts.openai}
           icon="Sparkles"
           color="bg-purple-100 text-purple-600"
+          hint={allPubs.length ? `${Math.round((counts.openai / allPubs.length) * 100)}% публикаций` : undefined}
         />
         <StatBox
-          label="Не проверено"
-          value={pubs.filter((p) => !p.last_check_at).length}
-          icon="CircleDashed"
-          color="bg-amber-100 text-amber-600"
+          label="Найдено в Яндексе"
+          value={counts.yandex}
+          icon="Search"
+          color="bg-rose-100 text-rose-600"
+          hint={allPubs.length ? `${Math.round((counts.yandex / allPubs.length) * 100)}% публикаций` : undefined}
         />
+        <StatBox
+          label="В обоих"
+          value={counts.both}
+          icon="CheckCircle2"
+          color="bg-emerald-100 text-emerald-600"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap mb-6">
+        {FILTER_OPTIONS.map((f) => {
+          const c = counts[f.id];
+          const active = filter === f.id;
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                active
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+              }`}
+            >
+              <Icon name={f.icon} size={14} />
+              {f.label}
+              <span className={`text-xs px-1.5 rounded-full ${active ? 'bg-white/20' : 'bg-slate-100'}`}>{c}</span>
+            </button>
+          );
+        })}
       </div>
 
       {pubsQ.isLoading ? (
         <div className="text-slate-500">Загрузка…</div>
-      ) : pubs.length === 0 ? (
+      ) : allPubs.length === 0 ? (
         <div className="bg-white border rounded-2xl p-12 text-center">
           <Icon name="Send" size={40} className="text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 mb-4">Пока нет публикаций. Добавьте опубликованные материалы — отследим попадание в LLM.</p>
@@ -168,6 +232,12 @@ export default function GeoPublications() {
             <Icon name="Plus" size={16} className="mr-2" />
             Добавить
           </Button>
+        </div>
+      ) : pubs.length === 0 ? (
+        <div className="bg-white border rounded-2xl p-12 text-center">
+          <Icon name="FilterX" size={40} className="text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 mb-4">Под этот фильтр пока нет публикаций.</p>
+          <Button variant="outline" onClick={() => setFilter('all')}>Сбросить фильтр</Button>
         </div>
       ) : (
         <div className="bg-white border rounded-2xl divide-y">
@@ -185,15 +255,21 @@ export default function GeoPublications() {
                       {p.title}
                     </a>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
-                    {p.last_check_found === true && (
+                    {isOpenAi(p) && (
                       <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                         <Icon name="Sparkles" size={11} />
-                        В LLM
+                        OpenAI
                       </span>
                     )}
-                    {p.last_check_found === false && (
+                    {isYandex(p) && (
+                      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <Icon name="Search" size={11} />
+                        Яндекс
+                      </span>
+                    )}
+                    {p.last_check_at && !isOpenAi(p) && !isYandex(p) && (
                       <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                        Не нашли
+                        Пока не нашли
                       </span>
                     )}
                   </div>
@@ -328,15 +404,16 @@ export default function GeoPublications() {
   );
 }
 
-function StatBox({ label, value, icon, color }: { label: string; value: number; icon: string; color: string }) {
+function StatBox({ label, value, icon, color, hint }: { label: string; value: number; icon: string; color: string; hint?: string }) {
   return (
     <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
         <Icon name={icon} size={18} />
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="text-xl font-bold">{value}</div>
-        <div className="text-xs text-slate-500">{label}</div>
+        <div className="text-xs text-slate-500 truncate">{label}</div>
+        {hint && <div className="text-[10px] text-slate-400 mt-0.5 truncate">{hint}</div>}
       </div>
     </div>
   );
