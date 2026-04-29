@@ -10,6 +10,7 @@ const NAV = [
   { to: '/geo/brands', label: 'Бренды', icon: 'Tag' },
   { to: '/geo/content', label: 'Контент', icon: 'FileText' },
   { to: '/geo/publications', label: 'Публикации', icon: 'Send' },
+  { to: '/geo/settings', label: 'Настройки', icon: 'Settings' },
 ];
 
 export default function GeoLayout({ children }: { children: ReactNode }) {

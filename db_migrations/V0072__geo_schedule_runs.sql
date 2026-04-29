@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS geo_schedule_runs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID, kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ok', polled INT DEFAULT 0, responses INT DEFAULT 0, mentions INT DEFAULT 0, checked INT DEFAULT 0, found INT DEFAULT 0, error TEXT, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), finished_at TIMESTAMPTZ);

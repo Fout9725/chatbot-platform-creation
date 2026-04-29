@@ -1,0 +1,1 @@
+ALTER TABLE geo_tenants ADD COLUMN IF NOT EXISTS last_auto_pub_check_at TIMESTAMPTZ;

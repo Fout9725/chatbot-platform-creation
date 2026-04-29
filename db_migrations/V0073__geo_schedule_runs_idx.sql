@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_geo_schedule_runs ON geo_schedule_runs(tenant_id, started_at DESC);

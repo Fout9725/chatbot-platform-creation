@@ -1,0 +1,1 @@
+ALTER TABLE geo_tenants ADD COLUMN IF NOT EXISTS poll_interval_hours INT NOT NULL DEFAULT 24;

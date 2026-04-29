@@ -8,6 +8,7 @@ export const GEO_POLL_URL = URLS['geo-poll'];
 export const GEO_ANALYTICS_URL = URLS['geo-analytics'];
 export const GEO_CONTENT_URL = URLS['geo-content'];
 export const GEO_PUBS_URL = URLS['geo-publications'];
+export const GEO_SETTINGS_URL = URLS['geo-settings'];
 
 const TOKEN_KEY = 'geo_token';
 
@@ -155,6 +156,43 @@ export const geoApi = {
         { method: 'GET' },
       ),
   },
+
+  settings: {
+    get: () => request<{ settings: GeoSettings }>(GEO_SETTINGS_URL, { method: 'GET' }),
+    update: (data: Partial<{
+      poll_enabled: boolean; poll_interval_hours: number;
+      pub_check_enabled: boolean; pub_check_interval_hours: number;
+      company: string;
+    }>) =>
+      request<{ settings: GeoSettings }>(GEO_SETTINGS_URL, { method: 'PUT', body: JSON.stringify(data) }),
+    runs: (limit = 20) =>
+      request<{ runs: GeoScheduleRun[] }>(`${GEO_SETTINGS_URL}?action=runs&limit=${limit}`, { method: 'GET' }),
+  },
+};
+
+export type GeoSettings = {
+  company: string;
+  plan: string;
+  poll_enabled: boolean;
+  poll_interval_hours: number;
+  pub_check_enabled: boolean;
+  pub_check_interval_hours: number;
+  last_auto_poll_at: string | null;
+  last_auto_pub_check_at: string | null;
+};
+
+export type GeoScheduleRun = {
+  id: string;
+  kind: 'poll' | 'pub_check';
+  status: 'ok' | 'error' | 'running';
+  polled: number;
+  responses: number;
+  mentions: number;
+  checked: number;
+  found: number;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
 };
 
 export type GeoPublication = {
