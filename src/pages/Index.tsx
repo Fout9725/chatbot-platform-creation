@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import HowItWorks from '@/components/landing/HowItWorks';
 import CtaBlock from '@/components/landing/CtaBlock';
 import SiteFooter from '@/components/landing/SiteFooter';
+import GeoPromo from '@/components/landing/GeoPromo';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Index = () => {
@@ -216,6 +217,8 @@ const Index = () => {
       <div data-tour="marketplace">
         <BotMarketplace />
       </div>
+
+      <GeoPromo />
 
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4 text-center">
