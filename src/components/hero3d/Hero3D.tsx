@@ -70,17 +70,6 @@ export default function Hero3D() {
         }}
       />
 
-      <div
-        className="absolute inset-0 pointer-events-none opacity-30"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(59,130,246,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.18) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-          maskImage: 'linear-gradient(to bottom, transparent 0%, #000 30%, #000 60%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 30%, #000 60%, transparent 100%)',
-        }}
-      />
-
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
         viewBox="0 0 100 100"

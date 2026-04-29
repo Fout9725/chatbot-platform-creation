@@ -246,14 +246,14 @@ const CosmicBackground = () => {
         style={{
           position: 'absolute',
           inset: 0,
-          opacity: 0.22,
+          opacity: 0.08,
           backgroundImage:
-            'linear-gradient(rgba(99,102,241,0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.22) 1px, transparent 1px)',
-          backgroundSize: '70px 70px',
+            'linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px)',
+          backgroundSize: '90px 90px',
           maskImage:
-            'radial-gradient(ellipse at center, #000 30%, transparent 80%)',
+            'radial-gradient(ellipse at center, #000 20%, transparent 70%)',
           WebkitMaskImage:
-            'radial-gradient(ellipse at center, #000 30%, transparent 80%)',
+            'radial-gradient(ellipse at center, #000 20%, transparent 70%)',
           transform: 'translate3d(var(--cx, 0px), var(--cy, 0px), 0)',
           transition: 'transform 0.1s linear',
         }}

@@ -10,7 +10,6 @@ import HowItWorks from '@/components/landing/HowItWorks';
 import Hero3D from '@/components/hero3d/Hero3D';
 import CtaBlock from '@/components/landing/CtaBlock';
 import SiteFooter from '@/components/landing/SiteFooter';
-import GeoPromo from '@/components/landing/GeoPromo';
 import PricingPreview from '@/components/landing/PricingPreview';
 import FaqAccordion from '@/components/landing/FaqAccordion';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -239,14 +238,6 @@ const Index = () => {
               'radial-gradient(ellipse at 30% 50%, rgba(59,130,246,0.10) 0%, rgba(10,14,39,0) 60%), radial-gradient(ellipse at 70% 50%, rgba(139,92,246,0.10) 0%, rgba(10,14,39,0) 60%)',
           }}
         />
-        <div
-          className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{
-            background:
-              'linear-gradient(90deg, transparent 0%, rgba(139,92,246,0.5) 50%, transparent 100%)',
-          }}
-        />
-
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 max-w-5xl mx-auto">
             {[
@@ -360,8 +351,6 @@ const Index = () => {
         </div>
       </section>
 
-      <GeoPromo />
-
       <section
         className="relative py-20 md:py-24 overflow-hidden"
         style={{ background: 'transparent' }}
@@ -373,17 +362,6 @@ const Index = () => {
               'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.10) 0%, rgba(10,14,39,0) 60%)',
           }}
         />
-        <div
-          className="absolute inset-0 pointer-events-none opacity-25"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px)',
-            backgroundSize: '70px 70px',
-            maskImage: 'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
-            WebkitMaskImage: 'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
-          }}
-        />
-
         <div className="container mx-auto px-4 text-center relative z-10">
           <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"

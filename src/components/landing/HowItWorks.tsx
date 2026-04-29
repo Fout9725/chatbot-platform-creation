@@ -39,19 +39,6 @@ const HowItWorks = () => {
         }}
       />
 
-      <div
-        className="absolute inset-0 pointer-events-none opacity-25"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px)',
-          backgroundSize: '70px 70px',
-          maskImage:
-            'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse at center, #000 30%, transparent 75%)',
-        }}
-      />
-
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
