@@ -15,6 +15,7 @@ import Catalog from "./pages/Catalog";
 import Industries from "./pages/Industries";
 import Faq from "./pages/Faq";
 import Contacts from "./pages/Contacts";
+import AuthPage from "./pages/AuthPage";
 import BotShowcasePage from "./pages/BotShowcasePage";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
@@ -85,6 +86,8 @@ const App = () => (
                 <Route path="/industries" element={<Industries />} />
                 <Route path="/faq" element={<Faq />} />
                 <Route path="/contacts" element={<Contacts />} />
+                <Route path="/login" element={<AuthPage mode="login" />} />
+                <Route path="/register" element={<AuthPage mode="register" />} />
                 <Route path="/bot/:id" element={<BotDetails />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/profile" element={<Profile />} />
