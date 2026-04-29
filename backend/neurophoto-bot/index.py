@@ -19,6 +19,15 @@ VSEGPT_KEY = os.environ.get('VSEGPT_API_KEY', '')
 OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 YOOKASSA_PAYMENT_URL = 'https://functions.poehali.dev/b41b8133-a3ad-4896-bda6-2b5ffa2bdeb3'
 
+ADMIN_USER_IDS = {285675692}
+
+
+def is_admin(tid):
+    try:
+        return int(tid) in ADMIN_USER_IDS
+    except (TypeError, ValueError):
+        return False
+
 PACKAGES = {
     'pack_10': {'generations': 10, 'price': 199, 'label': '10 генераций — 199 ₽'},
     'pack_50': {'generations': 50, 'price': 799, 'label': '50 генераций — 799 ₽'},
@@ -1144,7 +1153,7 @@ def build_pricing_text():
     return '\n'.join(lines)
 
 
-def start_keyboard(has_last_result=False):
+def start_keyboard(has_last_result=False, show_admin=False):
     buttons = []
     if has_last_result:
         buttons.append([{'text': '🖼 Последний результат', 'callback_data': 'last_result'}])
@@ -1152,6 +1161,8 @@ def start_keyboard(has_last_result=False):
     buttons.append([{'text': '✨ Составить промпт (AI)', 'callback_data': 'show_prompt'}])
     buttons.append([{'text': '💰 Тарифы и стоимость', 'callback_data': 'show_pricing'}])
     buttons.append([{'text': '💳 Пополнить баланс', 'callback_data': 'show_buy'}])
+    if show_admin:
+        buttons.append([{'text': '👑 Войти как администратор', 'callback_data': 'admin_panel'}])
     return {'inline_keyboard': buttons}
 
 
@@ -1406,7 +1417,7 @@ def handler(event, context):
                 f'✍️ Напишите текст — я предложу нейросети для генерации\n'
                 f'📸 Отправьте фото — я предложу нейросети для редактирования\n\n'
                 f'💎 Доступно генераций: <b>{remaining(user)}</b>',
-                reply_markup=start_keyboard(has_last_result=bool(last_gen))
+                reply_markup=start_keyboard(has_last_result=bool(last_gen), show_admin=is_admin(tid))
             )
             return ok()
 
@@ -1421,7 +1432,43 @@ def handler(event, context):
                 '/model — выбрать AI модель\n'
                 '/prompt — AI составит промпт\n'
                 '/balance — проверить баланс',
-                reply_markup=start_keyboard()
+                reply_markup=start_keyboard(show_admin=is_admin(tid))
+            )
+            return ok()
+
+        if text == '/admin':
+            if not is_admin(tid):
+                send_msg(chat_id, '⛔ Команда доступна только администратору.')
+                return ok()
+
+            total_users = 0
+            total_gens = 0
+            try:
+                cur = conn.cursor()
+                try:
+                    cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_users')
+                    row = cur.fetchone()
+                    if row:
+                        total_users = row[0]
+                    cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_generations')
+                    row = cur.fetchone()
+                    if row:
+                        total_gens = row[0]
+                finally:
+                    cur.close()
+            except Exception as e:
+                print(f'[ADMIN] stats error: {e}')
+
+            send_msg(chat_id,
+                '👑 <b>Админ-панель</b>\n\n'
+                f'👤 Пользователей: <b>{total_users}</b>\n'
+                f'🖼 Всего генераций: <b>{total_gens}</b>\n\n'
+                'Выберите действие:',
+                reply_markup={'inline_keyboard': [
+                    [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
+                    [{'text': '👥 Список пользователей', 'callback_data': 'admin_users'}],
+                    [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
+                ]}
             )
             return ok()
 
@@ -1462,7 +1509,7 @@ def handler(event, context):
 
         if text == '/pricing' or text == '/tariff':
             pricing_text = build_pricing_text()
-            send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
+            send_msg(chat_id, pricing_text, reply_markup=start_keyboard(show_admin=is_admin(tid)))
             return ok()
 
         if text == '/buy' or text == '/pay':
@@ -1662,7 +1709,7 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                 f'📸 Отправьте фото — предложу нейросети для редактирования\n\n'
                 f'💎 Генераций: <b>{remaining(user)}</b>'
             )
-            kb = start_keyboard(has_last_result=bool(last_gen))
+            kb = start_keyboard(has_last_result=bool(last_gen), show_admin=is_admin(tid))
             is_photo_msg = bool(callback.get('message', {}).get('photo'))
             if is_photo_msg:
                 tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
@@ -1758,14 +1805,14 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
         is_photo_msg = bool(callback.get('message', {}).get('photo'))
         if is_photo_msg:
             tg('editMessageReplyMarkup', {'chat_id': chat_id, 'message_id': msg_id, 'reply_markup': {'inline_keyboard': []}})
-            send_msg(chat_id, pricing_text, reply_markup=start_keyboard())
+            send_msg(chat_id, pricing_text, reply_markup=start_keyboard(show_admin=is_admin(tid)))
         else:
             tg('editMessageText', {
                 'chat_id': chat_id,
                 'message_id': msg_id,
                 'text': pricing_text,
                 'parse_mode': 'HTML',
-                'reply_markup': start_keyboard()
+                'reply_markup': start_keyboard(show_admin=is_admin(tid))
             })
         return ok()
 
@@ -1797,6 +1844,132 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             conn.close()
         return ok()
 
+    if cb_data == 'admin_panel':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        total_users = 0
+        total_gens = 0
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            try:
+                cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_users')
+                row = cur.fetchone()
+                if row:
+                    total_users = row[0]
+                cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_generations')
+                row = cur.fetchone()
+                if row:
+                    total_gens = row[0]
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+        send_msg(chat_id,
+            '👑 <b>Админ-панель</b>\n\n'
+            f'👤 Пользователей: <b>{total_users}</b>\n'
+            f'🖼 Всего генераций: <b>{total_gens}</b>\n\n'
+            'Выберите действие:',
+            reply_markup={'inline_keyboard': [
+                [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
+                [{'text': '👥 Список пользователей', 'callback_data': 'admin_users'}],
+                [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_stats':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            stats_lines = []
+            try:
+                cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_users')
+                row = cur.fetchone()
+                stats_lines.append(f'👤 Всего пользователей: <b>{row[0] if row else 0}</b>')
+                cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.neurophoto_users WHERE created_at > NOW() - INTERVAL '7 days'")
+                row = cur.fetchone()
+                stats_lines.append(f'🆕 За 7 дней: <b>{row[0] if row else 0}</b>')
+                cur.execute(f'SELECT COUNT(*) FROM {SCHEMA}.neurophoto_generations')
+                row = cur.fetchone()
+                stats_lines.append(f'🖼 Всего генераций: <b>{row[0] if row else 0}</b>')
+                cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.neurophoto_generations WHERE created_at > NOW() - INTERVAL '24 hours'")
+                row = cur.fetchone()
+                stats_lines.append(f'⚡ За 24 часа: <b>{row[0] if row else 0}</b>')
+            except Exception as e:
+                print(f'[ADMIN_STATS] error: {e}')
+                stats_lines.append('⚠️ Не удалось получить часть данных')
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+        send_msg(chat_id,
+            '📊 <b>Статистика бота</b>\n\n' + '\n'.join(stats_lines),
+            reply_markup={'inline_keyboard': [
+                [{'text': '⬅️ Назад', 'callback_data': 'admin_panel'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_users':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        rows = []
+        try:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f'SELECT telegram_id, COALESCE(username, \'\'), COALESCE(first_name, \'\'), '
+                    f'COALESCE(free_generations, 0) + COALESCE(paid_generations, 0), created_at '
+                    f'FROM {SCHEMA}.neurophoto_users ORDER BY created_at DESC LIMIT 20'
+                )
+                rows = cur.fetchall()
+            except Exception as e:
+                print(f'[ADMIN_USERS] error: {e}')
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+
+        if not rows:
+            text = '👥 <b>Пользователи</b>\n\nСписок пуст.'
+        else:
+            lines = ['👥 <b>Последние 20 пользователей</b>\n']
+            for r in rows:
+                u_tid, u_uname, u_fname, u_left, u_created = r
+                handle = f'@{u_uname}' if u_uname else f'id{u_tid}'
+                name = u_fname if u_fname else 'без имени'
+                lines.append(f'• {name} ({handle}) — 💎 {u_left}')
+            text = '\n'.join(lines)
+
+        send_msg(chat_id, text,
+            reply_markup={'inline_keyboard': [
+                [{'text': '⬅️ Назад', 'callback_data': 'admin_panel'}],
+            ]}
+        )
+        return ok()
+
     if cb_data == 'last_result':
         tg('answerCallbackQuery', {'callback_query_id': cb_id})
         conn = get_db()
@@ -1813,10 +1986,10 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
                 res = send_photo_url(chat_id, last_gen['url'], caption, reply_markup=after_gen_keyboard())
                 if not res.get('ok'):
                     send_msg(chat_id, '❌ Не удалось загрузить последний результат. Возможно, изображение устарело.',
-                        reply_markup=start_keyboard())
+                        reply_markup=start_keyboard(show_admin=is_admin(tid)))
             else:
                 send_msg(chat_id, 'У вас пока нет сгенерированных изображений.\n\nОтправьте фото или текст для генерации!',
-                    reply_markup=start_keyboard())
+                    reply_markup=start_keyboard(show_admin=is_admin(tid)))
         finally:
             conn.close()
         return ok()
