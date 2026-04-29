@@ -50,6 +50,8 @@ import GeoLogin from "./pages/geo/GeoLogin";
 import GeoRegister from "./pages/geo/GeoRegister";
 import GeoDashboard from "./pages/geo/GeoDashboard";
 import GeoStub from "./pages/geo/GeoStub";
+import GeoBrands from "./pages/geo/GeoBrands";
+import GeoQueries from "./pages/geo/GeoQueries";
 
 const queryClient = new QueryClient();
 
@@ -104,8 +106,8 @@ const App = () => (
                 <Route path="/geo/login" element={<GeoLogin />} />
                 <Route path="/geo/register" element={<GeoRegister />} />
                 <Route path="/geo" element={<GeoProtectedRoute><GeoDashboard /></GeoProtectedRoute>} />
-                <Route path="/geo/queries" element={<GeoProtectedRoute><GeoStub title="Запросы" icon="Search" sprint="Спринт 2" /></GeoProtectedRoute>} />
-                <Route path="/geo/brands" element={<GeoProtectedRoute><GeoStub title="Бренды" icon="Tag" sprint="Спринт 2" /></GeoProtectedRoute>} />
+                <Route path="/geo/queries" element={<GeoProtectedRoute><GeoQueries /></GeoProtectedRoute>} />
+                <Route path="/geo/brands" element={<GeoProtectedRoute><GeoBrands /></GeoProtectedRoute>} />
                 <Route path="/geo/content" element={<GeoProtectedRoute><GeoStub title="Контент" icon="FileText" sprint="Спринт 4" /></GeoProtectedRoute>} />
                 <Route path="/geo/publications" element={<GeoProtectedRoute><GeoStub title="Публикации" icon="Send" sprint="Спринт 5" /></GeoProtectedRoute>} />
 

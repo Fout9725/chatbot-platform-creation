@@ -1,4 +1,7 @@
 {
+  "geo-queries": "https://functions.poehali.dev/99c24e33-4cfe-414a-89fc-a992d07c3a4d",
+  "geo-brands": "https://functions.poehali.dev/256f7a09-38e2-40c5-a52f-c1ce2d64b0bf",
+  "geo-poll": "https://functions.poehali.dev/47c36405-33dd-40f4-8ccd-c93029c28823",
   "geo-auth": "https://functions.poehali.dev/b2ade571-5b3b-4742-90d9-ad6f58cd89c5",
   "qualifier-bot": "https://functions.poehali.dev/ee384e88-64f8-4252-a912-e2c64046d296",
   "set-qualifier-webhook": "https://functions.poehali.dev/9826be3e-01ce-41b1-9415-f66f42835d79",
