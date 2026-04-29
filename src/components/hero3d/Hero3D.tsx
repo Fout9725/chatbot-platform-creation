@@ -220,7 +220,7 @@ export default function Hero3D() {
                 Создать своего бота
               </Button>
             </Link>
-            <Link to="/pricing">
+            <Link to="/catalog">
               <Button
                 size="lg"
                 variant="ghost"

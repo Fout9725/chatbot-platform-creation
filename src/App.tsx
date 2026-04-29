@@ -11,6 +11,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import SessionExpiryNotification from "./components/SessionExpiryNotification";
 import CosmicBackground from "./components/global/CosmicBackground";
 import Index from "./pages/Index";
+import Catalog from "./pages/Catalog";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
 import Profile from "./pages/Profile";
@@ -75,6 +76,7 @@ const App = () => (
               <div style={{ position: 'relative', zIndex: 1 }}>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/catalog" element={<Catalog />} />
                 <Route path="/bot/:id" element={<BotDetails />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/profile" element={<Profile />} />
