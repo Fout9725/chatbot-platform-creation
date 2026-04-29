@@ -30,7 +30,14 @@ export default function GeoLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 relative">
+      <Link
+        to="/"
+        className="absolute top-4 left-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 bg-white/70 backdrop-blur px-3 py-2 rounded-lg border border-slate-200 transition-colors"
+      >
+        <Icon name="ArrowLeft" size={16} />
+        На главную
+      </Link>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 items-center justify-center mb-4">
