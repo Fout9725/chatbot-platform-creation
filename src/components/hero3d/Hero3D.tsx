@@ -1,10 +1,8 @@
-import { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-
-const HeroScene = lazy(() => import('./HeroScene'));
+import HeroScene from './HeroScene';
 
 export default function Hero3D() {
   return (
@@ -18,9 +16,7 @@ export default function Hero3D() {
       />
 
       <div className="absolute inset-0">
-        <Suspense fallback={null}>
-          <HeroScene />
-        </Suspense>
+        <HeroScene />
       </div>
 
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center px-4">
