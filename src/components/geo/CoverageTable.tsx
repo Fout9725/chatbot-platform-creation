@@ -10,8 +10,31 @@ export default function CoverageTable({ rows }: { rows: GeoCoverageRow[] }) {
   if (!rows.length) {
     return <div className="text-center py-8 text-slate-400 text-sm">Запросы пока не добавлены.</div>;
   }
+  const noBrandRows = rows.filter((r) => r.responses > 0 && r.own_mentions === 0);
   return (
     <div className="overflow-x-auto">
+      {noBrandRows.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
+          <Icon name="Lightbulb" size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-900 space-y-2">
+            <p>
+              <b>Запросы без бренда ({noBrandRows.length}).</b> Нейросети ответили, но ваш бренд не упомянули.
+              Скорее всего запросы слишком общие — попробуйте переформулировать конкретнее, чтобы LLM
+              естественно упомянула именно вас.
+            </p>
+            <p className="text-amber-800">Примеры формулировок:</p>
+            <ul className="list-disc list-inside space-y-1 text-amber-800">
+              <li>«Магазины электротоваров в [вашем городе]»</li>
+              <li>«Где купить розетки оптом в России»</li>
+              <li>«Лучший интернет-магазин кабеля и проводов»</li>
+              <li>«Поставщики электротехники для электриков»</li>
+            </ul>
+            <p className="text-xs text-amber-700">
+              Совет: добавляйте в запросы город, нишу, тип клиента или формат покупки (опт/розница).
+            </p>
+          </div>
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-slate-500 border-b">
