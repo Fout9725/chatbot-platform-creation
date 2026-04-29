@@ -1467,6 +1467,9 @@ def handler(event, context):
                 reply_markup={'inline_keyboard': [
                     [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
                     [{'text': '👥 Список пользователей', 'callback_data': 'admin_users'}],
+                    [{'text': '➕ Выдать генерации', 'callback_data': 'admin_grant'}],
+                    [{'text': '➖ Списать генерации', 'callback_data': 'admin_revoke'}],
+                    [{'text': '📢 Рассылка всем', 'callback_data': 'admin_broadcast'}],
                     [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
                 ]}
             )
@@ -1575,6 +1578,191 @@ def handler(event, context):
 
         if text and not text.startswith('/'):
             state = user.get('state') or ''
+
+            if is_admin(tid) and state.startswith('admin_wait_uid_'):
+                action = state.replace('admin_wait_uid_', '', 1)
+                target_id = None
+                target_user = None
+                ident = text.strip().lstrip('@')
+
+                cur_a = conn.cursor()
+                try:
+                    if ident.isdigit():
+                        cur_a.execute(
+                            f"SELECT telegram_id, COALESCE(username,''), COALESCE(first_name,''), "
+                            f"COALESCE(free_generations,0)+COALESCE(paid_generations,0) "
+                            f"FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+                            (int(ident),)
+                        )
+                    else:
+                        cur_a.execute(
+                            f"SELECT telegram_id, COALESCE(username,''), COALESCE(first_name,''), "
+                            f"COALESCE(free_generations,0)+COALESCE(paid_generations,0) "
+                            f"FROM {SCHEMA}.neurophoto_users WHERE LOWER(username) = LOWER(%s)",
+                            (ident,)
+                        )
+                    row = cur_a.fetchone()
+                    if row:
+                        target_id = row[0]
+                        target_user = {'username': row[1], 'name': row[2], 'left': row[3]}
+                finally:
+                    cur_a.close()
+
+                if not target_id:
+                    send_msg(chat_id,
+                        f'⚠️ Пользователь <code>{text.strip()}</code> не найден.\n\n'
+                        'Отправьте корректный ID или @username, либо отмените.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+                        ]}
+                    )
+                    return ok()
+
+                cur_a = conn.cursor()
+                try:
+                    cur_a.execute(
+                        f"UPDATE {SCHEMA}.neurophoto_users "
+                        f"SET session_state = %s, session_photo_url = %s WHERE telegram_id = %s",
+                        (f'admin_wait_amount_{action}', str(target_id), tid)
+                    )
+                finally:
+                    cur_a.close()
+
+                handle = f'@{target_user["username"]}' if target_user['username'] else f'id{target_id}'
+                verb = 'Сколько генераций ВЫДАТЬ' if action == 'grant' else 'Сколько генераций СПИСАТЬ'
+                send_msg(chat_id,
+                    f'👤 Пользователь: <b>{target_user["name"] or "—"}</b> ({handle})\n'
+                    f'💎 Сейчас доступно: <b>{target_user["left"]}</b>\n\n'
+                    f'{verb}? Отправьте число.',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+                    ]}
+                )
+                return ok()
+
+            if is_admin(tid) and state.startswith('admin_wait_amount_'):
+                action = state.replace('admin_wait_amount_', '', 1)
+                amount_text = text.strip()
+                if not amount_text.isdigit() or int(amount_text) <= 0:
+                    send_msg(chat_id, '⚠️ Нужно положительное целое число. Попробуйте ещё раз.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+                        ]}
+                    )
+                    return ok()
+                amount = int(amount_text)
+                target_id_str = user.get('photo')
+                if not target_id_str or not str(target_id_str).isdigit():
+                    set_session(conn, tid, None)
+                    send_msg(chat_id, '⚠️ Сессия потеряна. Начните заново.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                        ]}
+                    )
+                    return ok()
+                target_id = int(target_id_str)
+
+                cur_a = conn.cursor()
+                try:
+                    if action == 'grant':
+                        cur_a.execute(
+                            f"UPDATE {SCHEMA}.neurophoto_users "
+                            f"SET paid_generations = COALESCE(paid_generations, 0) + %s "
+                            f"WHERE telegram_id = %s",
+                            (amount, target_id)
+                        )
+                    else:
+                        cur_a.execute(
+                            f"UPDATE {SCHEMA}.neurophoto_users "
+                            f"SET paid_generations = GREATEST(COALESCE(paid_generations, 0) - %s, 0) "
+                            f"WHERE telegram_id = %s",
+                            (amount, target_id)
+                        )
+                    cur_a.execute(
+                        f"SELECT COALESCE(free_generations,0)+COALESCE(paid_generations,0), "
+                        f"COALESCE(username,''), COALESCE(first_name,'') "
+                        f"FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+                        (target_id,)
+                    )
+                    row = cur_a.fetchone()
+                finally:
+                    cur_a.close()
+
+                set_session(conn, tid, None)
+
+                if not row:
+                    send_msg(chat_id, '⚠️ Пользователь не найден.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                        ]}
+                    )
+                    return ok()
+
+                new_left, t_uname, t_fname = row
+                handle = f'@{t_uname}' if t_uname else f'id{target_id}'
+                if action == 'grant':
+                    title = f'✅ Выдано <b>+{amount}</b> генераций'
+                    notify = f'🎁 Администратор выдал вам <b>+{amount}</b> генераций!\n💎 Ваш баланс: <b>{new_left}</b>'
+                else:
+                    title = f'➖ Списано <b>{amount}</b> генераций'
+                    notify = f'⚠️ Администратор списал у вас <b>{amount}</b> генераций.\n💎 Ваш баланс: <b>{new_left}</b>'
+
+                try:
+                    tg('sendMessage', {
+                        'chat_id': target_id,
+                        'text': notify,
+                        'parse_mode': 'HTML',
+                    })
+                except Exception:
+                    pass
+
+                send_msg(chat_id,
+                    f'{title}\n\n'
+                    f'👤 {t_fname or "—"} ({handle})\n'
+                    f'💎 Новый баланс: <b>{new_left}</b>',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                        [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
+                    ]}
+                )
+                return ok()
+
+            if is_admin(tid) and state == 'admin_wait_broadcast':
+                msg_text = text.strip()
+                if len(msg_text) < 3:
+                    send_msg(chat_id, '⚠️ Текст слишком короткий. Минимум 3 символа.',
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+                        ]}
+                    )
+                    return ok()
+
+                cur_a = conn.cursor()
+                total_recipients = 0
+                try:
+                    cur_a.execute(
+                        f"UPDATE {SCHEMA}.neurophoto_users SET session_photo_url = %s WHERE telegram_id = %s",
+                        (msg_text, tid)
+                    )
+                    cur_a.execute(f"SELECT COUNT(*) FROM {SCHEMA}.neurophoto_users")
+                    cnt = cur_a.fetchone()
+                    if cnt:
+                        total_recipients = cnt[0]
+                finally:
+                    cur_a.close()
+
+                preview = msg_text if len(msg_text) <= 600 else msg_text[:600] + '…'
+                send_msg(chat_id,
+                    f'📢 <b>Предпросмотр рассылки</b>\n\n'
+                    f'━━━━━━━━━━━━━━━\n{preview}\n━━━━━━━━━━━━━━━\n\n'
+                    f'👥 Получателей: <b>{total_recipients}</b>\n\n'
+                    f'Подтвердите отправку?',
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '✅ Отправить', 'callback_data': 'admin_broadcast_confirm'}],
+                        [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+                    ]}
+                )
+                return ok()
 
             if state.startswith('prompt_wait:'):
                 model_key = state.split(':', 1)[1]
@@ -1879,6 +2067,9 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
             reply_markup={'inline_keyboard': [
                 [{'text': '📊 Статистика', 'callback_data': 'admin_stats'}],
                 [{'text': '👥 Список пользователей', 'callback_data': 'admin_users'}],
+                [{'text': '➕ Выдать генерации', 'callback_data': 'admin_grant'}],
+                [{'text': '➖ Списать генерации', 'callback_data': 'admin_revoke'}],
+                [{'text': '📢 Рассылка всем', 'callback_data': 'admin_broadcast'}],
                 [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
             ]}
         )
@@ -1966,6 +2157,156 @@ def _handle_callback_inner(callback, cb_data, cb_id, chat_id, msg_id, tid):
         send_msg(chat_id, text,
             reply_markup={'inline_keyboard': [
                 [{'text': '⬅️ Назад', 'callback_data': 'admin_panel'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_grant' or cb_data == 'admin_revoke':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        action = 'grant' if cb_data == 'admin_grant' else 'revoke'
+        title = '➕ Выдача генераций' if action == 'grant' else '➖ Списание генераций'
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_state = %s, session_photo_url = NULL WHERE telegram_id = %s",
+                    (f'admin_wait_uid_{action}', tid)
+                )
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+        send_msg(chat_id,
+            f'{title}\n\n'
+            'Отправьте <b>Telegram ID</b> или <b>@username</b> пользователя одним сообщением.\n\n'
+            '<i>Пример: <code>123456789</code> или <code>@username</code></i>',
+            reply_markup={'inline_keyboard': [
+                [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_broadcast':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id})
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.neurophoto_users SET session_state = %s, session_photo_url = NULL WHERE telegram_id = %s",
+                    ('admin_wait_broadcast', tid)
+                )
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+        send_msg(chat_id,
+            '📢 <b>Рассылка всем пользователям</b>\n\n'
+            'Отправьте текст сообщения, которое получат все пользователи бота.\n\n'
+            'Поддерживается HTML: <b>жирный</b>, <i>курсив</i>, <code>код</code>, '
+            '<a href="https://example.com">ссылки</a>.',
+            reply_markup={'inline_keyboard': [
+                [{'text': '❌ Отмена', 'callback_data': 'admin_cancel'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_cancel':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {'callback_query_id': cb_id})
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': 'Отменено'})
+        conn = get_db()
+        try:
+            set_session(conn, tid, None)
+        finally:
+            conn.close()
+        send_msg(chat_id, '❌ Действие отменено.',
+            reply_markup={'inline_keyboard': [
+                [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
+            ]}
+        )
+        return ok()
+
+    if cb_data == 'admin_broadcast_confirm':
+        if not is_admin(tid):
+            tg('answerCallbackQuery', {
+                'callback_query_id': cb_id,
+                'text': '⛔ Доступ только для администратора',
+                'show_alert': True,
+            })
+            return ok()
+        tg('answerCallbackQuery', {'callback_query_id': cb_id, 'text': '🚀 Запуск рассылки...'})
+        conn = get_db()
+        broadcast_text = None
+        recipient_ids = []
+        try:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"SELECT session_photo_url FROM {SCHEMA}.neurophoto_users WHERE telegram_id = %s",
+                    (tid,)
+                )
+                row = cur.fetchone()
+                if row:
+                    broadcast_text = row[0]
+                cur.execute(f"SELECT telegram_id FROM {SCHEMA}.neurophoto_users")
+                recipient_ids = [r[0] for r in cur.fetchall()]
+            finally:
+                cur.close()
+            set_session(conn, tid, None)
+        finally:
+            conn.close()
+
+        if not broadcast_text:
+            send_msg(chat_id, '⚠️ Текст рассылки не найден. Попробуйте снова.',
+                reply_markup={'inline_keyboard': [
+                    [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                ]}
+            )
+            return ok()
+
+        sent = 0
+        failed = 0
+        for uid in recipient_ids:
+            try:
+                res = tg('sendMessage', {
+                    'chat_id': uid,
+                    'text': broadcast_text,
+                    'parse_mode': 'HTML',
+                    'disable_web_page_preview': False,
+                })
+                if res.get('ok'):
+                    sent += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+
+        send_msg(chat_id,
+            f'✅ <b>Рассылка завершена</b>\n\n'
+            f'📨 Доставлено: <b>{sent}</b>\n'
+            f'⚠️ Не доставлено: <b>{failed}</b>\n'
+            f'👥 Всего получателей: <b>{len(recipient_ids)}</b>',
+            reply_markup={'inline_keyboard': [
+                [{'text': '👑 Админ-панель', 'callback_data': 'admin_panel'}],
+                [{'text': '🏠 На главную', 'callback_data': 'go_start'}],
             ]}
         )
         return ok()
