@@ -1,67 +1,189 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGeoAuth } from '@/contexts/GeoAuthContext';
+import { geoApi } from '@/lib/geo/api';
+import StatCard from '@/components/geo/StatCard';
+import SovChart from '@/components/geo/SovChart';
+import SovBars from '@/components/geo/SovBars';
+import MentionsFeed from '@/components/geo/MentionsFeed';
+import CoverageTable from '@/components/geo/CoverageTable';
+import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
+import { toast } from '@/hooks/use-toast';
 
-const STATS = [
-  { label: 'Активных запросов', value: '0', icon: 'Search', color: 'indigo' },
-  { label: 'Брендов отслеживается', value: '0', icon: 'Tag', color: 'emerald' },
-  { label: 'Упоминаний за 7 дней', value: '0', icon: 'TrendingUp', color: 'amber' },
-  { label: 'Черновиков контента', value: '0', icon: 'FileText', color: 'purple' },
+const PERIODS = [
+  { d: 1, label: '24ч' },
+  { d: 7, label: '7д' },
+  { d: 30, label: '30д' },
 ];
-
-const COLOR_BG: Record<string, string> = {
-  indigo: 'bg-indigo-100 text-indigo-600',
-  emerald: 'bg-emerald-100 text-emerald-600',
-  amber: 'bg-amber-100 text-amber-600',
-  purple: 'bg-purple-100 text-purple-600',
-};
 
 export default function GeoDashboard() {
   const { user } = useGeoAuth();
+  const qc = useQueryClient();
+  const [days, setDays] = useState(7);
+
+  const overviewQ = useQuery({
+    queryKey: ['geo-overview', days],
+    queryFn: () => geoApi.analytics.overview(days),
+  });
+
+  const trendQ = useQuery({
+    queryKey: ['geo-trend', days],
+    queryFn: () => geoApi.analytics.sovTrend(days),
+  });
+
+  const mentionsQ = useQuery({
+    queryKey: ['geo-mentions', days],
+    queryFn: () => geoApi.analytics.mentions(days, 15),
+  });
+
+  const coverageQ = useQuery({
+    queryKey: ['geo-coverage', days],
+    queryFn: () => geoApi.analytics.coverage(days),
+  });
+
+  const pollAll = useMutation({
+    mutationFn: () => geoApi.poll(),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['geo-overview'] });
+      qc.invalidateQueries({ queryKey: ['geo-trend'] });
+      qc.invalidateQueries({ queryKey: ['geo-mentions'] });
+      qc.invalidateQueries({ queryKey: ['geo-coverage'] });
+      qc.invalidateQueries({ queryKey: ['geo-queries'] });
+      toast({
+        title: r.note === 'no_active_queries' ? 'Нет активных запросов' : 'Опрос завершён',
+        description: `Опрошено: ${r.polled}, ответов: ${r.responses}, упоминаний: ${r.mentions}`,
+      });
+    },
+    onError: (e: Error) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+  });
+
+  const o = overviewQ.data;
+  const isEmpty = o && o.queries.total === 0;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold">Привет, {user?.company}!</h1>
-        <p className="text-slate-500 mt-1">
-          Обзор упоминаний вашего бренда в ответах генеративных нейросетей
-        </p>
+    <div className="p-8 max-w-7xl mx-auto">
+      <header className="flex items-start justify-between flex-wrap gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Дашборд</h1>
+          <p className="text-slate-500 mt-1">Привет, {user?.company}! Вот срез по упоминаниям бренда.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="bg-white border rounded-lg p-1 flex">
+            {PERIODS.map((p) => (
+              <button
+                key={p.d}
+                onClick={() => setDays(p.d)}
+                className={`px-3 py-1.5 text-sm rounded-md transition ${
+                  days === p.d ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button onClick={() => pollAll.mutate()} disabled={pollAll.isPending}>
+            {pollAll.isPending ? (
+              <>
+                <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                Опрос…
+              </>
+            ) : (
+              <>
+                <Icon name="Zap" size={16} className="mr-2" />
+                Опросить все
+              </>
+            )}
+          </Button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {STATS.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border p-5">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${COLOR_BG[s.color]}`}>
-              <Icon name={s.icon} size={20} />
+      {isEmpty && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6 flex items-start gap-4">
+          <Icon name="Rocket" size={28} className="text-indigo-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold mb-1">Начните за 3 шага</h3>
+            <p className="text-sm text-slate-600 mb-3">
+              Добавьте бренды, заведите запросы и запустите первый опрос — данные появятся сразу.
+            </p>
+            <div className="flex gap-2">
+              <a href="/geo/brands" className="text-sm bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                → Добавить бренды
+              </a>
+              <a href="/geo/queries" className="text-sm bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                → Добавить запросы
+              </a>
             </div>
-            <div className="text-2xl font-bold">{s.value}</div>
-            <div className="text-sm text-slate-500">{s.label}</div>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label="Доля голоса (SOV)"
+          value={o ? `${o.own_sov}%` : '—'}
+          hint="Доля упоминаний моего бренда"
+          icon="PieChart"
+          color="indigo"
+        />
+        <StatCard
+          label="Упоминаний"
+          value={o ? o.mentions : '—'}
+          hint={`за ${days} дн`}
+          icon="Quote"
+          color="emerald"
+        />
+        <StatCard
+          label="Покрыто запросов"
+          value={o ? `${o.covered_queries} / ${o.queries.active}` : '—'}
+          hint="Где упомянули мой бренд"
+          icon="Target"
+          color="amber"
+        />
+        <StatCard
+          label="Ответов LLM"
+          value={o ? o.responses : '—'}
+          hint={`за ${days} дн`}
+          icon="MessageSquare"
+          color="purple"
+        />
       </div>
 
-      <div className="bg-white rounded-2xl border p-8 text-center">
-        <div className="inline-flex w-16 h-16 rounded-2xl bg-indigo-50 items-center justify-center mb-4">
-          <Icon name="Rocket" size={32} className="text-indigo-600" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="lg:col-span-2 bg-white border rounded-2xl p-6">
+          <h2 className="font-semibold mb-4">Динамика SOV по дням</h2>
+          {trendQ.isLoading ? (
+            <div className="h-72 flex items-center justify-center text-slate-400">Загрузка…</div>
+          ) : (
+            <SovChart trend={trendQ.data?.trend || []} brands={trendQ.data?.brands || []} />
+          )}
         </div>
-        <h2 className="text-xl font-semibold mb-2">Начните за 3 шага</h2>
-        <p className="text-slate-500 mb-6 max-w-md mx-auto">
-          Добавьте свой бренд и конкурентов, заведите запросы для отслеживания —
-          и платформа начнёт ежедневно опрашивать ChatGPT и Perplexity.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto text-left">
-          {[
-            { n: 1, title: 'Добавьте бренды', desc: 'Свой и 3-5 конкурентов' },
-            { n: 2, title: 'Заведите запросы', desc: 'Что спрашивают клиенты' },
-            { n: 3, title: 'Получайте отчёты', desc: 'SOV и упоминания каждый день' },
-          ].map((s) => (
-            <div key={s.n} className="bg-slate-50 rounded-xl p-4">
-              <div className="w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center mb-2">
-                {s.n}
-              </div>
-              <div className="font-medium">{s.title}</div>
-              <div className="text-xs text-slate-500 mt-1">{s.desc}</div>
-            </div>
-          ))}
+        <div className="bg-white border rounded-2xl p-6">
+          <h2 className="font-semibold mb-4">SOV по брендам</h2>
+          {overviewQ.isLoading ? (
+            <div className="text-slate-400 text-sm">Загрузка…</div>
+          ) : (
+            <SovBars sov={o?.sov || []} />
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border rounded-2xl p-6">
+          <h2 className="font-semibold mb-4">Последние упоминания</h2>
+          {mentionsQ.isLoading ? (
+            <div className="text-slate-400 text-sm">Загрузка…</div>
+          ) : (
+            <MentionsFeed mentions={mentionsQ.data?.mentions || []} />
+          )}
+        </div>
+        <div className="bg-white border rounded-2xl p-6">
+          <h2 className="font-semibold mb-4">Покрытие запросов</h2>
+          {coverageQ.isLoading ? (
+            <div className="text-slate-400 text-sm">Загрузка…</div>
+          ) : (
+            <CoverageTable rows={coverageQ.data?.coverage || []} />
+          )}
         </div>
       </div>
     </div>

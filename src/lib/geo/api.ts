@@ -5,6 +5,7 @@ export const GEO_AUTH_URL = URLS['geo-auth'];
 export const GEO_BRANDS_URL = URLS['geo-brands'];
 export const GEO_QUERIES_URL = URLS['geo-queries'];
 export const GEO_POLL_URL = URLS['geo-poll'];
+export const GEO_ANALYTICS_URL = URLS['geo-analytics'];
 
 const TOKEN_KEY = 'geo_token';
 
@@ -98,4 +99,64 @@ export const geoApi = {
       method: 'POST',
       body: JSON.stringify(queryId ? { query_id: queryId } : {}),
     }),
+
+  analytics: {
+    overview: (days = 7) =>
+      request<GeoOverview>(`${GEO_ANALYTICS_URL}?action=overview&days=${days}`, { method: 'GET' }),
+    sovTrend: (days = 7) =>
+      request<{ trend: Array<Record<string, number | string>>; brands: Array<{ id: string; name: string; is_own: boolean }> }>(
+        `${GEO_ANALYTICS_URL}?action=sov_trend&days=${days}`,
+        { method: 'GET' },
+      ),
+    mentions: (days = 7, limit = 20) =>
+      request<{ mentions: GeoMention[] }>(
+        `${GEO_ANALYTICS_URL}?action=mentions&days=${days}&limit=${limit}`,
+        { method: 'GET' },
+      ),
+    coverage: (days = 7) =>
+      request<{ coverage: GeoCoverageRow[] }>(`${GEO_ANALYTICS_URL}?action=coverage&days=${days}`, { method: 'GET' }),
+  },
+};
+
+export type GeoOverview = {
+  period_days: number;
+  queries: { active: number; total: number };
+  brands: { own: number; total: number };
+  responses: number;
+  mentions: number;
+  own_sov: number;
+  covered_queries: number;
+  sov: Array<{
+    brand_id: string;
+    name: string;
+    is_own: boolean;
+    mentions: number;
+    sov: number;
+    avg_sentiment: number;
+  }>;
+};
+
+export type GeoMention = {
+  id: string;
+  brand_name: string;
+  is_own: boolean;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  sentiment_score: number;
+  snippet: string;
+  position: number;
+  provider: string;
+  model: string;
+  query_text: string;
+  query_id: string;
+  created_at: string;
+};
+
+export type GeoCoverageRow = {
+  query_id: string;
+  text: string;
+  language: string;
+  responses: number;
+  own_mentions: number;
+  competitor_mentions: number;
+  last_polled: string | null;
 };
