@@ -157,7 +157,7 @@ def list_publications(tenant_id: str):
                        p.last_check_at, p.last_check_found, p.notes,
                        p.draft_id, p.query_id, q.text AS query_text,
                        p.created_at, p.updated_at
-                FROM geo_publications p
+                FROM geo_publications_v2 p
                 LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
                 WHERE p.tenant_id = %s
                 ORDER BY p.created_at DESC
@@ -207,7 +207,7 @@ def create_publication(tenant_id: str, body: dict):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO geo_publications
+                    INSERT INTO geo_publications_v2
                       (tenant_id, draft_id, query_id, title, url, platform, published_at, status, notes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, created_at, updated_at, last_check_at, last_check_found, published_at
@@ -252,7 +252,7 @@ def update_publication(tenant_id: str, pub_id: str, body: dict):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"UPDATE geo_publications SET {', '.join(fields)} WHERE tenant_id = %s AND id = %s",
+                    f"UPDATE geo_publications_v2 SET {', '.join(fields)} WHERE tenant_id = %s AND id = %s",
                     values
                 )
                 if cur.rowcount == 0:
@@ -269,9 +269,9 @@ def delete_publication(tenant_id: str, pub_id: str):
     try:
         with conn:
             with conn.cursor() as cur:
-                cur.execute('DELETE FROM geo_publication_checks WHERE tenant_id = %s AND publication_id = %s',
+                cur.execute('DELETE FROM geo_publication_checks_v2 WHERE tenant_id = %s AND publication_id = %s',
                             (tenant_id, pub_id))
-                cur.execute('DELETE FROM geo_publications WHERE tenant_id = %s AND id = %s',
+                cur.execute('DELETE FROM geo_publications_v2 WHERE tenant_id = %s AND id = %s',
                             (tenant_id, pub_id))
                 if cur.rowcount == 0:
                     return resp(404, {'error': 'not_found'})
@@ -287,7 +287,7 @@ def list_checks(tenant_id: str, pub_id: str):
             cur.execute(
                 """
                 SELECT id, provider, found, snippet, checked_at
-                FROM geo_publication_checks
+                FROM geo_publication_checks_v2
                 WHERE tenant_id = %s AND publication_id = %s
                 ORDER BY checked_at DESC
                 LIMIT 30
@@ -312,7 +312,7 @@ def check_publication(tenant_id: str, pub_id: str):
             cur.execute(
                 """
                 SELECT p.url, p.title, p.query_id, q.text AS query_text
-                FROM geo_publications p
+                FROM geo_publications_v2 p
                 LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
                 WHERE p.tenant_id = %s AND p.id = %s
                 """,
@@ -357,7 +357,7 @@ def check_publication(tenant_id: str, pub_id: str):
             with conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        'INSERT INTO geo_publication_checks '
+                        'INSERT INTO geo_publication_checks_v2 '
                         '(tenant_id, publication_id, provider, found, snippet, raw_response) '
                         'VALUES (%s, %s, %s, %s, %s, %s)',
                         (tenant_id, pub_id, provider, found, snippet[:1024], r['text'][:5000])
@@ -374,7 +374,7 @@ def check_publication(tenant_id: str, pub_id: str):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    'UPDATE geo_publications SET last_check_at = NOW(), last_check_found = %s, updated_at = NOW() '
+                    'UPDATE geo_publications_v2 SET last_check_at = NOW(), last_check_found = %s, updated_at = NOW() '
                     'WHERE tenant_id = %s AND id = %s',
                     (any_found, tenant_id, pub_id)
                 )
