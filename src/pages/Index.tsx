@@ -106,6 +106,15 @@ const Index = () => {
               </div>
 
               <Button
+                size="sm"
+                onClick={() => navigate('/geo')}
+                className="ml-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm shadow-indigo-500/20 border-0"
+              >
+                <Icon name="Radar" size={15} className="mr-1.5" />
+                GEO Factory
+              </Button>
+
+              <Button
                 variant={isAuthenticated ? 'default' : 'outline'}
                 size="sm"
                 onClick={handleProfileClick}
@@ -150,6 +159,12 @@ const Index = () => {
               </Button>
               <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/automation-hub'); setMobileMenuOpen(false); }}>
                 <Icon name="Zap" size={16} className="mr-2" /> Автоматизация
+              </Button>
+              <Button
+                className="w-full justify-start bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white"
+                onClick={() => { navigate('/geo'); setMobileMenuOpen(false); }}
+              >
+                <Icon name="Radar" size={16} className="mr-2" /> GEO Factory
               </Button>
               {user?.role === 'admin' && (
                 <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}>
