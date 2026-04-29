@@ -17,8 +17,10 @@ from psycopg2.extras import RealDictCursor
 
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
+YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
 PROVIDERS = {
     'openai_gpt4o': 'openai/gpt-4o-mini',
+    'yandex_gpt': 'yandexgpt/latest',
 }
 MAX_QUERIES_PER_RUN = 3
 POSITIVE = {'лучший', 'рекоменд', 'надёжн', 'качествен', 'удобн', 'выгодн',
@@ -46,7 +48,40 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def call_yandex_gpt(query, timeout=60):
+    api_key = os.environ.get('YANDEX_GPT_API_KEY', '')
+    folder_id = os.environ.get('YANDEX_GPT_FOLDER_ID', '')
+    if not api_key or not folder_id:
+        raise RuntimeError('YANDEX_GPT_API_KEY or YANDEX_GPT_FOLDER_ID missing')
+    payload = {
+        'modelUri': f'gpt://{folder_id}/yandexgpt/latest',
+        'completionOptions': {'stream': False, 'temperature': 0.3, 'maxTokens': 700},
+        'messages': [
+            {'role': 'system', 'text': 'Ты — поисковый ассистент. Дай развёрнутый, фактический ответ с конкретными названиями брендов, цифрами и источниками.'},
+            {'role': 'user', 'text': query},
+        ],
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        YANDEX_GPT_BASE, data=data, method='POST',
+        headers={'Authorization': f'Api-Key {api_key}', 'Content-Type': 'application/json', 'x-folder-id': folder_id},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        body = json.loads(r.read().decode('utf-8'))
+    alts = (body.get('result') or {}).get('alternatives') or []
+    text = (alts[0].get('message') or {}).get('text', '') if alts else ''
+    usage = (body.get('result') or {}).get('usage') or {}
+    return {
+        'text': text,
+        'citations': [],
+        'model': 'yandexgpt/latest',
+        'usage': usage,
+    }
+
+
 def call_vsegpt(provider, query, language='ru', timeout=60):
+    if provider == 'yandex_gpt':
+        return call_yandex_gpt(query, timeout)
     api_key = os.environ.get('VSEGPT_API_KEY', '')
     if not api_key:
         raise RuntimeError('VSEGPT_API_KEY missing')

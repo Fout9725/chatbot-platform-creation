@@ -17,9 +17,11 @@ from psycopg2.extras import RealDictCursor
 
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
+YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
 PROVIDERS = {
     'openai_gpt4o': 'openai/gpt-4o-mini',
     'openai_gpt4': 'openai/gpt-4o',
+    'yandex_gpt': 'yandexgpt/latest',
 }
 
 
@@ -82,7 +84,38 @@ def extract_domain(url: str) -> str:
         return ''
 
 
+def call_yandex_gpt(query: str, timeout: int = 60):
+    api_key = os.environ.get('YANDEX_GPT_API_KEY', '')
+    folder_id = os.environ.get('YANDEX_GPT_FOLDER_ID', '')
+    if not api_key or not folder_id:
+        raise RuntimeError('YANDEX_GPT_API_KEY or YANDEX_GPT_FOLDER_ID missing')
+    payload = {
+        'modelUri': f'gpt://{folder_id}/yandexgpt/latest',
+        'completionOptions': {'stream': False, 'temperature': 0.3, 'maxTokens': 1500},
+        'messages': [
+            {'role': 'system', 'text': 'Ответь на вопрос с указанием конкретных источников, брендов и ссылок.'},
+            {'role': 'user', 'text': query},
+        ],
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        YANDEX_GPT_BASE, data=data, method='POST',
+        headers={'Authorization': f'Api-Key {api_key}', 'Content-Type': 'application/json', 'x-folder-id': folder_id},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            body = json.loads(r.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'YandexGPT HTTP {e.code}: {err_body[:300]}')
+    alts = (body.get('result') or {}).get('alternatives') or []
+    text = (alts[0].get('message') or {}).get('text', '') if alts else ''
+    return {'text': text, 'citations': []}
+
+
 def call_vsegpt(provider: str, query: str, timeout: int = 60):
+    if provider == 'yandex_gpt':
+        return call_yandex_gpt(query, timeout)
     api_key = os.environ.get('VSEGPT_API_KEY', '')
     if not api_key:
         raise RuntimeError('VSEGPT_API_KEY missing')
