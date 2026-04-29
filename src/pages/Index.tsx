@@ -50,28 +50,53 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100 bg-white/90 backdrop-blur-lg sticky top-0 z-50">
+      <header
+        className="sticky top-0 z-50"
+        style={{
+          background: 'rgba(10,14,39,0.7)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          borderBottom: '1px solid rgba(139,92,246,0.18)',
+          boxShadow: '0 4px 30px rgba(10,14,39,0.25)',
+        }}
+      >
         <div className="container mx-auto px-4 py-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="bg-violet-600 p-2 rounded-xl">
+              <div
+                className="p-2 rounded-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)',
+                  boxShadow: '0 0 20px rgba(139,92,246,0.5)',
+                }}
+              >
                 <Icon name="Bot" className="text-white" size={22} />
               </div>
-              <span className="text-lg font-bold text-gray-900">ИнтеллектПро</span>
+              <span
+                className="text-lg font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #C4B5FD 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                ИнтеллектПро
+              </span>
             </div>
 
             <nav className="hidden md:flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/pricing')}>
+              <Button variant="ghost" size="sm" className="text-slate-200 hover:text-white hover:bg-white/10" onClick={() => navigate('/pricing')}>
                 Тарифы
               </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={scrollToCatalog}>
+              <Button variant="ghost" size="sm" className="text-slate-200 hover:text-white hover:bg-white/10" onClick={scrollToCatalog}>
                 Каталог
               </Button>
-              <Button data-tour="my-bots" variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/my-bots')}>
+              <Button data-tour="my-bots" variant="ghost" size="sm" className="text-slate-200 hover:text-white hover:bg-white/10" onClick={() => navigate('/my-bots')}>
                 Мои боты
               </Button>
               {user?.role === 'admin' && (
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={() => navigate('/admin')}>
+                <Button variant="ghost" size="sm" className="text-slate-200 hover:text-white hover:bg-white/10" onClick={() => navigate('/admin')}>
                   Админ
                 </Button>
               )}
@@ -81,9 +106,10 @@ const Index = () => {
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => navigate('/automation-hub')}
-                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 hover:border-amber-300 hover:from-amber-100 hover:to-orange-100 hover:shadow-md hover:shadow-amber-200/30 transition-all duration-200 hover:scale-105"
+                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl border border-amber-300/30 hover:border-amber-300/60 transition-all duration-200 hover:scale-105"
+                      style={{ background: 'rgba(251,191,36,0.12)', backdropFilter: 'blur(10px)' }}
                     >
-                      <Icon name="Zap" size={17} className="text-amber-600 group-hover:text-amber-700 transition-colors" />
+                      <Icon name="Zap" size={17} className="text-amber-300 group-hover:text-amber-200 transition-colors" />
                       <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
                     </button>
                   </TooltipTrigger>
@@ -96,9 +122,10 @@ const Index = () => {
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => navigate('/prompt-engineer')}
-                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200/60 hover:border-violet-300 hover:from-violet-100 hover:to-fuchsia-100 hover:shadow-md hover:shadow-violet-200/30 transition-all duration-200 hover:scale-105"
+                      className="relative group w-9 h-9 flex items-center justify-center rounded-xl border border-violet-300/30 hover:border-violet-300/60 transition-all duration-200 hover:scale-105"
+                      style={{ background: 'rgba(139,92,246,0.15)', backdropFilter: 'blur(10px)' }}
                     >
-                      <Icon name="Sparkles" size={17} className="text-violet-600 group-hover:text-violet-700 transition-colors" />
+                      <Icon name="Sparkles" size={17} className="text-violet-300 group-hover:text-violet-200 transition-colors" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="font-medium">
@@ -117,10 +144,16 @@ const Index = () => {
               </Button>
 
               <Button
-                variant={isAuthenticated ? 'default' : 'outline'}
                 size="sm"
                 onClick={handleProfileClick}
-                className={isAuthenticated ? 'bg-violet-600 hover:bg-violet-700 ml-2' : 'ml-2'}
+                className="ml-2 text-white border"
+                style={{
+                  background: isAuthenticated
+                    ? 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)'
+                    : 'rgba(255,255,255,0.06)',
+                  borderColor: 'rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(10px)',
+                }}
               >
                 <Icon name="User" size={16} className="mr-1.5" />
                 {isAuthenticated ? user?.name : 'Войти'}
@@ -129,37 +162,50 @@ const Index = () => {
 
             <div className="md:hidden flex items-center gap-2">
               <Button
-                variant={isAuthenticated ? 'default' : 'outline'}
                 size="sm"
                 onClick={handleProfileClick}
-                className={isAuthenticated ? 'bg-violet-600 hover:bg-violet-700' : ''}
+                className="text-white border"
+                style={{
+                  background: isAuthenticated
+                    ? 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)'
+                    : 'rgba(255,255,255,0.06)',
+                  borderColor: 'rgba(255,255,255,0.15)',
+                }}
               >
                 <Icon name="User" size={16} />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="text-slate-200 hover:text-white hover:bg-white/10"
+              >
                 <Icon name={mobileMenuOpen ? "X" : "Menu"} size={20} />
               </Button>
             </div>
           </div>
 
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-100 mt-3 pt-3 pb-1 space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}>
+            <div
+              className="md:hidden mt-3 pt-3 pb-1 space-y-1"
+              style={{ borderTop: '1px solid rgba(139,92,246,0.18)' }}
+            >
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}>
                 <Icon name="CreditCard" size={16} className="mr-2" /> Тарифы
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { scrollToCatalog(); setMobileMenuOpen(false); }}>
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { scrollToCatalog(); setMobileMenuOpen(false); }}>
                 <Icon name="Store" size={16} className="mr-2" /> Каталог
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/my-bots'); setMobileMenuOpen(false); }}>
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/my-bots'); setMobileMenuOpen(false); }}>
                 <Icon name="Folder" size={16} className="mr-2" /> Мои боты
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/prompt-engineer'); setMobileMenuOpen(false); }}>
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/prompt-engineer'); setMobileMenuOpen(false); }}>
                 <Icon name="Sparkles" size={16} className="mr-2" /> Промт-Инженер
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/docs'); setMobileMenuOpen(false); }}>
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/docs'); setMobileMenuOpen(false); }}>
                 <Icon name="BookOpen" size={16} className="mr-2" /> Документация
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/automation-hub'); setMobileMenuOpen(false); }}>
+              <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/automation-hub'); setMobileMenuOpen(false); }}>
                 <Icon name="Zap" size={16} className="mr-2" /> Автоматизация
               </Button>
               <Button
@@ -169,7 +215,7 @@ const Index = () => {
                 <Icon name="Radar" size={16} className="mr-2" /> GEO Factory
               </Button>
               {user?.role === 'admin' && (
-                <Button variant="ghost" className="w-full justify-start text-gray-600" onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}>
+                <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}>
                   <Icon name="Shield" size={16} className="mr-2" /> Админ-панель
                 </Button>
               )}
