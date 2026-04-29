@@ -59,7 +59,7 @@ export default function Hero3D() {
       className="relative w-full overflow-hidden"
       style={{
         minHeight: '92vh',
-        background: '#0A0E27',
+        background: 'transparent',
       }}
     >
       <div
@@ -263,9 +263,9 @@ export default function Hero3D() {
       </div>
 
       <div
-        className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(10,14,39,0) 0%, #ffffff 100%)',
+          background: 'linear-gradient(to bottom, rgba(10,14,39,0) 0%, rgba(10,14,39,0.7) 100%)',
         }}
       />
     </section>

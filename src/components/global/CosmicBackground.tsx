@@ -227,7 +227,7 @@ const CosmicBackground = () => {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: -1,
+        zIndex: 0,
         pointerEvents: 'none',
         background: '#0A0E27',
         overflow: 'hidden',

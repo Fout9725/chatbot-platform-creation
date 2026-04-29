@@ -29,7 +29,7 @@ const HowItWorks = () => {
   return (
     <section
       className="relative py-20 md:py-28 overflow-hidden"
-      style={{ background: '#0A0E27' }}
+      style={{ background: 'transparent' }}
     >
       <div
         className="absolute inset-0 pointer-events-none"

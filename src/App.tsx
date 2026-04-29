@@ -72,6 +72,7 @@ const App = () => (
             <BrowserRouter>
               <SessionExpiryNotification />
               <TourManager />
+              <div style={{ position: 'relative', zIndex: 1 }}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/bot/:id" element={<BotDetails />} />
@@ -121,6 +122,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
               <AIAssistant />
+              </div>
             </BrowserRouter>
           </TooltipProvider>
         </BotStatsProvider>
