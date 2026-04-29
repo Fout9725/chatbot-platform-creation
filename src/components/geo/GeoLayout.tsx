@@ -62,6 +62,13 @@ export default function GeoLayout({ children }: { children: ReactNode }) {
             <div className="text-sm font-medium truncate">{user?.company}</div>
             <div className="text-xs text-slate-500 truncate">{user?.email}</div>
           </div>
+          <Link
+            to="/"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition mb-1"
+          >
+            <Icon name="Home" size={16} />
+            На главную
+          </Link>
           <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
             <Icon name="LogOut" size={16} className="mr-2" />
             Выйти
