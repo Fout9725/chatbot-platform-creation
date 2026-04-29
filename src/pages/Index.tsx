@@ -7,6 +7,7 @@ import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
 import { useAuth } from '@/contexts/AuthContext';
 import HowItWorks from '@/components/landing/HowItWorks';
+import Hero3D from '@/components/hero3d/Hero3D';
 import CtaBlock from '@/components/landing/CtaBlock';
 import SiteFooter from '@/components/landing/SiteFooter';
 import GeoPromo from '@/components/landing/GeoPromo';
@@ -177,36 +178,24 @@ const Index = () => {
         </div>
       </header>
 
-      <section className="py-16 md:py-28">
-        <div className="container mx-auto px-4 text-center max-w-3xl">
-          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
-            ИИ-сотрудники для вашего бизнеса
-          </h1>
-          <p className="text-lg md:text-xl text-gray-500 mb-8 max-w-xl mx-auto leading-relaxed">
-            Готовые боты для Telegram, WhatsApp и VK. Подключите за 5 минут без программиста.
-          </p>
-          <Button
-            size="lg"
-            onClick={scrollToCatalog}
-            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-8 h-13 text-base shadow-lg shadow-violet-500/20"
-          >
-            Посмотреть решения
-            <Icon name="ArrowDown" size={18} className="ml-2" />
-          </Button>
-          <div className="flex items-center justify-center gap-8 mt-10 text-sm text-gray-400">
+      <Hero3D />
+
+      <section className="py-10 bg-white border-b border-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-center gap-8 text-sm text-gray-500 flex-wrap">
             {totalUsers > 0 && (
               <div className="flex items-center gap-1.5">
-                <Icon name="Users" size={16} className="text-violet-400" />
-                <span><b className="text-gray-600">{totalUsers.toLocaleString()}+</b> пользователей</span>
+                <Icon name="Users" size={16} className="text-violet-500" />
+                <span><b className="text-gray-800">{totalUsers.toLocaleString()}+</b> пользователей</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
-              <Icon name="Bot" size={16} className="text-violet-400" />
-              <span><b className="text-gray-600">85</b> готовых ботов</span>
+              <Icon name="Bot" size={16} className="text-violet-500" />
+              <span><b className="text-gray-800">85</b> готовых ботов</span>
             </div>
-            <div className="hidden sm:flex items-center gap-1.5">
-              <Icon name="Clock" size={16} className="text-violet-400" />
-              <span><b className="text-gray-600">3 дня</b> бесплатно</span>
+            <div className="flex items-center gap-1.5">
+              <Icon name="Clock" size={16} className="text-violet-500" />
+              <span><b className="text-gray-800">3 дня</b> бесплатно</span>
             </div>
           </div>
         </div>
