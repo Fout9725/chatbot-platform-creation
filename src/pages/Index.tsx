@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import BotMarketplace from '@/components/BotMarketplace';
 import { useNavigate } from 'react-router-dom';
 import AuthModal from '@/components/modals/AuthModal';
 import ConstructorModeModal from '@/components/modals/ConstructorModeModal';
@@ -47,7 +47,7 @@ const Index = () => {
   };
 
   const scrollToCatalog = () => {
-    document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
+    navigate('/catalog');
   };
 
   return (
@@ -301,9 +301,64 @@ const Index = () => {
 
       <HowItWorks />
 
-      <div data-tour="marketplace">
-        <BotMarketplace />
-      </div>
+      <section className="relative py-12 md:py-16">
+        <div className="container mx-auto px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.6 }}
+            className="rounded-3xl p-8 md:p-12 max-w-4xl mx-auto"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              boxShadow:
+                '0 20px 50px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+            }}
+          >
+            <div
+              className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+                boxShadow: '0 10px 30px -10px rgba(139,92,246,0.7)',
+              }}
+            >
+              <Icon name="Grid3x3" size={26} className="text-white" />
+            </div>
+            <h2
+              className="text-3xl md:text-4xl font-bold mb-3"
+              style={{
+                background:
+                  'linear-gradient(135deg, #ffffff 0%, #C4B5FD 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              Откройте полный каталог решений
+            </h2>
+            <p className="text-slate-300 mb-6 max-w-xl mx-auto">
+              85+ готовых ИИ-ботов для продаж, поддержки, HR, маркетинга и
+              других задач бизнеса
+            </p>
+            <Button
+              size="lg"
+              onClick={() => navigate('/catalog')}
+              className="text-white border-0 px-8 h-12"
+              style={{
+                background:
+                  'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+                boxShadow: '0 10px 30px -10px rgba(139,92,246,0.7)',
+              }}
+            >
+              <Icon name="Sparkles" size={18} className="mr-2" />
+              Перейти в каталог
+            </Button>
+          </motion.div>
+        </div>
+      </section>
 
       <GeoPromo />
 
