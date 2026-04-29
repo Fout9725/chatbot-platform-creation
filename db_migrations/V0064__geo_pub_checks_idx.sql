@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_geo_pub_checks_pub ON geo_publication_checks(tenant_id, publication_id, checked_at DESC);

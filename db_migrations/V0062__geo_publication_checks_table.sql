@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS geo_publication_checks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL, publication_id UUID NOT NULL, provider TEXT NOT NULL, found BOOLEAN NOT NULL DEFAULT FALSE, snippet TEXT, raw_response TEXT, checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW());

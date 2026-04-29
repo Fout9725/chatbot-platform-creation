@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_geo_publications_tenant ON geo_publications(tenant_id, created_at DESC);

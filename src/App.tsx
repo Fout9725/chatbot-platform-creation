@@ -53,6 +53,7 @@ import GeoStub from "./pages/geo/GeoStub";
 import GeoBrands from "./pages/geo/GeoBrands";
 import GeoQueries from "./pages/geo/GeoQueries";
 import GeoContent from "./pages/geo/GeoContent";
+import GeoPublications from "./pages/geo/GeoPublications";
 
 const queryClient = new QueryClient();
 
@@ -110,7 +111,7 @@ const App = () => (
                 <Route path="/geo/queries" element={<GeoProtectedRoute><GeoQueries /></GeoProtectedRoute>} />
                 <Route path="/geo/brands" element={<GeoProtectedRoute><GeoBrands /></GeoProtectedRoute>} />
                 <Route path="/geo/content" element={<GeoProtectedRoute><GeoContent /></GeoProtectedRoute>} />
-                <Route path="/geo/publications" element={<GeoProtectedRoute><GeoStub title="Публикации" icon="Send" sprint="Спринт 5" /></GeoProtectedRoute>} />
+                <Route path="/geo/publications" element={<GeoProtectedRoute><GeoPublications /></GeoProtectedRoute>} />
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

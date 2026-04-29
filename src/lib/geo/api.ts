@@ -7,6 +7,7 @@ export const GEO_QUERIES_URL = URLS['geo-queries'];
 export const GEO_POLL_URL = URLS['geo-poll'];
 export const GEO_ANALYTICS_URL = URLS['geo-analytics'];
 export const GEO_CONTENT_URL = URLS['geo-content'];
+export const GEO_PUBS_URL = URLS['geo-publications'];
 
 const TOKEN_KEY = 'geo_token';
 
@@ -132,6 +133,45 @@ export const geoApi = {
     remove: (id: string) =>
       request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'DELETE' }),
   },
+
+  publications: {
+    list: () => request<{ publications: GeoPublication[] }>(GEO_PUBS_URL, { method: 'GET' }),
+    create: (data: {
+      title: string; url: string; platform?: string; draft_id?: string;
+      query_id?: string; published_at?: string; notes?: string; status?: string;
+    }) => request<{ publication: GeoPublication }>(GEO_PUBS_URL, { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ title: string; url: string; platform: string; status: string; notes: string }>) =>
+      request<{ ok: true }>(`${GEO_PUBS_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) =>
+      request<{ ok: true }>(`${GEO_PUBS_URL}?id=${id}`, { method: 'DELETE' }),
+    check: (id: string) =>
+      request<{ found: boolean; results: Array<{ provider: string; found: boolean; snippet?: string; citations?: string[]; error?: string }> }>(
+        `${GEO_PUBS_URL}?id=${id}&action=check`,
+        { method: 'POST', body: '{}' },
+      ),
+    history: (id: string) =>
+      request<{ checks: Array<{ id: string; provider: string; found: boolean; snippet: string | null; checked_at: string }> }>(
+        `${GEO_PUBS_URL}?id=${id}&action=checks`,
+        { method: 'GET' },
+      ),
+  },
+};
+
+export type GeoPublication = {
+  id: string;
+  title: string;
+  url: string;
+  platform: string | null;
+  status: string;
+  notes: string | null;
+  draft_id: string | null;
+  query_id: string | null;
+  query_text: string | null;
+  published_at: string | null;
+  last_check_at: string | null;
+  last_check_found: boolean | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type GeoDraftListItem = {
