@@ -6,6 +6,7 @@ export const GEO_BRANDS_URL = URLS['geo-brands'];
 export const GEO_QUERIES_URL = URLS['geo-queries'];
 export const GEO_POLL_URL = URLS['geo-poll'];
 export const GEO_ANALYTICS_URL = URLS['geo-analytics'];
+export const GEO_CONTENT_URL = URLS['geo-content'];
 
 const TOKEN_KEY = 'geo_token';
 
@@ -116,6 +117,38 @@ export const geoApi = {
     coverage: (days = 7) =>
       request<{ coverage: GeoCoverageRow[] }>(`${GEO_ANALYTICS_URL}?action=coverage&days=${days}`, { method: 'GET' }),
   },
+
+  content: {
+    list: () => request<{ drafts: GeoDraftListItem[] }>(GEO_CONTENT_URL, { method: 'GET' }),
+    get: (id: string) =>
+      request<{ draft: GeoDraft }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'GET' }),
+    generate: (data: { query_id?: string; topic?: string; tone?: string; length?: string; model?: string }) =>
+      request<{ draft: GeoDraft }>(`${GEO_CONTENT_URL}?action=generate`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<{ title: string; content_md: string; status: string; target_keywords: string[] }>) =>
+      request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) =>
+      request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'DELETE' }),
+  },
+};
+
+export type GeoDraftListItem = {
+  id: string;
+  title: string;
+  status: string;
+  word_count: number;
+  target_keywords: string[];
+  model: string | null;
+  query_id: string | null;
+  query_text: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GeoDraft = GeoDraftListItem & {
+  content_md: string;
 };
 
 export type GeoOverview = {
