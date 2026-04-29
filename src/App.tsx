@@ -9,6 +9,7 @@ import { ActiveBotsProvider } from "./contexts/ActiveBotsContext";
 import { BotStatsProvider } from "./contexts/BotStatsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import SessionExpiryNotification from "./components/SessionExpiryNotification";
+import CosmicBackground from "./components/global/CosmicBackground";
 import Index from "./pages/Index";
 import BotDetails from "./pages/BotDetails";
 import Pricing from "./pages/Pricing";
@@ -67,6 +68,7 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <CosmicBackground />
             <BrowserRouter>
               <SessionExpiryNotification />
               <TourManager />
