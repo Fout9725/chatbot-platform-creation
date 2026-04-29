@@ -251,12 +251,6 @@ export default function Hero3D() {
         </div>
       </div>
 
-      <div
-        className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to bottom, rgba(10,14,39,0) 0%, rgba(10,14,39,0.7) 100%)',
-        }}
-      />
     </section>
   );
 }

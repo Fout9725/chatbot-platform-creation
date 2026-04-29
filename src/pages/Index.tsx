@@ -54,11 +54,10 @@ const Index = () => {
       <header
         className="sticky top-0 z-50"
         style={{
-          background: 'rgba(10,14,39,0.7)',
+          background: 'rgba(10,14,39,0.55)',
           backdropFilter: 'blur(30px)',
           WebkitBackdropFilter: 'blur(30px)',
-          borderBottom: '1px solid rgba(139,92,246,0.18)',
-          boxShadow: '0 4px 30px rgba(10,14,39,0.25)',
+          borderBottom: '1px solid transparent',
         }}
       >
         <div className="container mx-auto px-4 py-3.5">
@@ -189,7 +188,7 @@ const Index = () => {
           {mobileMenuOpen && (
             <div
               className="md:hidden mt-3 pt-3 pb-1 space-y-1"
-              style={{ borderTop: '1px solid rgba(139,92,246,0.18)' }}
+              style={{ borderTop: '1px solid transparent' }}
             >
               <Button variant="ghost" className="w-full justify-start text-slate-200 hover:text-white hover:bg-white/10" onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}>
                 <Icon name="CreditCard" size={16} className="mr-2" /> Тарифы
