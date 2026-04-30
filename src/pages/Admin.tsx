@@ -13,6 +13,9 @@ import AdminUsersTab from '@/components/admin/AdminUsersTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminDocsTab from '@/components/admin/AdminDocsTab';
+import GlassCard from '@/components/global/GlassCard';
+import PageLayout from '@/components/global/PageLayout';
+import Scene3D from '@/components/global/Scene3D';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -105,25 +108,27 @@ const Admin = () => {
 
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
+      <PageLayout
+        title="Админ-панель"
+        description="Управление платформой"
+        keywords="админ-панель, управление, ИнтеллектПро"
+      >
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <GlassCard variant="default" className="w-full max-w-md p-6">
+            <div className="flex items-center gap-2 text-red-300 mb-2">
               <Icon name="ShieldAlert" />
-              Доступ запрещён
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
+              <h2 className="text-xl font-semibold">Доступ запрещён</h2>
+            </div>
+            <p className="text-glass-muted mb-4">
               Эта страница доступна только администраторам.
             </p>
-            <Button onClick={() => navigate('/')}>
+            <Button onClick={() => navigate('/')} className="btn-glass-primary">
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               Вернуться на главную
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </GlassCard>
+        </div>
+      </PageLayout>
     );
   }
 
@@ -154,14 +159,21 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+    <PageLayout
+      title="Админ-панель"
+      description="Управление платформой"
+      keywords="админ-панель, управление, статистика, ИнтеллектПро"
+    >
+      <div className="relative container mx-auto px-4 py-8 glass-fade-in">
+        <div className="absolute top-4 right-4 opacity-30 hidden md:block pointer-events-none">
+          <Scene3D variant="cube" size={180} />
+        </div>
+        <div className="mb-8 relative z-10">
           <Button
             type="button"
             variant="ghost"
             onClick={() => navigate('/dashboard')}
-            className="mb-4"
+            className="mb-4 text-gray-200 hover:text-white hover:bg-white/10"
           >
             <Icon name="ArrowLeft" size={18} className="mr-2" />
             Вернуться в панель
@@ -169,39 +181,54 @@ const Admin = () => {
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold mb-2 text-glass-title">
                 Административная панель
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-glass-muted">
                 Управление платформой, статистика и настройки
               </p>
             </div>
-            <Badge variant="destructive" className="flex items-center gap-2">
+            <Badge variant="destructive" className="flex items-center gap-2 bg-red-500/30 text-red-100 border border-red-400/50">
               <Icon name="Shield" size={16} />
               Администратор
             </Badge>
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="stats">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 relative z-10">
+          <TabsList className="grid w-full grid-cols-5 glass-panel-subtle border border-white/10 bg-transparent">
+            <TabsTrigger
+              value="stats"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="BarChart3" size={16} className="mr-2" />
               Статистика
             </TabsTrigger>
-            <TabsTrigger value="users">
+            <TabsTrigger
+              value="users"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="Users" size={16} className="mr-2" />
               Пользователи
             </TabsTrigger>
-            <TabsTrigger value="pricing">
+            <TabsTrigger
+              value="pricing"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="DollarSign" size={16} className="mr-2" />
               Тарифы
             </TabsTrigger>
-            <TabsTrigger value="templates">
+            <TabsTrigger
+              value="templates"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="Library" size={16} className="mr-2" />
               Шаблоны
             </TabsTrigger>
-            <TabsTrigger value="docs">
+            <TabsTrigger
+              value="docs"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="FileText" size={16} className="mr-2" />
               Документы
             </TabsTrigger>
@@ -228,7 +255,7 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

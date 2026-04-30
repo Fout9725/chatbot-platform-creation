@@ -1,9 +1,11 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { Link } from 'react-router-dom';
+import GlassCard from '@/components/global/GlassCard';
+import PageLayout from '@/components/global/PageLayout';
+import Scene3D from '@/components/global/Scene3D';
 
 interface Notification {
   id: number;
@@ -59,19 +61,63 @@ const mockNotifications: Notification[] = [
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
-    case 'success': return { icon: 'CheckCircle', color: 'text-green-500' };
-    case 'warning': return { icon: 'AlertTriangle', color: 'text-yellow-500' };
-    case 'error': return { icon: 'XCircle', color: 'text-red-500' };
-    default: return { icon: 'Info', color: 'text-blue-500' };
+    case 'success': return { icon: 'CheckCircle', color: 'text-green-400' };
+    case 'warning': return { icon: 'AlertTriangle', color: 'text-yellow-400' };
+    case 'error': return { icon: 'XCircle', color: 'text-red-400' };
+    default: return { icon: 'Info', color: 'text-blue-400' };
   }
 };
 
 const Notifications = () => {
   const unreadCount = mockNotifications.filter(n => !n.read).length;
 
+  const renderNotificationCard = (notification: Notification, forceUnreadStyle = false) => {
+    const iconConfig = getNotificationIcon(notification.type);
+    const isUnread = forceUnreadStyle || !notification.read;
+    return (
+      <GlassCard
+        key={notification.id}
+        variant="subtle"
+        className={`p-5 transition-all hover:-translate-y-0.5 glass-fade-in ${
+          isUnread ? 'border-l-4 border-l-primary' : ''
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <Icon
+              name={iconConfig.icon as any}
+              className={iconConfig.color}
+              size={20}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold mb-1 flex items-center gap-2 text-white">
+                {notification.title}
+                {isUnread && (
+                  <Badge className="text-xs bg-primary/20 text-primary border border-primary/40">
+                    Новое
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-glass-muted">
+                {notification.message}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs text-glass-muted whitespace-nowrap">
+            {notification.time}
+          </span>
+        </div>
+      </GlassCard>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-50">
+    <PageLayout
+      title="Уведомления"
+      description="Центр уведомлений ИнтеллектПро"
+      keywords="уведомления, центр уведомлений, ИнтеллектПро"
+    >
+      <header className="border-b glass-divider glass-panel-subtle sticky top-0 z-50 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3">
@@ -79,14 +125,14 @@ const Notifications = () => {
                 <Icon name="Bot" className="text-white" size={28} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-glass-title">
                   ИнтеллектПро
                 </h1>
-                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
+                <p className="text-xs text-glass-muted">Интеллект в действии</p>
               </div>
             </Link>
             <Link to="/">
-              <Button type="button" variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm" className="text-gray-200 hover:text-white hover:bg-white/10">
                 <Icon name="ArrowLeft" size={18} className="mr-2" />
                 Назад
               </Button>
@@ -95,136 +141,76 @@ const Notifications = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8 flex items-center justify-between">
+      <main className="relative container mx-auto px-4 py-8 max-w-4xl glass-fade-in">
+        <div className="absolute top-4 right-4 opacity-30 hidden md:block pointer-events-none">
+          <Scene3D variant="rings" size={180} />
+        </div>
+
+        <div className="mb-8 flex items-center justify-between relative z-10">
           <div>
-            <h2 className="text-3xl font-bold mb-2">Уведомления</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold mb-2 text-glass-title">Уведомления</h2>
+            <p className="text-glass-muted">
               {unreadCount > 0 ? `У вас ${unreadCount} непрочитанных` : 'Все уведомления прочитаны'}
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm">
+          <Button
+            type="button"
+            size="sm"
+            className="btn-glass-secondary"
+          >
             <Icon name="Check" size={16} className="mr-2" />
             Отметить все как прочитанные
           </Button>
         </div>
 
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="all">
+        <Tabs defaultValue="all" className="w-full relative z-10">
+          <TabsList className="grid w-full grid-cols-4 mb-6 glass-panel-subtle border border-white/10 bg-transparent">
+            <TabsTrigger value="all" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300">
               Все
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="ml-2">{mockNotifications.length}</Badge>
+                <Badge variant="secondary" className="ml-2 bg-white/10 text-gray-200 border-white/10">
+                  {mockNotifications.length}
+                </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="unread">
+            <TabsTrigger value="unread" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300">
               Непрочитанные
               {unreadCount > 0 && (
-                <Badge className="ml-2">{unreadCount}</Badge>
+                <Badge className="ml-2 bg-primary/30 text-white border border-primary/50">{unreadCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="important">
+            <TabsTrigger value="important" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300">
               Важные
             </TabsTrigger>
-            <TabsTrigger value="archive">
+            <TabsTrigger value="archive" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300">
               Архив
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-3">
-            {mockNotifications.map((notification) => {
-              const iconConfig = getNotificationIcon(notification.type);
-              return (
-                <Card 
-                  key={notification.id}
-                  className={`transition-all hover:shadow-md ${!notification.read ? 'border-l-4 border-l-primary bg-primary/5' : ''}`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        <Icon 
-                          name={iconConfig.icon as any} 
-                          className={iconConfig.color} 
-                          size={20} 
-                        />
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base mb-1 flex items-center gap-2">
-                            {notification.title}
-                            {!notification.read && (
-                              <Badge variant="secondary" className="text-xs">Новое</Badge>
-                            )}
-                          </CardTitle>
-                          <CardDescription className="text-sm">
-                            {notification.message}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {notification.time}
-                      </span>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })}
+            {mockNotifications.map((notification) => renderNotificationCard(notification))}
           </TabsContent>
 
           <TabsContent value="unread" className="space-y-3">
-            {mockNotifications.filter(n => !n.read).map((notification) => {
-              const iconConfig = getNotificationIcon(notification.type);
-              return (
-                <Card 
-                  key={notification.id}
-                  className="border-l-4 border-l-primary bg-primary/5 transition-all hover:shadow-md"
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        <Icon 
-                          name={iconConfig.icon as any} 
-                          className={iconConfig.color} 
-                          size={20} 
-                        />
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base mb-1 flex items-center gap-2">
-                            {notification.title}
-                            <Badge variant="secondary" className="text-xs">Новое</Badge>
-                          </CardTitle>
-                          <CardDescription className="text-sm">
-                            {notification.message}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {notification.time}
-                      </span>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })}
+            {mockNotifications.filter(n => !n.read).map((notification) => renderNotificationCard(notification, true))}
           </TabsContent>
 
           <TabsContent value="important">
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground">
-                <Icon name="Star" size={48} className="mx-auto mb-4 opacity-50" />
-                <p>Нет важных уведомлений</p>
-              </CardContent>
-            </Card>
+            <GlassCard variant="subtle" className="p-10 text-center">
+              <Icon name="Star" size={48} className="mx-auto mb-4 opacity-50 text-gray-300" />
+              <p className="text-glass-muted">Нет важных уведомлений</p>
+            </GlassCard>
           </TabsContent>
 
           <TabsContent value="archive">
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground">
-                <Icon name="Archive" size={48} className="mx-auto mb-4 opacity-50" />
-                <p>Архив пуст</p>
-              </CardContent>
-            </Card>
+            <GlassCard variant="subtle" className="p-10 text-center">
+              <Icon name="Archive" size={48} className="mx-auto mb-4 opacity-50 text-gray-300" />
+              <p className="text-glass-muted">Архив пуст</p>
+            </GlassCard>
           </TabsContent>
         </Tabs>
       </main>
-    </div>
+    </PageLayout>
   );
 };
 

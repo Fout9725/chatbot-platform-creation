@@ -24,7 +24,7 @@ import Notifications from "./pages/Notifications";
 import Constructor from "./pages/Constructor";
 import MyBotsPage from "./pages/MyBotsPage";
 import Documentation from "./components/Documentation";
-import NotFound from "./pages/NotFound";
+import NotFound from "./pages/NotFoundPage";
 import PlanSelection from "./pages/PlanSelection";
 import Dashboard from "./pages/Dashboard";
 import PartnerProgram from "./pages/PartnerProgram";

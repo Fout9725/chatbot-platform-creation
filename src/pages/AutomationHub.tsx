@@ -6,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import GlassCard from '@/components/global/GlassCard';
+import PageLayout from '@/components/global/PageLayout';
+import Scene3D from '@/components/global/Scene3D';
 
 interface Automation {
   id: string;
@@ -208,11 +211,19 @@ export default function AutomationHub() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-10">
+    <PageLayout
+      title="Хаб автоматизации"
+      description="Автоматизация Instagram, Telegram, VK, YouTube, TikTok"
+      keywords="автоматизация, Instagram, Telegram, VK, YouTube, TikTok, SMM, n8n"
+    >
+      <header className="border-b glass-divider glass-panel-subtle sticky top-0 z-10 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/')}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
+            >
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               Главная
             </Button>
@@ -221,8 +232,8 @@ export default function AutomationHub() {
                 <Icon name="Zap" className="text-white" size={28} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Автоматизации</h1>
-                <p className="text-xs text-muted-foreground">SMM и контент-маркетинг</p>
+                <h1 className="text-2xl font-bold text-glass-title">Автоматизации</h1>
+                <p className="text-xs text-glass-muted">SMM и контент-маркетинг</p>
               </div>
             </div>
             <div className="w-24" />
@@ -230,85 +241,98 @@ export default function AutomationHub() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+      <main className="relative container mx-auto px-4 py-8 glass-fade-in">
+        <div className="absolute top-4 right-4 opacity-30 hidden md:block pointer-events-none">
+          <Scene3D variant="rings" size={240} />
+        </div>
+        <div className="mb-8 relative z-10">
+          <h2 className="text-3xl font-bold mb-3 text-glass-title">
             Выберите платформу для автоматизации
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-glass-muted">
             Готовые n8n workflow для автоматизации SMM и контент-маркетинга
           </p>
         </div>
 
-        <div data-tour="automation-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div data-tour="automation-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
           {automations.map((automation) => (
-            <Card
+            <GlassCard
               key={automation.id}
-              className={`border-2 transition-all duration-300 ${
+              variant="subtle"
+              className={`p-6 transition-all duration-300 ${
                 automation.status === 'ready'
-                  ? 'hover:shadow-xl hover:scale-105 cursor-pointer'
+                  ? 'hover:-translate-y-1 hover:shadow-2xl cursor-pointer'
                   : 'opacity-60 cursor-not-allowed'
               }`}
               onClick={() => handleCardClick(automation)}
             >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className={`bg-gradient-to-br ${automation.color} p-3 rounded-xl mb-3`}>
-                    <Icon name={automation.icon} className="text-white" size={32} />
-                  </div>
-                  <Badge variant={automation.status === 'ready' ? 'default' : 'secondary'}>
-                    {automation.status === 'ready' ? 'Готово' : 'Скоро'}
-                  </Badge>
+              <div className="flex items-start justify-between">
+                <div className={`bg-gradient-to-br ${automation.color} p-3 rounded-xl mb-3`}>
+                  <Icon name={automation.icon} className="text-white" size={32} />
                 </div>
-                <CardTitle className="text-xl">{automation.name}</CardTitle>
-                <CardDescription className="text-sm">{automation.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Icon name="Sparkles" size={16} />
-                    <span>{automation.platform}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {automation.features.map((feature, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
+                <Badge
+                  className={
+                    automation.status === 'ready'
+                      ? 'bg-primary/30 text-white border border-primary/50'
+                      : 'bg-white/10 text-gray-300 border border-white/15'
+                  }
+                >
+                  {automation.status === 'ready' ? 'Готово' : 'Скоро'}
+                </Badge>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-1">{automation.name}</h3>
+              <p className="text-sm text-glass-muted mb-3">{automation.description}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-glass-muted">
+                  <Icon name="Sparkles" size={16} />
+                  <span>{automation.platform}</span>
                 </div>
-                {automation.status === 'ready' && (
-                  <Button className="w-full mt-4" variant="default">
-                    <Icon name="ArrowRight" size={16} className="mr-2" />
-                    Настроить
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {automation.features.map((feature, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className="text-xs border-white/15 text-gray-200 bg-white/5"
+                    >
+                      {feature}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              {automation.status === 'ready' && (
+                <Button className="w-full mt-4 btn-glass-primary">
+                  <Icon name="ArrowRight" size={16} className="mr-2" />
+                  Настроить
+                </Button>
+              )}
+            </GlassCard>
           ))}
         </div>
 
-        <Card className="mt-8 border-2 border-violet-200 bg-gradient-to-br from-violet-50/50 to-fuchsia-50/50">
-          <CardHeader className="cursor-pointer" onClick={() => setAiOpen(!aiOpen)}>
+        <GlassCard variant="accent" className="mt-8 relative z-10">
+          <div
+            className="cursor-pointer p-6"
+            onClick={() => setAiOpen(!aiOpen)}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 p-2.5 rounded-xl">
                   <Icon name="Sparkles" className="text-white" size={22} />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">ИИ-помощник по автоматизациям</CardTitle>
-                  <CardDescription>Опишите задачу — я подберу подходящую автоматизацию</CardDescription>
+                  <h3 className="text-xl font-semibold text-glass-title">ИИ-помощник по автоматизациям</h3>
+                  <p className="text-sm text-glass-muted">Опишите задачу — я подберу подходящую автоматизацию</p>
                 </div>
               </div>
-              <Icon name={aiOpen ? 'ChevronUp' : 'ChevronDown'} size={20} className="text-muted-foreground" />
+              <Icon name={aiOpen ? 'ChevronUp' : 'ChevronDown'} size={20} className="text-glass-muted" />
             </div>
-          </CardHeader>
+          </div>
 
           {aiOpen && (
-            <CardContent className="pt-0">
-              <div className="bg-white rounded-xl border p-4 mb-4 max-h-80 overflow-y-auto space-y-3">
+            <div className="px-6 pb-6">
+              <div className="glass-panel-subtle rounded-xl border border-white/10 p-4 mb-4 max-h-80 overflow-y-auto space-y-3">
                 {aiMessages.length === 0 && (
-                  <div className="text-center py-6 text-muted-foreground">
+                  <div className="text-center py-6 text-glass-muted">
                     <Icon name="Bot" size={36} className="mx-auto mb-2 text-violet-300" />
                     <p className="text-sm">Расскажите, что хотите автоматизировать, и я помогу выбрать решение</p>
                     <div className="flex flex-wrap justify-center gap-2 mt-3">
@@ -316,7 +340,7 @@ export default function AutomationHub() {
                         <button
                           key={q}
                           onClick={() => { setAiInput(q); }}
-                          className="text-xs bg-violet-50 hover:bg-violet-100 text-violet-700 px-3 py-1.5 rounded-full border border-violet-200 transition-colors"
+                          className="text-xs bg-violet-500/20 hover:bg-violet-500/30 text-violet-200 px-3 py-1.5 rounded-full border border-violet-400/30 transition-colors"
                         >
                           {q}
                         </button>
@@ -329,13 +353,13 @@ export default function AutomationHub() {
                     <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                       msg.role === 'user'
                         ? 'bg-violet-600 text-white'
-                        : 'bg-gray-100 text-gray-800'
+                        : 'bg-white/10 text-gray-100 border border-white/10'
                     }`}>
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                       {msg.platform && msg.role === 'assistant' && (
                         <Button
                           size="sm"
-                          className="mt-2 bg-violet-600 hover:bg-violet-700 text-white"
+                          className="mt-2 btn-glass-primary"
                           onClick={() => {
                             const found = automations.find(a => a.id === msg.platform);
                             if (found) navigate(found.path);
@@ -350,7 +374,7 @@ export default function AutomationHub() {
                 ))}
                 {aiLoading && (
                   <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-2xl px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
+                    <div className="bg-white/10 border border-white/10 rounded-2xl px-4 py-3 text-sm text-gray-300 flex items-center gap-2">
                       <div className="flex gap-1">
                         <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                         <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -368,7 +392,7 @@ export default function AutomationHub() {
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
                   placeholder="Например: Хочу автопостинг в Instagram с генерацией текстов..."
-                  className="resize-none min-h-[44px] max-h-24"
+                  className="resize-none min-h-[44px] max-h-24 glass-input"
                   rows={1}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -380,61 +404,59 @@ export default function AutomationHub() {
                 <Button
                   onClick={handleAiSend}
                   disabled={!aiInput.trim() || aiLoading}
-                  className="bg-violet-600 hover:bg-violet-700 px-4 shrink-0"
+                  className="btn-glass-primary px-4 shrink-0"
                 >
                   <Icon name="Send" size={18} />
                 </Button>
               </div>
-            </CardContent>
+            </div>
           )}
-        </Card>
+        </GlassCard>
 
-        <Card data-tour="how-it-works" className="mt-8 border-2 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="Info" size={20} />
-              Как это работает?
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <GlassCard variant="subtle" data-tour="how-it-works" className="mt-8 p-6 relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="Info" size={20} className="text-primary" />
+            <h3 className="text-xl font-semibold text-glass-title">Как это работает?</h3>
+          </div>
+          <div className="space-y-4">
             <div className="grid md:grid-cols-3 gap-4">
               <div className="flex gap-3">
-                <div className="bg-primary/10 p-2 rounded-lg h-fit">
+                <div className="bg-primary/20 p-2 rounded-lg h-fit">
                   <Icon name="Settings" size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">1. Настройка</h4>
-                  <p className="text-sm text-muted-foreground">
+                  <h4 className="font-semibold mb-1 text-white">1. Настройка</h4>
+                  <p className="text-sm text-glass-muted">
                     Укажите API ключи и параметры автоматизации
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="bg-primary/10 p-2 rounded-lg h-fit">
+                <div className="bg-primary/20 p-2 rounded-lg h-fit">
                   <Icon name="Download" size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">2. Скачивание</h4>
-                  <p className="text-sm text-muted-foreground">
+                  <h4 className="font-semibold mb-1 text-white">2. Скачивание</h4>
+                  <p className="text-sm text-glass-muted">
                     Получите готовый n8n workflow в формате JSON
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="bg-primary/10 p-2 rounded-lg h-fit">
+                <div className="bg-primary/20 p-2 rounded-lg h-fit">
                   <Icon name="Play" size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">3. Запуск</h4>
-                  <p className="text-sm text-muted-foreground">
+                  <h4 className="font-semibold mb-1 text-white">3. Запуск</h4>
+                  <p className="text-sm text-glass-muted">
                     Импортируйте в n8n и запустите автоматизацию
                   </p>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
       </main>
-    </div>
+    </PageLayout>
   );
 }

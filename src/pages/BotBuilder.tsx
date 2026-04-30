@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import PageLayout from '@/components/global/PageLayout';
+import Scene3D from '@/components/global/Scene3D';
 
 const n8nTemplates = [
   {
@@ -219,14 +221,22 @@ const BotBuilder = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+    <PageLayout
+      title="Конструктор ботов"
+      description="Создание AI-бота без программирования"
+      keywords="конструктор ботов, AI-бот, создание бота, ИнтеллектПро"
+    >
+      <div className="relative container mx-auto px-4 py-8 glass-fade-in">
+        <div className="absolute top-4 right-4 opacity-30 hidden md:block pointer-events-none">
+          <Scene3D variant="cube" size={220} />
+        </div>
+        <div className="mb-8 relative z-10">
           <div className="flex gap-2 mb-4">
             <Button
               type="button"
               variant="ghost"
               onClick={() => navigate('/')}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
             >
               <Icon name="Home" size={18} className="mr-2" />
               Главная
@@ -235,6 +245,7 @@ const BotBuilder = () => {
               type="button"
               variant="ghost"
               onClick={() => navigate('/dashboard')}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
             >
               <Icon name="ArrowLeft" size={18} className="mr-2" />
               Назад к панели
@@ -243,18 +254,18 @@ const BotBuilder = () => {
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold mb-2 text-glass-title">
                 Конструктор ИИ-агентов
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-glass-muted">
                 Создайте бота блоками, из шаблона или просто опишите задачу
               </p>
             </div>
             <div className="text-right">
-              <Badge variant="outline" className="mb-2">
+              <Badge variant="outline" className="mb-2 border-white/20 text-gray-200 bg-white/5">
                 Тариф: {userPlan === 'free' ? 'Бесплатный' : userPlan === 'optimal' ? 'Оптимальный' : userPlan === 'premium' ? 'Премиум' : 'Партнёрский'}
               </Badge>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-glass-muted">
                 {currentLimits.templates === -1 ? 'Безлимит шаблонов' : `Шаблонов: ${currentLimits.templates}`}
                 {currentLimits.textGeneration !== 0 && (
                   <span className="ml-2">
@@ -266,17 +277,29 @@ const BotBuilder = () => {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList data-tour="builder-tabs" className="grid w-full grid-cols-3">
-            <TabsTrigger value="visual">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 relative z-10">
+          <TabsList
+            data-tour="builder-tabs"
+            className="grid w-full grid-cols-3 glass-panel-subtle border border-white/10 bg-transparent"
+          >
+            <TabsTrigger
+              value="visual"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="Boxes" size={16} className="mr-2" />
               Визуальный конструктор
             </TabsTrigger>
-            <TabsTrigger value="templates">
+            <TabsTrigger
+              value="templates"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="Library" size={16} className="mr-2" />
               Шаблоны N8N
             </TabsTrigger>
-            <TabsTrigger value="ai">
+            <TabsTrigger
+              value="ai"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
               <Icon name="Sparkles" size={16} className="mr-2" />
               Создать по тексту
             </TabsTrigger>
@@ -293,21 +316,23 @@ const BotBuilder = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Название бота</label>
+                    <label className="text-sm font-medium mb-2 block text-gray-200">Название бота</label>
                     <Input
                       type="text"
                       placeholder="Мой ИИ-помощник"
                       value={botName}
                       onChange={(e) => setBotName(e.target.value)}
+                      className="glass-input"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Описание</label>
+                    <label className="text-sm font-medium mb-2 block text-gray-200">Описание</label>
                     <Textarea
                       placeholder="Что будет делать ваш бот?"
                       value={botDescription}
                       onChange={(e) => setBotDescription(e.target.value)}
                       rows={3}
+                      className="glass-input"
                     />
                   </div>
 
@@ -440,6 +465,7 @@ const BotBuilder = () => {
                         value={textPrompt}
                         onChange={(e) => setTextPrompt(e.target.value)}
                         rows={6}
+                        className="glass-input"
                       />
                       <p className="text-xs text-muted-foreground mt-2">
                         {currentLimits.textGeneration === -1 
@@ -484,7 +510,7 @@ const BotBuilder = () => {
 
                     <Button
                       type="button"
-                      className="w-full"
+                      className="w-full btn-glass-primary"
                       size="lg"
                       onClick={handleGenerateFromText}
                       disabled={isGenerating || !textPrompt.trim()}
@@ -525,7 +551,7 @@ const BotBuilder = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

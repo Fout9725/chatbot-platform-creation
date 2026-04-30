@@ -35,33 +35,18 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
-      toast({
-        title: 'Ошибка',
-        description: 'Заполните все поля',
-        variant: 'destructive',
-      });
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
       return;
     }
-    
     try {
       await login(email, password);
-      
       const savedUser = localStorage.getItem('user');
       const userData = savedUser ? JSON.parse(savedUser) : null;
-      
-      toast({
-        title: 'Добро пожаловать!',
-        description: 'Вы успешно вошли в систему',
-      });
+      toast({ title: 'Добро пожаловать!', description: 'Вы успешно вошли в систему' });
       onClose();
-      
-      if (userData && userData.role === 'admin') {
-        navigate('/admin');
-      } else if (userData && userData.plan && userData.plan !== 'free') {
-        navigate('/dashboard');
-      } else {
-        navigate('/plan-selection');
-      }
+      if (userData && userData.role === 'admin') navigate('/admin');
+      else if (userData && userData.plan && userData.plan !== 'free') navigate('/dashboard');
+      else navigate('/plan-selection');
     } catch (error) {
       toast({
         title: 'Ошибка входа',
@@ -73,30 +58,17 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   const handlePhoneAuth = () => {
     if (!phone) {
-      toast({
-        title: 'Ошибка',
-        description: 'Введите номер телефона',
-        variant: 'destructive',
-      });
+      toast({ title: 'Ошибка', description: 'Введите номер телефона', variant: 'destructive' });
       return;
     }
-    
-    toast({
-      title: 'SMS отправлено',
-      description: `Код подтверждения отправлен на ${phone}`,
-    });
+    toast({ title: 'SMS отправлено', description: `Код подтверждения отправлен на ${phone}` });
   };
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      toast({
-        title: 'Ошибка',
-        description: 'Заполните все поля',
-        variant: 'destructive',
-      });
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
       return;
     }
-    
     if (password.length < 8) {
       toast({
         title: 'Ошибка',
@@ -105,13 +77,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       });
       return;
     }
-    
     try {
       await register(name, email, password);
-      toast({
-        title: 'Регистрация успешна!',
-        description: 'Выберите тарифный план для продолжения',
-      });
+      toast({ title: 'Регистрация успешна!', description: 'Выберите тарифный план для продолжения' });
       onClose();
       navigate('/plan-selection');
     } catch (error) {
@@ -123,23 +91,71 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
+  const dialogStyle = {
+    background:
+      'linear-gradient(180deg, rgba(99,102,241,0.14) 0%, rgba(10,14,39,0.96) 100%)',
+    border: '1px solid rgba(99,102,241,0.4)',
+    backdropFilter: 'blur(28px)',
+    WebkitBackdropFilter: 'blur(28px)',
+    boxShadow:
+      '0 30px 80px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)',
+    color: '#e5e7eb',
+  };
+
+  const inputCls = 'glass-input';
+  const labelCls = 'text-gray-200';
+  const dividerInner = (text: string) => (
+    <div className="relative my-2">
+      <div className="absolute inset-0 flex items-center">
+        <span className="w-full border-t border-white/10" />
+      </div>
+      <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+        <span
+          className="px-3 text-glass-muted"
+          style={{ background: 'rgba(10,14,39,0.95)' }}
+        >
+          {text}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md p-6 rounded-3xl" style={dialogStyle}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon name="User" size={24} />
-            Вход в аккаунт
+          <DialogTitle className="flex items-center gap-2 text-white text-2xl">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(99,102,241,0.5), rgba(139,92,246,0.5))',
+                boxShadow: '0 0 24px rgba(139,92,246,0.4)',
+              }}
+            >
+              <Icon name="User" size={20} className="text-white" />
+            </div>
+            <span className="text-glass-title font-extrabold">Вход в аккаунт</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-glass-muted">
             Войдите или зарегистрируйтесь для продолжения
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Вход</TabsTrigger>
-            <TabsTrigger value="register">Регистрация</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 glass-panel-subtle border border-white/10 bg-transparent p-1">
+            <TabsTrigger
+              value="login"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
+              Вход
+            </TabsTrigger>
+            <TabsTrigger
+              value="register"
+              className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+            >
+              Регистрация
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="login" className="space-y-4 mt-4">
@@ -147,105 +163,89 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
-                  className="flex-1"
+                  className={`flex-1 ${
+                    authMethod === 'email' ? 'btn-glass-primary' : 'btn-glass-secondary'
+                  }`}
                 >
                   <Icon name="Mail" size={16} className="mr-2" />
                   Email
                 </Button>
                 <Button
                   type="button"
-                  variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
-                  className="flex-1"
+                  className={`flex-1 ${
+                    authMethod === 'phone' ? 'btn-glass-primary' : 'btn-glass-secondary'
+                  }`}
                 >
                   <Icon name="Smartphone" size={16} className="mr-2" />
                   Телефон
                 </Button>
               </div>
-              
+
               {authMethod === 'email' ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Логин или Email</Label>
+                    <Label htmlFor="login-email" className={labelCls}>Логин или Email</Label>
                     <Input
                       id="login-email"
                       type="text"
                       placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      className={inputCls}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Пароль</Label>
+                    <Label htmlFor="login-password" className={labelCls}>Пароль</Label>
                     <Input
                       id="login-password"
                       type="password"
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      className={inputCls}
                     />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="login-phone">Номер телефона</Label>
+                    <Label htmlFor="login-phone" className={labelCls}>Номер телефона</Label>
                     <Input
                       id="login-phone"
                       type="tel"
                       placeholder="+7 (999) 123-45-67"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      className={inputCls}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-glass-muted">
                     Мы отправим SMS с кодом подтверждения
                   </p>
                 </>
               )}
 
-              <Button 
+              <Button
                 type="button"
                 onClick={authMethod === 'email' ? handleEmailAuth : handlePhoneAuth}
-                className="w-full"
+                className="w-full btn-glass-primary"
               >
                 <Icon name="LogIn" size={16} className="mr-2" />
                 Войти
               </Button>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Или войти через
-                  </span>
-                </div>
-              </div>
+              {dividerInner('Или войти через')}
 
               <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleAuth('Google')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('Google')} className="w-full btn-glass-secondary">
                   <Icon name="Chrome" size={20} />
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleAuth('Яндекс')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('Яндекс')} className="w-full btn-glass-secondary">
                   <span className="font-bold text-lg">Я</span>
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleAuth('VK')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('VK')} className="w-full btn-glass-secondary">
                   <Icon name="MessageCircle" size={20} />
                 </Button>
               </div>
@@ -253,7 +253,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <Button
                 type="button"
                 variant="link"
-                className="w-full text-sm"
+                className="w-full text-sm text-indigo-300 hover:text-indigo-200"
                 onClick={() => setIsForgotPasswordOpen(true)}
               >
                 Забыли пароль?
@@ -264,30 +264,33 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <TabsContent value="register" className="space-y-4 mt-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reg-name">Имя</Label>
+                <Label htmlFor="reg-name" className={labelCls}>Имя</Label>
                 <Input
                   id="reg-name"
                   placeholder="Ваше имя"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className={inputCls}
                 />
               </div>
 
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant={authMethod === 'email' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('email')}
-                  className="flex-1"
+                  className={`flex-1 ${
+                    authMethod === 'email' ? 'btn-glass-primary' : 'btn-glass-secondary'
+                  }`}
                 >
                   <Icon name="Mail" size={16} className="mr-2" />
                   Email
                 </Button>
                 <Button
                   type="button"
-                  variant={authMethod === 'phone' ? 'default' : 'outline'}
                   onClick={() => setAuthMethod('phone')}
-                  className="flex-1"
+                  className={`flex-1 ${
+                    authMethod === 'phone' ? 'btn-glass-primary' : 'btn-glass-secondary'
+                  }`}
                 >
                   <Icon name="Smartphone" size={16} className="mr-2" />
                   Телефон
@@ -297,96 +300,77 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               {authMethod === 'email' ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-email">Email</Label>
+                    <Label htmlFor="reg-email" className={labelCls}>Email</Label>
                     <Input
                       id="reg-email"
                       type="email"
                       placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      className={inputCls}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-password">Пароль</Label>
+                    <Label htmlFor="reg-password" className={labelCls}>Пароль</Label>
                     <Input
                       id="reg-password"
                       type="password"
                       placeholder="Минимум 8 символов"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      className={inputCls}
                     />
                   </div>
                 </>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="reg-phone">Номер телефона</Label>
+                  <Label htmlFor="reg-phone" className={labelCls}>Номер телефона</Label>
                   <Input
                     id="reg-phone"
                     type="tel"
                     placeholder="+7 (999) 123-45-67"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    className={inputCls}
                   />
                 </div>
               )}
 
-              <Button 
+              <Button
                 type="button"
                 onClick={handleRegister}
-                className="w-full"
+                className="w-full btn-glass-primary"
               >
                 <Icon name="UserPlus" size={16} className="mr-2" />
                 Зарегистрироваться
               </Button>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Или через соцсети
-                  </span>
-                </div>
-              </div>
+              {dividerInner('Или через соцсети')}
 
               <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleAuth('Google')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('Google')} className="w-full btn-glass-secondary">
                   <Icon name="Chrome" size={20} />
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleAuth('Яндекс')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('Яндекс')} className="w-full btn-glass-secondary">
                   <span className="font-bold text-lg">Я</span>
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleAuth('VK')}
-                  className="w-full"
-                >
+                <Button onClick={() => handleAuth('VK')} className="w-full btn-glass-secondary">
                   <Icon name="MessageCircle" size={20} />
                 </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-xs text-glass-muted text-center">
                 Регистрируясь, вы соглашаетесь с{' '}
-                <a href="#" className="underline">условиями использования</a>
+                <a href="/terms" className="underline text-indigo-300 hover:text-indigo-200">
+                  условиями использования
+                </a>
               </p>
             </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
-      
-      <ForgotPasswordModal 
+
+      <ForgotPasswordModal
         isOpen={isForgotPasswordOpen}
         onClose={() => setIsForgotPasswordOpen(false)}
       />

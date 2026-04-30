@@ -10,6 +10,8 @@ import { ProfileSidebar } from '@/components/profile/ProfileSidebar';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
 import { ProfileStats } from '@/components/profile/ProfileStats';
 import { AvatarDialog } from '@/components/profile/AvatarDialog';
+import PageLayout from '@/components/global/PageLayout';
+import Scene3D from '@/components/global/Scene3D';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -89,8 +91,12 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-white">
-      <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-50">
+    <PageLayout
+      title="Профиль"
+      description="Личный кабинет в ИнтеллектПро"
+      keywords="профиль, личный кабинет, ИнтеллектПро, настройки аккаунта"
+    >
+      <header className="border-b glass-divider glass-panel-subtle sticky top-0 z-50 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3">
@@ -98,14 +104,14 @@ const Profile = () => {
                 <Icon name="Bot" className="text-white" size={28} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-glass-title">
                   ИнтеллектПро
                 </h1>
-                <p className="text-xs text-muted-foreground">Интеллект в действии</p>
+                <p className="text-xs text-glass-muted">Интеллект в действии</p>
               </div>
             </Link>
             <Link to="/dashboard">
-              <Button type="button" variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm" className="text-gray-200 hover:text-white hover:bg-white/10">
                 <Icon name="ArrowLeft" size={18} className="mr-2" />
                 Назад
               </Button>
@@ -114,13 +120,17 @@ const Profile = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Профиль</h2>
-          <p className="text-muted-foreground">Управление настройками аккаунта</p>
+      <main className="relative container mx-auto px-4 py-8 max-w-4xl glass-fade-in">
+        <div className="absolute top-4 right-4 opacity-30 hidden md:block pointer-events-none">
+          <Scene3D variant="cube" size={200} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mb-8 relative z-10">
+          <h2 className="text-3xl font-bold mb-2 text-glass-title">Профиль</h2>
+          <p className="text-glass-muted">Управление настройками аккаунта</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
           <div data-tour="profile-sidebar">
             <ProfileSidebar
               name={name}
@@ -159,7 +169,7 @@ const Profile = () => {
         avatarSeeds={avatarSeeds}
         onSelectAvatar={handleSelectAvatar}
       />
-    </div>
+    </PageLayout>
   );
 };
 
