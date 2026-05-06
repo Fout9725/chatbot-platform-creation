@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
+import ImportArticleDialog from '@/components/geo/ImportArticleDialog';
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   draft: { label: 'Черновик', cls: 'bg-slate-100 text-slate-700' },
@@ -82,6 +83,7 @@ function formatDate(s: string) {
 export default function GeoContent() {
   const qc = useQueryClient();
   const [genOpen, setGenOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
   const draftsQ = useQuery({
@@ -174,10 +176,16 @@ export default function GeoContent() {
           <h1 className="text-3xl font-bold">Контент</h1>
           <p className="text-slate-500 mt-1">Черновики статей под GEO-запросы. Markdown, готов к публикации.</p>
         </div>
-        <Button onClick={() => setGenOpen(true)}>
-          <Icon name="Sparkles" size={16} className="mr-2" />
-          Сгенерировать статью
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Icon name="Upload" size={16} className="mr-2" />
+            Прикрепить свою статью
+          </Button>
+          <Button onClick={() => setGenOpen(true)}>
+            <Icon name="Sparkles" size={16} className="mr-2" />
+            Сгенерировать статью
+          </Button>
+        </div>
       </div>
 
       {lowCoverage.length > 0 && (
@@ -213,11 +221,19 @@ export default function GeoContent() {
       ) : drafts.length === 0 ? (
         <div className="bg-white border rounded-2xl p-12 text-center">
           <Icon name="FileText" size={40} className="text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500 mb-4">Пока нет черновиков. Сгенерируйте первую статью.</p>
-          <Button onClick={() => setGenOpen(true)}>
-            <Icon name="Sparkles" size={16} className="mr-2" />
-            Сгенерировать
-          </Button>
+          <p className="text-slate-500 mb-4">
+            Пока нет статей. Сгенерируйте новую или прикрепите свою.
+          </p>
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Button onClick={() => setGenOpen(true)}>
+              <Icon name="Sparkles" size={16} className="mr-2" />
+              Сгенерировать
+            </Button>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Icon name="Upload" size={16} className="mr-2" />
+              Прикрепить свою
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -291,6 +307,13 @@ export default function GeoContent() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ImportArticleDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        queries={queriesQ.data?.queries || []}
+        onCreated={(id) => setEditId(id)}
+      />
     </div>
   );
 }

@@ -129,6 +129,11 @@ export const geoApi = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    create: (data: { title: string; content_md: string; query_id?: string | null; target_keywords?: string[]; status?: string }) =>
+      request<{ draft: GeoDraft }>(GEO_CONTENT_URL, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     update: (id: string, data: Partial<{ title: string; content_md: string; status: string; target_keywords: string[] }>) =>
       request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) =>
