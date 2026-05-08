@@ -24,8 +24,36 @@ interface ImportArticleDialogProps {
   onCreated?: (draftId: string) => void;
 }
 
-const ACCEPTED = '.txt,.md,.markdown,.html,.htm,.doc,.docx,text/plain,text/markdown,text/html';
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED = '.txt,.md,.markdown,.html,.htm,.doc,.docx,.pdf,text/plain,text/markdown,text/html,application/pdf';
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+async function extractPdfText(file: File): Promise<string> {
+  // Динамический импорт чтобы не утяжелять основной бандл
+  const pdfjs = await import('pdfjs-dist');
+  // Локально подключаем worker как ESM-модуль (CDN не требуется)
+  const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  pdfjs.GlobalWorkerOptions.workerSrc = (pdfjsWorker as { default: string }).default;
+
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const parts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((it: unknown) => (it as { str?: string }).str || '')
+      .join(' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (pageText) parts.push(pageText);
+  }
+  // Пытаемся восстановить абзацы: если в строке есть точка/перевод — отделяем
+  return parts
+    .join('\n\n')
+    .replace(/([.!?])\s+(?=[А-ЯA-Z])/g, '$1\n\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 function htmlToMarkdown(html: string): string {
   const tmp = document.createElement('div');
@@ -80,7 +108,7 @@ function htmlToMarkdown(html: string): string {
 
 async function readFileAsMarkdown(file: File): Promise<{ title: string; content: string }> {
   const name = file.name;
-  const baseTitle = name.replace(/\.(txt|md|markdown|html?|docx?)$/i, '').replace(/[-_]+/g, ' ').trim();
+  const baseTitle = name.replace(/\.(txt|md|markdown|html?|docx?|pdf)$/i, '').replace(/[-_]+/g, ' ').trim();
   const ext = (name.split('.').pop() || '').toLowerCase();
 
   if (ext === 'md' || ext === 'markdown' || ext === 'txt' || file.type === 'text/markdown' || file.type === 'text/plain') {
@@ -93,6 +121,19 @@ async function readFileAsMarkdown(file: File): Promise<{ title: string; content:
     const txt = await file.text();
     const titleMatch = txt.match(/<title[^>]*>([^<]*)<\/title>/i);
     return { title: (titleMatch?.[1] || baseTitle).trim(), content: htmlToMarkdown(txt) };
+  }
+
+  if (ext === 'pdf' || file.type === 'application/pdf') {
+    try {
+      const text = await extractPdfText(file);
+      if (!text || text.length < 30) {
+        throw new Error('PDF не содержит распознаваемого текста (возможно, это отсканированный документ — нужен OCR).');
+      }
+      return { title: baseTitle, content: text };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Не удалось извлечь текст из PDF. ${msg}`);
+    }
   }
 
   if (ext === 'docx') {
@@ -241,7 +282,7 @@ export default function ImportArticleDialog({
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > MAX_FILE_BYTES) {
-      toast({ title: 'Файл слишком большой', description: 'Максимум 5 МБ', variant: 'destructive' });
+      toast({ title: 'Файл слишком большой', description: 'Максимум 10 МБ', variant: 'destructive' });
       e.target.value = '';
       return;
     }
@@ -288,7 +329,7 @@ export default function ImportArticleDialog({
             Прикрепить свою статью
           </DialogTitle>
           <DialogDescription>
-            Загрузите готовый текст из файла или вставьте вручную. Поддерживаются форматы: TXT, Markdown, HTML, DOCX.
+            Загрузите готовый текст из файла или вставьте вручную. Поддерживаются форматы: TXT, Markdown, HTML, DOCX, PDF.
           </DialogDescription>
         </DialogHeader>
 
@@ -329,7 +370,7 @@ export default function ImportArticleDialog({
                   {pickedFileName ? pickedFileName : 'Нажмите, чтобы выбрать файл'}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">
-                  TXT · Markdown · HTML · DOCX (до 5 МБ)
+                  TXT · Markdown · HTML · DOCX · PDF (до 10 МБ)
                 </div>
                 <input
                   ref={fileInputRef}

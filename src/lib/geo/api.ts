@@ -98,10 +98,53 @@ export const geoApi = {
   },
 
   poll: (queryId?: string) =>
-    request<{ polled: number; responses: number; mentions: number; note?: string }>(GEO_POLL_URL, {
+    request<GeoPollResponse>(GEO_POLL_URL, {
       method: 'POST',
       body: JSON.stringify(queryId ? { query_id: queryId } : {}),
     }),
+
+  pollBatch: (params: { offset?: number; batch_size?: number; query_id?: string } = {}) =>
+    request<GeoPollResponse>(GEO_POLL_URL, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  /** Опросить все запросы пачками с автоматическим продолжением до конца. */
+  pollAll: async (
+    onProgress?: (info: { processed: number; total: number; responses: number; mentions: number }) => void,
+  ): Promise<GeoPollResponse> => {
+    let offset = 0;
+    const totals = { polled: 0, responses: 0, mentions: 0, total: 0 };
+    const allErrors: Array<{ query_id: string; provider: string; error: string }> = [];
+    // Защита от бесконечного цикла
+    for (let i = 0; i < 50; i++) {
+      const r = await request<GeoPollResponse>(GEO_POLL_URL, {
+        method: 'POST',
+        body: JSON.stringify({ offset, batch_size: 5 }),
+      });
+      totals.polled += r.polled;
+      totals.responses += r.responses;
+      totals.mentions += r.mentions;
+      totals.total = r.total ?? totals.total;
+      if (r.errors) allErrors.push(...r.errors);
+      onProgress?.({
+        processed: Math.min(offset + (r.processed_in_batch ?? 0), totals.total || 0),
+        total: totals.total,
+        responses: totals.responses,
+        mentions: totals.mentions,
+      });
+      if (r.next_offset == null) break;
+      offset = r.next_offset;
+    }
+    return {
+      polled: totals.polled,
+      responses: totals.responses,
+      mentions: totals.mentions,
+      total: totals.total,
+      next_offset: null,
+      errors: allErrors.slice(0, 20),
+    };
+  },
 
   analytics: {
     overview: (days = 7) =>
@@ -173,6 +216,17 @@ export const geoApi = {
     runs: (limit = 20) =>
       request<{ runs: GeoScheduleRun[] }>(`${GEO_SETTINGS_URL}?action=runs&limit=${limit}`, { method: 'GET' }),
   },
+};
+
+export type GeoPollResponse = {
+  polled: number;
+  responses: number;
+  mentions: number;
+  total?: number;
+  processed_in_batch?: number;
+  next_offset: number | null;
+  note?: string;
+  errors?: Array<{ query_id: string; provider: string; error: string }>;
 };
 
 export type GeoSettings = {

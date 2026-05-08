@@ -80,7 +80,7 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
-def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 60):
+def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 25):
     api_key = os.environ.get('VSEGPT_API_KEY', '')
     if not api_key:
         raise RuntimeError('VSEGPT_API_KEY missing')
@@ -183,12 +183,22 @@ def handler(event, context):
         return resp(401, {'error': 'unauthorized'})
 
     query_id = body.get('query_id')
-    return poll_for_tenant(tenant_id, query_id)
+    # offset/limit для постраничного опроса всех запросов (защита от таймаута Cloud Function)
+    offset = int(body.get('offset', 0) or 0)
+    batch_size = int(body.get('batch_size', 5) or 5)
+    batch_size = max(1, min(batch_size, 20))
+    return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
 
 
-def poll_for_tenant(tenant_id: str, query_id):
+# Безопасный лимит общего времени работы функции (Cloud Function timeout по умолчанию 30 сек)
+MAX_TOTAL_SECONDS = 23
+
+
+def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int = 5):
     conn = get_db()
     polled, total_resp, total_ment = 0, 0, 0
+    errors = []
+    started = time.time()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             if query_id:
@@ -197,13 +207,24 @@ def poll_for_tenant(tenant_id: str, query_id):
                     'WHERE tenant_id = %s AND id = %s AND is_active = TRUE',
                     (tenant_id, query_id)
                 )
+                all_queries = cur.fetchall()
+                total_queries = len(all_queries)
+                queries = all_queries
             else:
                 cur.execute(
-                    'SELECT id, text, language FROM geo_tracked_queries '
+                    'SELECT COUNT(*) AS c FROM geo_tracked_queries '
                     'WHERE tenant_id = %s AND is_active = TRUE',
                     (tenant_id,)
                 )
-            queries = cur.fetchall()
+                total_queries = int(cur.fetchone()['c'])
+                cur.execute(
+                    'SELECT id, text, language FROM geo_tracked_queries '
+                    'WHERE tenant_id = %s AND is_active = TRUE '
+                    'ORDER BY COALESCE(last_polled, created_at) ASC, id ASC '
+                    'LIMIT %s OFFSET %s',
+                    (tenant_id, batch_size, offset)
+                )
+                queries = cur.fetchall()
 
             cur.execute(
                 'SELECT id, name, aliases, is_own FROM geo_brands WHERE tenant_id = %s',
@@ -214,42 +235,84 @@ def poll_for_tenant(tenant_id: str, query_id):
                 'aliases': r['aliases'] or [], 'is_own': r['is_own'],
             } for r in cur.fetchall()]
 
-        if not queries:
-            return resp(200, {'polled': 0, 'responses': 0, 'mentions': 0, 'note': 'no_active_queries'})
+        if total_queries == 0:
+            return resp(200, {
+                'polled': 0, 'responses': 0, 'mentions': 0,
+                'total': 0, 'next_offset': None,
+                'note': 'no_active_queries',
+            })
 
         for q in queries:
+            # Останавливаемся если приближается таймаут — клиент сам дозапросит остаток
+            if time.time() - started > MAX_TOTAL_SECONDS:
+                print(f'[poll] time budget exceeded, stopping at polled={polled}')
+                break
             qid = str(q['id'])
+            any_provider_ok = False
             for provider in PROVIDERS.keys():
                 try:
                     res = call_vsegpt(provider, q['text'], q['language'])
                 except Exception as e:
-                    print(f'[poll] {provider} {qid}: {e}')
+                    msg = str(e)[:200]
+                    print(f'[poll] {provider} {qid}: {msg}')
+                    errors.append({'query_id': qid, 'provider': provider, 'error': msg})
                     continue
 
-                with conn:
-                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                        cur.execute(
-                            'INSERT INTO geo_llm_responses '
-                            '(tenant_id, query_id, provider, model, raw_text, citations, meta) '
-                            'VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id',
-                            (tenant_id, qid, provider, res['model'], res['text'],
-                             json.dumps(res['citations']), json.dumps({'usage': res['usage']}))
-                        )
-                        rid = str(cur.fetchone()['id'])
-                        total_resp += 1
-
-                        mentions = find_mentions(res['text'], brands)
-                        for m in mentions:
+                any_provider_ok = True
+                try:
+                    with conn:
+                        with conn.cursor(cursor_factory=RealDictCursor) as cur:
                             cur.execute(
-                                'INSERT INTO geo_mentions '
-                                '(tenant_id, response_id, brand_id, sentiment, sentiment_score, position, snippet) '
-                                'VALUES (%s, %s, %s, %s, %s, %s, %s)',
-                                (tenant_id, rid, m['brand_id'], m['sentiment'],
-                                 m['score'], m['position'], m['snippet'])
+                                'INSERT INTO geo_llm_responses '
+                                '(tenant_id, query_id, provider, model, raw_text, citations, meta) '
+                                'VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id',
+                                (tenant_id, qid, provider, res['model'], res['text'],
+                                 json.dumps(res['citations']), json.dumps({'usage': res['usage']}))
                             )
-                            total_ment += 1
-            polled += 1
+                            rid = str(cur.fetchone()['id'])
+                            total_resp += 1
 
-        return resp(200, {'polled': polled, 'responses': total_resp, 'mentions': total_ment})
+                            mentions = find_mentions(res['text'], brands)
+                            for m in mentions:
+                                cur.execute(
+                                    'INSERT INTO geo_mentions '
+                                    '(tenant_id, response_id, brand_id, sentiment, sentiment_score, position, snippet) '
+                                    'VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                                    (tenant_id, rid, m['brand_id'], m['sentiment'],
+                                     m['score'], m['position'], m['snippet'])
+                                )
+                                total_ment += 1
+                except Exception as db_err:
+                    print(f'[poll] db save error {qid}: {db_err}')
+                    errors.append({'query_id': qid, 'provider': provider, 'error': f'db: {str(db_err)[:160]}'})
+
+            if any_provider_ok:
+                # отметим last_polled, чтобы при пагинации опрашивать давно не опрошенные первыми
+                try:
+                    with conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                'UPDATE geo_tracked_queries SET last_polled = NOW() WHERE id = %s AND tenant_id = %s',
+                                (qid, tenant_id)
+                            )
+                except Exception:
+                    pass
+                polled += 1
+
+        next_offset = None
+        if not query_id:
+            advanced = offset + len(queries)
+            if advanced < total_queries:
+                next_offset = advanced
+
+        return resp(200, {
+            'polled': polled,
+            'responses': total_resp,
+            'mentions': total_ment,
+            'total': total_queries,
+            'processed_in_batch': len(queries),
+            'next_offset': next_offset,
+            'errors': errors[:10],
+        })
     finally:
         conn.close()

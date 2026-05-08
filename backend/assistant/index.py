@@ -146,7 +146,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 - Эмодзи для наглядности (умеренно)
 - Если не знаешь точного ответа — честно признайся и предложи обратиться к администратору @Fou9725
 
-Отвечай всегда на русском языке. Будь полезным и помогай пользователям максимально эффективно."""
+ВАЖНО — ЯЗЫК ОТВЕТА:
+- Отвечай ИСКЛЮЧИТЕЛЬНО на русском языке.
+- НИКОГДА не используй английский, китайский или любой другой язык.
+- Все размышления ("thinking", "reasoning") — ТОЛЬКО на русском.
+- Если пользователь пишет на другом языке — всё равно отвечай на русском.
+- Технические термины (API, CRM, AI, Telegram, OpenAI) пиши как есть, остальной текст — на русском.
+- Если внезапно начал писать на английском — немедленно переключись на русский.
+
+Будь полезным и помогай пользователям максимально эффективно."""
 
         # Специальная обработка для продолжения ответа
         is_continue = user_message.lower() in ['продолжи ответ', 'продолжи', 'continue']
@@ -235,6 +243,33 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 # Убираем лишние пробелы и переносы строк
                 full_response = '\n'.join(line.strip() for line in full_response.split('\n') if line.strip())
+
+                # Проверяем, что ответ на русском языке.
+                # Считаем долю кириллицы среди букв. Если меньше 30% — модель ответила на чужом
+                # языке: пробуем повторно с явным указанием языка.
+                def _is_russian(text: str) -> bool:
+                    letters = [ch for ch in text if ch.isalpha()]
+                    if len(letters) < 20:
+                        return True  # слишком короткий ответ — пропускаем
+                    cyr = sum(1 for ch in letters if 'а' <= ch.lower() <= 'я' or ch.lower() == 'ё')
+                    return (cyr / len(letters)) >= 0.3
+
+                if not _is_russian(full_response) and not is_continue and attempt < max_retries - 1:
+                    print(f'Non-russian response detected, retrying with russian-forced prompt')
+                    # Усиливаем системное сообщение и повторяем
+                    request_data['messages'] = [
+                        {'role': 'system', 'content': system_prompt + '\n\nКРИТИЧНО: предыдущая попытка была на чужом языке. Отвечай ТОЛЬКО НА РУССКОМ, без английских/китайских/иных языков.'},
+                        {'role': 'user', 'content': user_message + '\n\n(Ответ строго на русском языке)'}
+                    ]
+                    request_data['temperature'] = 0.4
+                    continue
+
+                # Если после повторов всё ещё не русский — fallback-сообщение
+                if not _is_russian(full_response):
+                    full_response = (
+                        'Извините, я временно не смог сформулировать ответ на русском. '
+                        'Попробуйте задать вопрос ещё раз или напишите администратору @Fou9725 — он поможет вам напрямую.'
+                    )
                 
                 print(f'Cleaned response (first 200 chars): {full_response[:200]}')
                 

@@ -49,7 +49,7 @@ const FloatingOrbs = () => {
           top: '-120px',
           left: '-120px',
           background:
-            'radial-gradient(circle, rgba(99,102,241,0.35) 0%, rgba(99,102,241,0) 70%)',
+            'radial-gradient(circle, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0) 70%)',
           filter: 'blur(40px)',
           transform:
             'translate3d(calc(var(--ox, 0px) * 1.2), calc(var(--oy, 0px) * 1.2), 0)',
@@ -64,7 +64,7 @@ const FloatingOrbs = () => {
           bottom: '-160px',
           right: '-180px',
           background:
-            'radial-gradient(circle, rgba(168,85,247,0.30) 0%, rgba(168,85,247,0) 70%)',
+            'radial-gradient(circle, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%)',
           filter: 'blur(50px)',
           transform:
             'translate3d(calc(var(--ox, 0px) * -1.5), calc(var(--oy, 0px) * -1.5), 0)',
@@ -79,7 +79,7 @@ const FloatingOrbs = () => {
           top: '40%',
           right: '15%',
           background:
-            'radial-gradient(circle, rgba(59,130,246,0.22) 0%, rgba(59,130,246,0) 70%)',
+            'radial-gradient(circle, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0) 70%)',
           filter: 'blur(45px)',
           transform:
             'translate3d(calc(var(--ox, 0px) * 0.8), calc(var(--oy, 0px) * 0.8), 0)',

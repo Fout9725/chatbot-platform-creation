@@ -42,20 +42,41 @@ export default function GeoDashboard() {
     queryFn: () => geoApi.analytics.coverage(days),
   });
 
+  const [pollProgress, setPollProgress] = useState<{ processed: number; total: number } | null>(null);
+
   const pollAll = useMutation({
-    mutationFn: () => geoApi.poll(),
+    mutationFn: () =>
+      geoApi.pollAll((info) => setPollProgress({ processed: info.processed, total: info.total })),
+    onMutate: () => setPollProgress({ processed: 0, total: 0 }),
+    onSettled: () => setPollProgress(null),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['geo-overview'] });
       qc.invalidateQueries({ queryKey: ['geo-trend'] });
       qc.invalidateQueries({ queryKey: ['geo-mentions'] });
       qc.invalidateQueries({ queryKey: ['geo-coverage'] });
       qc.invalidateQueries({ queryKey: ['geo-queries'] });
+      const errCount = r.errors?.length || 0;
+      const isEmpty = r.note === 'no_active_queries' || (r.polled === 0 && errCount === 0);
       toast({
-        title: r.note === 'no_active_queries' ? 'Нет активных запросов' : 'Опрос завершён',
-        description: `Опрошено: ${r.polled}, ответов: ${r.responses}, упоминаний: ${r.mentions}`,
+        title: isEmpty
+          ? 'Нет активных запросов'
+          : errCount > 0
+            ? `Опрос завершён с ${errCount} ошибками`
+            : 'Опрос завершён',
+        description: `Опрошено: ${r.polled}, ответов: ${r.responses}, упоминаний: ${r.mentions}${
+          errCount > 0 ? ` · ошибок: ${errCount}` : ''
+        }`,
+        variant: errCount > 0 && r.polled === 0 ? 'destructive' : 'default',
       });
     },
-    onError: (e: Error) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) =>
+      toast({
+        title: 'Ошибка опроса',
+        description:
+          e.message ||
+          'Не удалось завершить опрос. Попробуйте через минуту или опросите запросы по одному в разделе «Запросы».',
+        variant: 'destructive',
+      }),
   });
 
   const o = overviewQ.data;
@@ -86,7 +107,9 @@ export default function GeoDashboard() {
             {pollAll.isPending ? (
               <>
                 <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                Опрос…
+                {pollProgress && pollProgress.total > 0
+                  ? `Опрос ${pollProgress.processed}/${pollProgress.total}…`
+                  : 'Опрос…'}
               </>
             ) : (
               <>
@@ -102,11 +125,16 @@ export default function GeoDashboard() {
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6 flex items-start gap-4">
           <Icon name="Rocket" size={28} className="text-indigo-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold mb-1">Начните за 3 шага</h3>
+            <h3 className="font-semibold mb-1">Начните за 5 шагов</h3>
             <p className="text-sm text-slate-600 mb-3">
               Добавьте бренды, заведите запросы и запустите первый опрос — данные появятся сразу.
+              Не уверены, с чего начать? Откройте подробный гайд — там пошаговые инструкции,
+              чек-лист AEO и план на 90 дней.
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <a href="/geo/guide" className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700">
+                📖 Открыть гайд
+              </a>
               <a href="/geo/brands" className="text-sm bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50">
                 → Добавить бренды
               </a>

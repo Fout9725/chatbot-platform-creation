@@ -10,6 +10,7 @@ const NAV = [
   { to: '/geo/brands', label: 'Бренды', icon: 'Tag' },
   { to: '/geo/content', label: 'Контент', icon: 'FileText' },
   { to: '/geo/publications', label: 'Публикации', icon: 'Send' },
+  { to: '/geo/guide', label: 'Гайд', icon: 'BookOpen' },
   { to: '/geo/settings', label: 'Настройки', icon: 'Settings' },
 ];
 
