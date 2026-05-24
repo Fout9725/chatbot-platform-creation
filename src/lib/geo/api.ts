@@ -215,10 +215,18 @@ export const geoApi = {
     remove: (id: string) =>
       request<{ ok: true }>(`${GEO_PUBS_URL}?id=${id}`, { method: 'DELETE' }),
     check: (id: string) =>
-      request<{ found: boolean; results: Array<{ provider: string; found: boolean; snippet?: string; citations?: string[]; error?: string }> }>(
-        `${GEO_PUBS_URL}?id=${id}&action=check`,
-        { method: 'POST', body: '{}' },
-      ),
+      request<{
+        found: boolean;
+        summary?: string;
+        results: Array<{
+          provider: string;
+          found: boolean;
+          snippet?: string;
+          citations?: string[];
+          matches?: string[];
+          error?: string;
+        }>;
+      }>(`${GEO_PUBS_URL}?id=${id}&action=check`, { method: 'POST', body: '{}' }),
     history: (id: string) =>
       request<{ checks: Array<{ id: string; provider: string; found: boolean; snippet: string | null; checked_at: string }> }>(
         `${GEO_PUBS_URL}?id=${id}&action=checks`,

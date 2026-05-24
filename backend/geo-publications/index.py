@@ -18,11 +18,18 @@ from psycopg2.extras import RealDictCursor
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
 YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
-PROVIDERS = {
-    'openai_gpt4o': 'openai/gpt-4o-mini',
-    'openai_gpt4': 'openai/gpt-4o',
-    'yandex_gpt': 'yandexgpt/latest',
+
+# Search-enabled LLM с реальным доступом в интернет.
+# Обычные gpt-4o-mini и YandexGPT не умеют гуглить → ничего не находят.
+SEARCH_LLM_PROVIDERS = {
+    'perplexity_sonar': 'perplexity/llama-3.1-sonar-large-128k-online',
+    'gpt4o_search': 'openai/gpt-4o-search-preview',
 }
+
+USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+)
 
 
 def cors_headers():
@@ -393,7 +400,153 @@ def list_checks(tenant_id: str, pub_id: str):
         conn.close()
 
 
+def http_fetch(url: str, timeout: int = 10) -> tuple[int, str]:
+    """Скачать страницу. Возвращает (status_code, html). Никогда не падает."""
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={'User-Agent': USER_AGENT, 'Accept-Language': 'ru,en;q=0.9'},
+            method='GET',
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = r.read(200_000)  # первые 200 КБ
+            try:
+                text = data.decode('utf-8', errors='replace')
+            except Exception:
+                text = ''
+            return r.getcode() or 200, text
+    except urllib.error.HTTPError as e:
+        return e.code, ''
+    except Exception:
+        return 0, ''
+
+
+def check_url_alive(urls: list[str]) -> dict:
+    """Проверить, что хотя бы один URL отдаёт 200 и содержит осмысленный контент."""
+    alive_urls = []
+    checked = []
+    for u in urls[:5]:
+        code, html = http_fetch(u, timeout=8)
+        ok = (200 <= code < 400) and len(html) > 500
+        checked.append({'url': u, 'status': code, 'ok': ok, 'size': len(html)})
+        if ok:
+            alive_urls.append(u)
+    return {
+        'found': bool(alive_urls),
+        'urls': alive_urls,
+        'details': checked,
+    }
+
+
+def yandex_search(query: str, target_domains: list[str], timeout: int = 8) -> dict:
+    """
+    Проверить через Яндекс. Используется публичный HTML-поиск (без API-ключа).
+    Возвращает found + найденные ссылки на наш домен.
+    """
+    try:
+        q = urllib.parse.quote_plus(query)
+        url = f'https://yandex.ru/search/?text={q}&lr=213'
+        code, html = http_fetch(url, timeout=timeout)
+        if code != 200 or not html:
+            return {'found': False, 'error': f'HTTP {code}', 'matches': []}
+        html_lc = html.lower()
+        # Проверяем антиспам капчу Яндекса
+        if 'showcaptcha' in html_lc or 'are you a robot' in html_lc:
+            return {'found': False, 'error': 'captcha', 'matches': []}
+        matches = [d for d in target_domains if d and d in html_lc]
+        return {
+            'found': bool(matches),
+            'matches': matches,
+            'snippet': f'Найдено упоминаний домена: {", ".join(matches)}' if matches else '',
+        }
+    except Exception as e:
+        return {'found': False, 'error': str(e)[:200], 'matches': []}
+
+
+def duckduckgo_search(query: str, target_domains: list[str], timeout: int = 8) -> dict:
+    """
+    Проверить через DuckDuckGo HTML-поиск (без API-ключа, без капчи).
+    Google почти всегда требует API-ключ или возвращает капчу — DDG надёжнее как fallback.
+    """
+    try:
+        q = urllib.parse.quote_plus(query)
+        url = f'https://html.duckduckgo.com/html/?q={q}'
+        code, html = http_fetch(url, timeout=timeout)
+        if code != 200 or not html:
+            return {'found': False, 'error': f'HTTP {code}', 'matches': []}
+        html_lc = html.lower()
+        matches = [d for d in target_domains if d and d in html_lc]
+        return {
+            'found': bool(matches),
+            'matches': matches,
+            'snippet': f'Найдено упоминаний домена: {", ".join(matches)}' if matches else '',
+        }
+    except Exception as e:
+        return {'found': False, 'error': str(e)[:200], 'matches': []}
+
+
+def call_search_llm(provider_key: str, query: str, timeout: int = 40) -> dict:
+    """
+    Вызов search-enabled LLM (модели с реальным доступом в интернет: Sonar, gpt-4o-search).
+    Эти модели обращаются к веб-поиску и возвращают цитаты.
+    """
+    model = SEARCH_LLM_PROVIDERS.get(provider_key)
+    if not model:
+        raise ValueError(f'unknown search provider: {provider_key}')
+    api_key = os.environ.get('VSEGPT_API_KEY', '')
+    if not api_key:
+        raise RuntimeError('VSEGPT_API_KEY missing')
+    sys_prompt = (
+        'Ты — поисковый ассистент с доступом к интернету. Найди в реальном вебе '
+        'актуальные источники по запросу. ВСЕГДА указывай конкретные URL источников '
+        'в ответе (формат https://...). Если источников несколько — перечисли все. '
+        'Если по теме нет свежих источников — честно скажи об этом.'
+    )
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': sys_prompt},
+            {'role': 'user', 'content': query},
+        ],
+        'temperature': 0.2,
+        'max_tokens': 1200,
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        VSEGPT_BASE, data=data, method='POST',
+        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            body = json.loads(r.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'SearchLLM HTTP {e.code}: {err_body[:200]}')
+    choice = body['choices'][0]['message']
+    return {
+        'text': choice.get('content', '') or '',
+        'citations': body.get('citations') or choice.get('citations') or [],
+        'model': body.get('model', model),
+    }
+
+
+def find_urls_in_text(text: str) -> list[str]:
+    """Извлечь все URL из произвольного текста."""
+    import re
+    return re.findall(r'https?://[^\s\)"\'>\]]+', text or '')
+
+
 def check_publication(tenant_id: str, pub_id: str):
+    """
+    Полная проверка попадания публикации в нейровыдачу.
+
+    Реальные проверки:
+      1) url_alive — публикация жива (отдаёт 200, есть контент)
+      2) yandex_search — индексирована Яндексом по теме
+      3) duckduckgo — индексирована DDG/Bing
+      4) perplexity_sonar — search-enabled LLM с реальным доступом в интернет
+      5) gpt4o_search — search-preview модель
+    """
     if not pub_id:
         return resp(400, {'error': 'id_required'})
     conn = get_db()
@@ -419,68 +572,167 @@ def check_publication(tenant_id: str, pub_id: str):
             except Exception:
                 extra = []
         all_urls = [pub['url']] + [u for u in extra if u]
-        url_pairs = [(u.lower(), extract_domain(u)) for u in all_urls]
-        title_words = (pub['title'] or '').lower()
-        query_text = pub['query_text'] or pub['title'] or ''
-        if not query_text:
-            return resp(400, {'error': 'no_query_to_check'})
+        domains = list({d for d in (extract_domain(u) for u in all_urls) if d})
+        title = (pub['title'] or '').strip()
+        query_text = pub['query_text'] or title or ''
+
+        # Запрос для поисковиков: title + название домена для усиления
+        # Если есть конкретная query — комбинируем
+        search_query = f'{title} {domains[0]}' if title and domains else (title or query_text)
 
         results = []
         any_found = False
-        for provider in PROVIDERS.keys():
+
+        def _save(provider: str, found: bool, snippet: str, raw: str):
             try:
-                r = call_vsegpt(provider, query_text)
+                with conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            'INSERT INTO geo_publication_checks_v2 '
+                            '(tenant_id, publication_id, provider, found, snippet, raw_response) '
+                            'VALUES (%s, %s, %s, %s, %s, %s)',
+                            (tenant_id, pub_id, provider, found, snippet[:1024], raw[:5000])
+                        )
+            except Exception as save_err:
+                print(f'[pub-check] save {provider}: {save_err}')
+
+        # 1) Проверка живости URL — главное доказательство, что публикация в открытом интернете
+        try:
+            alive = check_url_alive(all_urls)
+            snippet = (
+                f'Страница отвечает кодом 200 и содержит контент'
+                if alive['found']
+                else 'Ни один из указанных URL не отвечает (страница удалена или закрыта от ботов)'
+            )
+            results.append({
+                'provider': 'url_alive',
+                'found': alive['found'],
+                'snippet': snippet,
+                'details': alive['details'],
+            })
+            _save('url_alive', alive['found'], snippet, json.dumps(alive['details'], ensure_ascii=False))
+            if alive['found']:
+                any_found = True
+        except Exception as e:
+            print(f'[pub-check] url_alive: {e}')
+            results.append({'provider': 'url_alive', 'found': False, 'error': str(e)[:200]})
+
+        # 2) Яндекс — публичный HTML-поиск
+        if search_query and domains:
+            ya = yandex_search(search_query, domains)
+            snippet = ya.get('snippet') or (
+                'Не найдено в результатах Яндекса. '
+                'Возможно, ещё не проиндексировано (нужно 1–4 недели после публикации).'
+            )
+            if ya.get('error'):
+                snippet = f'Яндекс: {ya["error"]} (попробуйте позже)'
+            results.append({
+                'provider': 'yandex_search',
+                'found': ya['found'],
+                'snippet': snippet,
+                'matches': ya.get('matches', []),
+            })
+            _save('yandex_search', ya['found'], snippet, json.dumps(ya, ensure_ascii=False))
+            if ya['found']:
+                any_found = True
+
+        # 3) DuckDuckGo (≈ Bing/Google)
+        if search_query and domains:
+            ddg = duckduckgo_search(search_query, domains)
+            snippet = ddg.get('snippet') or 'Не найдено в DuckDuckGo (Bing/Google).'
+            if ddg.get('error'):
+                snippet = f'DuckDuckGo: {ddg["error"]} (попробуйте позже)'
+            results.append({
+                'provider': 'duckduckgo',
+                'found': ddg['found'],
+                'snippet': snippet,
+                'matches': ddg.get('matches', []),
+            })
+            _save('duckduckgo', ddg['found'], snippet, json.dumps(ddg, ensure_ascii=False))
+            if ddg['found']:
+                any_found = True
+
+        # 4) Search-enabled LLM (Perplexity Sonar, GPT-4o Search) — нейровыдача
+        for provider in SEARCH_LLM_PROVIDERS.keys():
+            try:
+                r = call_search_llm(provider, query_text or search_query)
             except Exception as e:
-                print(f'[pub-check] {provider}: {e}')
-                results.append({'provider': provider, 'found': False, 'error': str(e)})
+                msg = str(e)[:200]
+                print(f'[pub-check] {provider}: {msg}')
+                low = msg.lower()
+                user_msg = msg
+                if any(w in low for w in ('insufficient', 'balance', 'payment', '402', 'недостаточно')):
+                    user_msg = 'У провайдера моделей нет средств — пополните vsegpt.ru'
+                elif '404' in low or 'not found' in low or 'model' in low:
+                    user_msg = f'Search-модель «{provider}» недоступна у провайдера'
+                results.append({'provider': provider, 'found': False, 'error': user_msg})
+                _save(provider, False, user_msg, msg)
                 continue
 
             text_lc = (r['text'] or '').lower()
             citations = r.get('citations') or []
-            found_in_citations = False
-            found_in_text = False
+            # Собираем URL'ы и из цитат, и из текста ответа
+            cited_urls = [str(c) for c in citations] + find_urls_in_text(r['text'] or '')
+            cited_lc = [u.lower() for u in cited_urls]
+
+            matched_url = ''
             matched_domain = ''
-            for url_lc, dom in url_pairs:
-                if dom and any(dom in str(c).lower() for c in citations):
-                    found_in_citations = True; matched_domain = dom; break
-                if (dom and dom in text_lc) or url_lc in text_lc:
-                    found_in_text = True; matched_domain = dom; break
-            found_by_title = title_words and title_words in text_lc and len(title_words) > 15
-            found = bool(found_in_citations or found_in_text or found_by_title)
+            for u in all_urls:
+                u_lc = u.lower().rstrip('/')
+                for c in cited_lc:
+                    if u_lc in c or c.rstrip('/') == u_lc:
+                        matched_url = u
+                        break
+                if matched_url:
+                    break
+            if not matched_url:
+                for dom in domains:
+                    if any(dom in c for c in cited_lc) or dom in text_lc:
+                        matched_domain = dom
+                        break
 
-            snippet = ''
-            if matched_domain:
-                idx = text_lc.find(matched_domain)
-                if idx >= 0:
-                    snippet = r['text'][max(0, idx - 100):idx + 200]
-            if not snippet and citations:
-                snippet = ' | '.join(str(c) for c in citations[:3])[:500]
+            found = bool(matched_url or matched_domain)
 
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        'INSERT INTO geo_publication_checks_v2 '
-                        '(tenant_id, publication_id, provider, found, snippet, raw_response) '
-                        'VALUES (%s, %s, %s, %s, %s, %s)',
-                        (tenant_id, pub_id, provider, found, snippet[:1024], r['text'][:5000])
-                    )
+            if matched_url:
+                snippet = f'Нейросеть процитировала именно вашу ссылку: {matched_url}'
+            elif matched_domain:
+                snippet = f'Нейросеть сослалась на ваш домен {matched_domain} (не точный URL)'
+            else:
+                snippet = (
+                    'Нейросеть нашла источники по теме, но вашей публикации среди них нет. '
+                    f'Цитаты, которые она привела: {", ".join(cited_urls[:3]) or "—"}'
+                )
 
             results.append({
-                'provider': provider, 'found': found,
+                'provider': provider,
+                'found': found,
                 'snippet': snippet[:500],
-                'citations': citations[:5],
+                'citations': cited_urls[:5],
             })
+            _save(provider, found, snippet, r['text'])
             if found:
                 any_found = True
 
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    'UPDATE geo_publications_v2 SET last_check_at = NOW(), last_check_found = %s, updated_at = NOW() '
-                    'WHERE tenant_id = %s AND id = %s',
-                    (any_found, tenant_id, pub_id)
-                )
+        # Обновляем сводный статус
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        'UPDATE geo_publications_v2 SET last_check_at = NOW(), last_check_found = %s, updated_at = NOW() '
+                        'WHERE tenant_id = %s AND id = %s',
+                        (any_found, tenant_id, pub_id)
+                    )
+        except Exception as e:
+            print(f'[pub-check] update pub: {e}')
 
-        return resp(200, {'found': any_found, 'results': results})
+        return resp(200, {
+            'found': any_found,
+            'results': results,
+            'summary': (
+                'Публикация найдена в открытом интернете' if any_found
+                else 'Публикация пока не индексирована в проверенных источниках. '
+                     'После публикации обычно нужно 1–4 недели, чтобы поисковики и нейросети её увидели.'
+            ),
+        })
     finally:
         conn.close()

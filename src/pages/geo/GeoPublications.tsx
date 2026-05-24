@@ -17,17 +17,31 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
-  openai_gpt4o: 'GPT-4o mini',
-  openai_gpt4: 'GPT-4o',
+  url_alive: 'Страница жива',
+  yandex_search: 'Яндекс (поиск)',
+  duckduckgo: 'DuckDuckGo / Bing',
+  perplexity_sonar: 'Perplexity (нейропоиск)',
+  gpt4o_search: 'ChatGPT Search',
+  // Старые ключи — для обратной совместимости со старыми записями
+  openai_gpt4o: 'GPT-4o mini (без интернета)',
+  openai_gpt4: 'GPT-4o (без интернета)',
   openai_search: 'ChatGPT Search',
   perplexity: 'Perplexity',
-  yandex_gpt: 'YandexGPT',
+  yandex_gpt: 'YandexGPT (без интернета)',
+};
+
+const PROVIDER_HINT: Record<string, string> = {
+  url_alive: 'Страница отвечает кодом 200 — публикация существует в открытом интернете',
+  yandex_search: 'Публикация найдена в поисковой выдаче Яндекса',
+  duckduckgo: 'Найдена в DuckDuckGo (использует индекс Bing/Google)',
+  perplexity_sonar: 'Нейросеть с реальным доступом в интернет процитировала источник',
+  gpt4o_search: 'GPT-4o с веб-поиском процитировал источник',
 };
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'Все', icon: 'List' },
-  { id: 'openai', label: 'В OpenAI', icon: 'Sparkles' },
-  { id: 'yandex', label: 'В Яндексе', icon: 'Search' },
+  { id: 'search', label: 'В поиске', icon: 'Search' },
+  { id: 'llm', label: 'В нейровыдаче', icon: 'Sparkles' },
   { id: 'both', label: 'Везде', icon: 'CheckCircle2' },
   { id: 'none', label: 'Не нашли', icon: 'XCircle' },
   { id: 'unchecked', label: 'Не проверено', icon: 'CircleDashed' },
@@ -35,12 +49,22 @@ const FILTER_OPTIONS = [
 
 type FilterId = typeof FILTER_OPTIONS[number]['id'];
 
-function isOpenAi(p: { providers?: Record<string, { found: boolean }> }) {
+// Поисковики (Яндекс / DuckDuckGo)
+function isInSearch(p: { providers?: Record<string, { found: boolean }> }) {
   const pr = p.providers || {};
-  return Object.entries(pr).some(([k, v]) => k.startsWith('openai') && v.found);
+  return !!(pr.yandex_search?.found || pr.duckduckgo?.found);
 }
-function isYandex(p: { providers?: Record<string, { found: boolean }> }) {
-  return !!p.providers?.yandex_gpt?.found;
+// Search-enabled LLM (Perplexity Sonar, GPT-4o Search) + старые ключи
+function isInLLM(p: { providers?: Record<string, { found: boolean }> }) {
+  const pr = p.providers || {};
+  return !!(
+    pr.perplexity_sonar?.found ||
+    pr.gpt4o_search?.found ||
+    pr.perplexity?.found ||
+    pr.openai_search?.found ||
+    Object.entries(pr).some(([k, v]) => k.startsWith('openai_gpt') && v.found) ||
+    pr.yandex_gpt?.found
+  );
 }
 
 function formatDate(s: string | null) {
@@ -121,11 +145,16 @@ export default function GeoPublications() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['geo-publications'] });
       qc.invalidateQueries({ queryKey: ['geo-pub-history'] });
+      const okList = (r.results || [])
+        .filter((x) => x.found)
+        .map((x) => PROVIDER_LABEL[x.provider] || x.provider);
       toast({
-        title: r.found ? 'Публикация в LLM' : 'Пока не нашли',
-        description: r.found
-          ? 'Один из движков сослался на ваш материал'
-          : 'Подождите 1-3 недели и проверьте снова',
+        title: r.found ? 'Публикация найдена' : 'Пока не нашли',
+        description:
+          r.summary ||
+          (r.found
+            ? `Найдено в: ${okList.join(', ')}`
+            : 'Подождите 1–4 недели и проверьте снова — нейросети и поисковики обновляют индекс постепенно.'),
       });
     },
     onError: (e: Error) => toast({ title: 'Ошибка проверки', description: e.message, variant: 'destructive' }),
@@ -161,19 +190,19 @@ export default function GeoPublications() {
 
   const counts = {
     all: allPubs.length,
-    openai: allPubs.filter(isOpenAi).length,
-    yandex: allPubs.filter(isYandex).length,
-    both: allPubs.filter((p) => isOpenAi(p) && isYandex(p)).length,
-    none: allPubs.filter((p) => p.last_check_at && !isOpenAi(p) && !isYandex(p)).length,
+    search: allPubs.filter(isInSearch).length,
+    llm: allPubs.filter(isInLLM).length,
+    both: allPubs.filter((p) => isInSearch(p) && isInLLM(p)).length,
+    none: allPubs.filter((p) => p.last_check_at && !isInSearch(p) && !isInLLM(p)).length,
     unchecked: allPubs.filter((p) => !p.last_check_at).length,
   };
 
   const pubs = allPubs.filter((p) => {
     if (filter === 'all') return true;
-    if (filter === 'openai') return isOpenAi(p);
-    if (filter === 'yandex') return isYandex(p);
-    if (filter === 'both') return isOpenAi(p) && isYandex(p);
-    if (filter === 'none') return p.last_check_at && !isOpenAi(p) && !isYandex(p);
+    if (filter === 'search') return isInSearch(p);
+    if (filter === 'llm') return isInLLM(p);
+    if (filter === 'both') return isInSearch(p) && isInLLM(p);
+    if (filter === 'none') return p.last_check_at && !isInSearch(p) && !isInLLM(p);
     if (filter === 'unchecked') return !p.last_check_at;
     return true;
   });
@@ -194,25 +223,38 @@ export default function GeoPublications() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <StatBox label="Всего" value={allPubs.length} icon="FileText" color="bg-indigo-100 text-indigo-600" />
         <StatBox
-          label="Найдено в OpenAI"
-          value={counts.openai}
-          icon="Sparkles"
-          color="bg-purple-100 text-purple-600"
-          hint={allPubs.length ? `${Math.round((counts.openai / allPubs.length) * 100)}% публикаций` : undefined}
-        />
-        <StatBox
-          label="Найдено в Яндексе"
-          value={counts.yandex}
+          label="В поиске (Яндекс/Bing)"
+          value={counts.search}
           icon="Search"
           color="bg-rose-100 text-rose-600"
-          hint={allPubs.length ? `${Math.round((counts.yandex / allPubs.length) * 100)}% публикаций` : undefined}
+          hint={allPubs.length ? `${Math.round((counts.search / allPubs.length) * 100)}% публикаций` : undefined}
         />
         <StatBox
-          label="В обоих"
+          label="В нейровыдаче"
+          value={counts.llm}
+          icon="Sparkles"
+          color="bg-purple-100 text-purple-600"
+          hint={allPubs.length ? `${Math.round((counts.llm / allPubs.length) * 100)}% публикаций` : undefined}
+        />
+        <StatBox
+          label="Везде"
           value={counts.both}
           icon="CheckCircle2"
           color="bg-emerald-100 text-emerald-600"
         />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 flex items-start gap-3 text-sm">
+        <Icon name="Info" size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-blue-900">
+          <div className="font-medium mb-0.5">Как работает проверка</div>
+          <div className="text-blue-800/90 text-xs leading-relaxed">
+            При нажатии «Проверить» платформа делает 4 реальных запроса в интернет:
+            проверяет что страница жива (HTTP 200), ищет публикацию в Яндексе и Bing/DuckDuckGo,
+            и спрашивает Perplexity / GPT-4o Search (нейросети с реальным веб-поиском).
+            Свежим публикациям нужно <b>1–4 недели</b>, чтобы попасть в индекс поисковиков и нейровыдачу.
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap mb-6">
@@ -270,19 +312,34 @@ export default function GeoPublications() {
                       {p.title}
                     </a>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
-                    {isOpenAi(p) && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <Icon name="Sparkles" size={11} />
-                        OpenAI
+                    {p.providers?.url_alive?.found && (
+                      <span
+                        title="Страница отвечает по HTTP — публикация жива в открытом интернете"
+                        className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                      >
+                        <Icon name="Globe" size={11} />
+                        Страница жива
                       </span>
                     )}
-                    {isYandex(p) && (
-                      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    {isInSearch(p) && (
+                      <span
+                        title="Найдена в поисковой выдаче Яндекса или Bing"
+                        className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                      >
                         <Icon name="Search" size={11} />
-                        Яндекс
+                        В поиске
                       </span>
                     )}
-                    {p.last_check_at && !isOpenAi(p) && !isYandex(p) && (
+                    {isInLLM(p) && (
+                      <span
+                        title="Процитирована нейросетью с реальным веб-поиском (Perplexity / GPT-4o Search)"
+                        className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                      >
+                        <Icon name="Sparkles" size={11} />
+                        В нейровыдаче
+                      </span>
+                    )}
+                    {p.last_check_at && !isInSearch(p) && !isInLLM(p) && (
                       <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
                         Пока не нашли
                       </span>
@@ -453,7 +510,10 @@ export default function GeoPublications() {
                     </div>
                     <span className="text-xs text-slate-500">{formatDate(c.checked_at)}</span>
                   </div>
-                  {c.snippet && <div className="text-xs text-slate-600 italic line-clamp-3">«{c.snippet}»</div>}
+                  {PROVIDER_HINT[c.provider] && (
+                    <div className="text-[11px] text-slate-500 mb-1">{PROVIDER_HINT[c.provider]}</div>
+                  )}
+                  {c.snippet && <div className="text-xs text-slate-700">{c.snippet}</div>}
                 </div>
               ))}
             </div>
