@@ -80,6 +80,11 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+class BillingError(Exception):
+    """Поднимается, когда у поставщика моделей нет денег / лимит исчерпан."""
+    pass
+
+
 def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 25):
     api_key = os.environ.get('VSEGPT_API_KEY', '')
     if not api_key:
@@ -113,6 +118,12 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
             body = json.loads(r.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='replace')
+        low = err_body.lower()
+        # 402, 429 или текст про деньги/баланс — отдельный класс ошибки
+        if e.code in (402, 429) or any(w in low for w in (
+            'insufficient', 'balance', 'payment', 'credit', 'quota', 'недостаточно', 'баланс'
+        )):
+            raise BillingError(f'VseGPT HTTP {e.code}: {err_body[:200]}')
         raise RuntimeError(f'VseGPT HTTP {e.code}: {err_body[:300]}')
 
     choice = body['choices'][0]['message']
@@ -187,7 +198,20 @@ def handler(event, context):
     offset = int(body.get('offset', 0) or 0)
     batch_size = int(body.get('batch_size', 5) or 5)
     batch_size = max(1, min(batch_size, 20))
-    return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
+    try:
+        return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
+    except Exception as e:
+        # Любая необработанная ошибка возвращается как валидный JSON
+        import traceback
+        print(f'[poll] FATAL: {e}\n{traceback.format_exc()}')
+        return resp(500, {
+            'error': 'internal_error',
+            'message': (
+                f'Внутренняя ошибка опроса: {str(e)[:200]}. '
+                'Попробуйте ещё раз через минуту или опросите запросы по одному в разделе «Запросы». '
+                'Если повторяется — напишите администратору @Fou9725.'
+            ),
+        })
 
 
 # Безопасный лимит общего времени работы функции (Cloud Function timeout по умолчанию 30 сек)
@@ -242,7 +266,10 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                 'note': 'no_active_queries',
             })
 
+        billing_blocked = False
         for q in queries:
+            if billing_blocked:
+                break
             # Останавливаемся если приближается таймаут — клиент сам дозапросит остаток
             if time.time() - started > MAX_TOTAL_SECONDS:
                 print(f'[poll] time budget exceeded, stopping at polled={polled}')
@@ -252,6 +279,12 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
             for provider in PROVIDERS.keys():
                 try:
                     res = call_vsegpt(provider, q['text'], q['language'])
+                except BillingError as be:
+                    msg = str(be)[:200]
+                    print(f'[poll] BILLING {provider} {qid}: {msg}')
+                    billing_blocked = True
+                    errors.append({'query_id': qid, 'provider': provider, 'error': msg})
+                    break
                 except Exception as e:
                     msg = str(e)[:200]
                     print(f'[poll] {provider} {qid}: {msg}')
@@ -300,11 +333,29 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                 polled += 1
 
         next_offset = None
-        if not query_id:
+        if not query_id and not billing_blocked:
             advanced = offset + len(queries)
             if advanced < total_queries:
                 next_offset = advanced
 
+        # Если ничего не опросили и причина — биллинг, отдаём 402 с человекочитаемой подсказкой
+        if billing_blocked and polled == 0:
+            return resp(402, {
+                'error': 'provider_billing',
+                'message': (
+                    'У поставщика моделей (VseGPT) недостаточно средств или превышен лимит. '
+                    'Пополните баланс в личном кабинете vsegpt.ru или подождите автоматического сброса дневного лимита, '
+                    'затем запустите опрос снова. Если проблема повторяется — напишите администратору @Fou9725.'
+                ),
+                'polled': 0,
+                'responses': 0,
+                'mentions': 0,
+                'total': total_queries,
+                'next_offset': None,
+                'errors': errors[:10],
+            })
+
+        note = 'billing_blocked' if billing_blocked else None
         return resp(200, {
             'polled': polled,
             'responses': total_resp,
@@ -313,6 +364,7 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
             'processed_in_batch': len(queries),
             'next_offset': next_offset,
             'errors': errors[:10],
+            'note': note,
         })
     finally:
         conn.close()

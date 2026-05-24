@@ -26,11 +26,27 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   };
   if (token) headers['X-Auth-Token'] = token;
 
-  const res = await fetch(url, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { ...init, headers });
+  } catch (netErr) {
+    throw new Error(
+      'Не удалось связаться с сервером. Проверьте интернет-соединение и попробуйте ещё раз.',
+    );
+  }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  let data: { error?: string; message?: string } = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text.slice(0, 200) };
+    }
+  }
   if (!res.ok) {
-    throw new Error(data.error || `HTTP ${res.status}`);
+    // Сервер передаёт message — приоритет ему (понятный пользователю текст)
+    const msg = data.message || data.error || `HTTP ${res.status}`;
+    throw new Error(msg);
   }
   return data as T;
 }
@@ -116,6 +132,7 @@ export const geoApi = {
     let offset = 0;
     const totals = { polled: 0, responses: 0, mentions: 0, total: 0 };
     const allErrors: Array<{ query_id: string; provider: string; error: string }> = [];
+    let lastNote: string | null | undefined = null;
     // Защита от бесконечного цикла
     for (let i = 0; i < 50; i++) {
       const r = await request<GeoPollResponse>(GEO_POLL_URL, {
@@ -127,12 +144,15 @@ export const geoApi = {
       totals.mentions += r.mentions;
       totals.total = r.total ?? totals.total;
       if (r.errors) allErrors.push(...r.errors);
+      if (r.note) lastNote = r.note;
       onProgress?.({
         processed: Math.min(offset + (r.processed_in_batch ?? 0), totals.total || 0),
         total: totals.total,
         responses: totals.responses,
         mentions: totals.mentions,
       });
+      // Если у поставщика закончились деньги — не дёргаем дальше
+      if (r.note === 'billing_blocked') break;
       if (r.next_offset == null) break;
       offset = r.next_offset;
     }
@@ -142,6 +162,7 @@ export const geoApi = {
       mentions: totals.mentions,
       total: totals.total,
       next_offset: null,
+      note: lastNote ?? undefined,
       errors: allErrors.slice(0, 20),
     };
   },

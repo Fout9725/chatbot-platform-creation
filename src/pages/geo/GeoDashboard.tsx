@@ -57,6 +57,15 @@ export default function GeoDashboard() {
       qc.invalidateQueries({ queryKey: ['geo-queries'] });
       const errCount = r.errors?.length || 0;
       const isEmpty = r.note === 'no_active_queries' || (r.polled === 0 && errCount === 0);
+      if (r.note === 'billing_blocked') {
+        toast({
+          title: 'У поставщика моделей нет средств',
+          description:
+            'Опрос остановлен: на балансе VseGPT закончились деньги или превышен лимит. Пополните vsegpt.ru или подождите автосброса лимита. Связь: @Fou9725',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
         title: isEmpty
           ? 'Нет активных запросов'
@@ -95,8 +104,10 @@ export default function GeoDashboard() {
               <button
                 key={p.d}
                 onClick={() => setDays(p.d)}
-                className={`px-3 py-1.5 text-sm rounded-md transition ${
-                  days === p.d ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                className={`px-3 py-1.5 text-sm rounded-md transition font-medium ${
+                  days === p.d
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30'
+                    : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {p.label}
