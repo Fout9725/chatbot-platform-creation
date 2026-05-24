@@ -47,7 +47,7 @@ export default function GeoLayout({ children }: { children: ReactNode }) {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700 font-medium'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium shadow-md shadow-indigo-500/30'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`
               }
