@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import GeoLayout from '@/components/geo/GeoLayout';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 
@@ -37,8 +36,7 @@ export default function GeoGuide() {
   };
 
   return (
-    <GeoLayout>
-      <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Гайд по GEO Factory</h1>
           <p className="text-slate-500">
@@ -446,7 +444,6 @@ export default function GeoGuide() {
           </div>
         </div>
       </div>
-    </GeoLayout>
   );
 }
 
