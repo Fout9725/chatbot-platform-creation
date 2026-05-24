@@ -7,6 +7,7 @@ import SovChart from '@/components/geo/SovChart';
 import SovBars from '@/components/geo/SovBars';
 import MentionsFeed from '@/components/geo/MentionsFeed';
 import CoverageTable from '@/components/geo/CoverageTable';
+import AutoPollStatus from '@/components/geo/AutoPollStatus';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
@@ -131,6 +132,10 @@ export default function GeoDashboard() {
           </Button>
         </div>
       </header>
+
+      <div className="mb-6">
+        <AutoPollStatus />
+      </div>
 
       {isEmpty && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6 flex items-start gap-4">
