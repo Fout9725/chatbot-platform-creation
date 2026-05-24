@@ -2,6 +2,7 @@
   "tests": [
     {"name": "OPTIONS", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
     {"name": "Unauthorized GET", "method": "GET", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"},
-    {"name": "Unauthorized PUT", "method": "PUT", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"}
+    {"name": "Unauthorized PUT", "method": "PUT", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"},
+    {"name": "Unauthorized POST run_now", "method": "POST", "path": "/?action=run_now", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"}
   ]
 }

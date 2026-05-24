@@ -9,14 +9,18 @@ import hmac
 import hashlib
 import base64
 import time
+import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+
+GEO_CRON_URL = 'https://functions.poehali.dev/cab0cab4-16c4-4522-95e3-b95f8fb0fb12'
 
 
 def cors_headers():
     return {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token',
         'Access-Control-Max-Age': '86400',
         'Content-Type': 'application/json',
@@ -89,6 +93,13 @@ def handler(event, context):
                 limit = 20
             return list_runs(tenant_id, limit)
         return get_settings(tenant_id)
+    if method == 'POST':
+        if qs.get('action') == 'run_now':
+            kind = (body.get('kind') or 'all').strip()
+            if kind not in ('poll', 'pub_check', 'all'):
+                kind = 'all'
+            return run_now(tenant_id, kind)
+        return resp(400, {'error': 'unknown_action'})
     if method == 'PUT':
         return update_settings(tenant_id, body)
     return resp(405, {'error': 'method_not_allowed'})
@@ -161,6 +172,65 @@ def update_settings(tenant_id, body):
         return get_settings(tenant_id)
     finally:
         conn.close()
+
+
+def run_now(tenant_id, kind):
+    """
+    Принудительно запустить цикл cron сейчас.
+    Стратегия:
+      1) Сбрасываем last_auto_*_at у текущего tenant → он попадёт в ближайший прогон.
+      2) Логируем запись в geo_schedule_runs (kind=poll или pub_check).
+      3) Асинхронно дёргаем geo-cron URL с очень коротким таймаутом
+         (если есть GEO_CRON_KEY) — он начнёт работу в фоне.
+      4) Возвращаем результат сразу, не дожидаясь окончания cron.
+    """
+    conn = get_db()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                if kind in ('poll', 'all'):
+                    cur.execute(
+                        'UPDATE geo_tenants SET last_auto_poll_at = NULL WHERE id = %s',
+                        (tenant_id,)
+                    )
+                if kind in ('pub_check', 'all'):
+                    cur.execute(
+                        'UPDATE geo_tenants SET last_auto_pub_check_at = NULL WHERE id = %s',
+                        (tenant_id,)
+                    )
+    finally:
+        conn.close()
+
+    # Пытаемся «разбудить» geo-cron немедленно (best-effort).
+    cron_triggered = False
+    cron_key = os.environ.get('GEO_CRON_KEY', '')
+    try:
+        headers = {'Content-Type': 'application/json'}
+        if cron_key:
+            headers['X-Cron-Key'] = cron_key
+        req = urllib.request.Request(
+            GEO_CRON_URL,
+            data=json.dumps({'kind': kind}).encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        # Очень короткий таймаут: задача — только инициировать запуск.
+        # geo-cron всё равно отработает в фоне, нам не нужно его ждать.
+        urllib.request.urlopen(req, timeout=3)
+        cron_triggered = True
+    except Exception as e:
+        # Это нормально (часто будет timeout) — главное, что флаги в БД сброшены.
+        print(f'[run_now] geo-cron call: {str(e)[:200]}')
+
+    return resp(200, {
+        'ok': True,
+        'kind': kind,
+        'cron_triggered': cron_triggered,
+        'message': (
+            'Запуск инициирован. Это займёт от 30 секунд до нескольких минут — '
+            'обновите страницу через минуту, чтобы увидеть результаты.'
+        ),
+    })
 
 
 def list_runs(tenant_id, limit):

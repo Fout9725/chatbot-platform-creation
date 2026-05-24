@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { geoApi } from '@/lib/geo/api';
 import Icon from '@/components/ui/icon';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import {
   Tooltip,
   TooltipContent,
@@ -106,11 +108,37 @@ function Row({ label, icon, enabled, intervalHours, lastAt }: RowProps) {
 }
 
 export default function AutoPollStatus() {
+  const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['geo-settings-status'],
     queryFn: () => geoApi.settings.get(),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
+  });
+
+  const runNowMut = useMutation({
+    mutationFn: () => geoApi.settings.runNow('all'),
+    onSuccess: (r) => {
+      toast({
+        title: 'Запуск таймера запрошен',
+        description:
+          r.message ||
+          'Опрос и проверка публикаций стартуют в течение минуты. Обновите страницу позже.',
+      });
+      // Сбрасываем кэш — индикатор обновит «не запускался → только что»
+      qc.invalidateQueries({ queryKey: ['geo-settings-status'] });
+      qc.invalidateQueries({ queryKey: ['geo-overview'] });
+      qc.invalidateQueries({ queryKey: ['geo-trend'] });
+      qc.invalidateQueries({ queryKey: ['geo-mentions'] });
+      qc.invalidateQueries({ queryKey: ['geo-coverage'] });
+      qc.invalidateQueries({ queryKey: ['geo-queries'] });
+    },
+    onError: (e: Error) =>
+      toast({
+        title: 'Не удалось запустить таймер',
+        description: e.message,
+        variant: 'destructive',
+      }),
   });
 
   if (isLoading) {
@@ -151,13 +179,43 @@ export default function AutoPollStatus() {
           intervalHours={s.pub_check_interval_hours}
           lastAt={s.last_auto_pub_check_at}
         />
-        <Link
-          to="/geo/settings"
-          className="ml-auto inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium hidden sm:inline-flex"
-        >
-          <Icon name="Settings" size={12} />
-          Настроить
-        </Link>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-xs font-medium border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
+                disabled={runNowMut.isPending}
+                onClick={() => runNowMut.mutate()}
+              >
+                {runNowMut.isPending ? (
+                  <>
+                    <Icon name="Loader2" size={12} className="mr-1 animate-spin" />
+                    Запускаю…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="PlayCircle" size={12} className="mr-1" />
+                    Запустить сейчас
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+              Принудительно запустить опрос всех активных запросов и проверку
+              публикаций, не дожидаясь следующего тика расписания. Займёт от
+              30 секунд до нескольких минут.
+            </TooltipContent>
+          </Tooltip>
+          <Link
+            to="/geo/settings"
+            className="hidden sm:inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            <Icon name="Settings" size={12} />
+            Настроить
+          </Link>
+        </div>
       </div>
     </TooltipProvider>
   );

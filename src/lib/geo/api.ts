@@ -236,6 +236,11 @@ export const geoApi = {
       request<{ settings: GeoSettings }>(GEO_SETTINGS_URL, { method: 'PUT', body: JSON.stringify(data) }),
     runs: (limit = 20) =>
       request<{ runs: GeoScheduleRun[] }>(`${GEO_SETTINGS_URL}?action=runs&limit=${limit}`, { method: 'GET' }),
+    runNow: (kind: 'poll' | 'pub_check' | 'all' = 'all') =>
+      request<{ ok: true; kind: string; cron_triggered: boolean; message: string }>(
+        `${GEO_SETTINGS_URL}?action=run_now`,
+        { method: 'POST', body: JSON.stringify({ kind }) },
+      ),
   },
 };
 
