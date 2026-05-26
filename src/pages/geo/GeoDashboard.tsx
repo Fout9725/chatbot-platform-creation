@@ -166,28 +166,50 @@ export default function GeoDashboard() {
         <StatCard
           label="Доля голоса (SOV)"
           value={o ? `${o.own_sov}%` : '—'}
-          hint="Доля упоминаний моего бренда"
+          hint="Среди всех брендов в ответах LLM"
           icon="PieChart"
           color="indigo"
+          progress={o?.own_sov}
+          progressLabel={o ? 'Цель: 50%+' : undefined}
         />
         <StatCard
-          label="Упоминаний"
+          label="Упоминаний бренда"
           value={o ? o.mentions : '—'}
-          hint={`за ${days} дн`}
+          hint={
+            o
+              ? `≈ ${(o.mentions / Math.max(1, days)).toFixed(1)} в день за ${days} дн`
+              : `за ${days} дн`
+          }
           icon="Quote"
           color="emerald"
         />
         <StatCard
           label="Покрыто запросов"
-          value={o ? `${o.covered_queries} / ${o.queries.active}` : '—'}
-          hint="Где упомянули мой бренд"
+          value={
+            o ? `${o.covered_queries} / ${o.queries.active}` : '—'
+          }
+          hint="Где LLM назвали ваш бренд"
           icon="Target"
           color="amber"
+          progress={
+            o && o.queries.active
+              ? (o.covered_queries / o.queries.active) * 100
+              : undefined
+          }
+          progressLabel={
+            o && o.queries.active
+              ? `${o.covered_queries} из ${o.queries.active} запросов`
+              : undefined
+          }
         />
         <StatCard
           label="Ответов LLM"
           value={o ? o.responses : '—'}
-          hint={`за ${days} дн`}
+          hint={
+            o && o.queries.active
+              ? `≈ ${(o.responses / Math.max(1, o.queries.active)).toFixed(1)} ответа на запрос`
+              : `за ${days} дн`
+          }
           icon="MessageSquare"
           color="purple"
         />
