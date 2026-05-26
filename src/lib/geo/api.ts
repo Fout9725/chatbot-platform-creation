@@ -68,14 +68,52 @@ export type GeoBrand = {
   created_at: string;
 };
 
+export type GeoQueryCategory = 'commercial' | 'comparison' | 'informational' | 'branded' | 'navigational' | 'local' | 'other';
+export type GeoQueryIntent = 'buy' | 'compare' | 'choose' | 'learn' | 'find' | 'review' | 'other';
+
+export type GeoQueryMetrics = {
+  own_mentions: number;
+  competitor_mentions: number;
+  total_mentions: number;
+  sov: number;
+  trend: '+' | '-' | '=';
+  sov_delta: number;
+  top_competitor: { name: string; count: number } | null;
+  window_days: number;
+};
+
 export type GeoQuery = {
   id: string;
   text: string;
   language: string;
   is_active: boolean;
+  category: GeoQueryCategory | null;
+  intent: GeoQueryIntent | null;
+  notes: string | null;
+  source: string;
   created_at: string;
   last_polled: string | null;
   responses_count: number;
+  metrics?: GeoQueryMetrics | null;
+};
+
+export type GeoQuerySuggestion = {
+  text: string;
+  category: GeoQueryCategory;
+  intent: GeoQueryIntent;
+  reason: string;
+  mentions_own: boolean;
+};
+
+export type GeoCompetitorGap = {
+  id: string;
+  text: string;
+  category: GeoQueryCategory | null;
+  intent: GeoQueryIntent | null;
+  responses: number;
+  own_mentions: number;
+  competitor_mentions: number;
+  top_competitors: Array<{ name: string; count: number }>;
 };
 
 export const geoApi = {
@@ -104,13 +142,65 @@ export const geoApi = {
   },
 
   queries: {
-    list: () => request<{ queries: GeoQuery[] }>(GEO_QUERIES_URL, { method: 'GET' }),
-    create: (data: { text: string; language?: string; is_active?: boolean }) =>
+    list: (days = 14) =>
+      request<{ queries: GeoQuery[] }>(`${GEO_QUERIES_URL}?days=${days}`, { method: 'GET' }),
+    create: (data: {
+      text: string;
+      language?: string;
+      is_active?: boolean;
+      category?: GeoQueryCategory | null;
+      intent?: GeoQueryIntent | null;
+      notes?: string | null;
+      source?: string;
+    }) =>
       request<{ query: GeoQuery }>(GEO_QUERIES_URL, { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<{ text: string; language: string; is_active: boolean }>) =>
+    update: (
+      id: string,
+      data: Partial<{
+        text: string;
+        language: string;
+        is_active: boolean;
+        category: GeoQueryCategory | null;
+        intent: GeoQueryIntent | null;
+        notes: string | null;
+      }>,
+    ) =>
       request<{ ok: true }>(`${GEO_QUERIES_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) =>
       request<{ ok: true }>(`${GEO_QUERIES_URL}?id=${id}`, { method: 'DELETE' }),
+    suggest: (data: {
+      industry?: string;
+      region?: string;
+      count?: number;
+      focus?: 'all' | 'commercial' | 'comparison' | 'informational' | 'branded';
+      extra_context?: string;
+    } = {}) =>
+      request<{
+        suggestions: GeoQuerySuggestion[];
+        context: { own_brand: string | null; competitors_count: number; industry: string | null; region: string };
+      }>(`${GEO_QUERIES_URL}?action=suggest`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    bulkCreate: (
+      items: Array<string | {
+        text: string;
+        language?: string;
+        category?: GeoQueryCategory | null;
+        intent?: GeoQueryIntent | null;
+        notes?: string | null;
+        source?: string;
+      }>,
+    ) =>
+      request<{ created: number; skipped: number; total: number }>(
+        `${GEO_QUERIES_URL}?action=bulk_create`,
+        { method: 'POST', body: JSON.stringify({ items }) },
+      ),
+    competitorGaps: (days = 14) =>
+      request<{ gaps: GeoCompetitorGap[]; weak_spots: GeoCompetitorGap[]; window_days: number }>(
+        `${GEO_QUERIES_URL}?action=competitor_gaps&days=${days}`,
+        { method: 'GET' },
+      ),
   },
 
   poll: (queryId?: string) =>
