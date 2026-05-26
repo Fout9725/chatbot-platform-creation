@@ -242,9 +242,13 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                 )
                 total_queries = int(cur.fetchone()['c'])
                 cur.execute(
-                    'SELECT id, text, language FROM geo_tracked_queries '
-                    'WHERE tenant_id = %s AND is_active = TRUE '
-                    'ORDER BY COALESCE(last_polled, created_at) ASC, id ASC '
+                    'SELECT q.id, q.text, q.language FROM geo_tracked_queries q '
+                    'LEFT JOIN LATERAL ('
+                    '  SELECT MAX(polled_at) AS last_polled '
+                    '  FROM geo_llm_responses r WHERE r.query_id = q.id'
+                    ') lp ON TRUE '
+                    'WHERE q.tenant_id = %s AND q.is_active = TRUE '
+                    'ORDER BY COALESCE(lp.last_polled, q.created_at) ASC, q.id ASC '
                     'LIMIT %s OFFSET %s',
                     (tenant_id, batch_size, offset)
                 )
