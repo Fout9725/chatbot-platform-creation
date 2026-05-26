@@ -119,13 +119,26 @@ export default function GeoContent() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, ...data }: { id: string; title?: string; content_md?: string; status?: string }) =>
+    mutationFn: ({ id, ...data }: { id: string; title?: string; content_md?: string; status?: string; published_url?: string | null }) =>
       geoApi.content.update(id, data),
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['geo-drafts'] });
       qc.invalidateQueries({ queryKey: ['geo-draft'] });
-      toast({ title: 'Сохранено' });
+      qc.invalidateQueries({ queryKey: ['geo-publications'] });
+      if (r.publication_id) {
+        toast({
+          title: 'Сохранено и добавлено в Публикации',
+          description: 'Запустил проверку через 3 нейросети — следите в разделе «Публикации».',
+        });
+        // Автоматически запускаем проверку через все 3 LLM
+        geoApi.publications.check(r.publication_id).then(() => {
+          qc.invalidateQueries({ queryKey: ['geo-publications'] });
+        }).catch(() => { /* ошибка проверки не критична */ });
+      } else {
+        toast({ title: 'Сохранено' });
+      }
     },
+    onError: (e: Error) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
   });
 
   const deleteMut = useMutation({
@@ -159,7 +172,7 @@ export default function GeoContent() {
 
   if (editId && draftQ.data) {
     return <DraftEditor
-      draft={draftQ.data.draft}
+      draft={draftQ.data.draft as GeoDraftListItem & { content_md: string }}
       onBack={() => setEditId(null)}
       onSave={(data) => updateMut.mutate({ id: editId, ...data })}
       onDelete={() => {
@@ -321,7 +334,9 @@ export default function GeoContent() {
 function DraftCard({ d, onOpen, onExport }: { d: GeoDraftListItem; onOpen: () => void; onExport: () => void }) {
   const s = STATUS_LABEL[d.status] || STATUS_LABEL.draft;
   return (
-    <div className="bg-white border rounded-2xl p-5 hover:shadow-md transition flex flex-col">
+    <div className={`bg-white border rounded-2xl p-5 hover:shadow-md transition flex flex-col ${
+      d.status === 'published' ? 'ring-1 ring-indigo-200' : ''
+    }`}>
       <div className="flex items-center justify-between mb-2">
         <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
         <span className="text-xs text-slate-400">{d.word_count} слов</span>
@@ -330,10 +345,23 @@ function DraftCard({ d, onOpen, onExport }: { d: GeoDraftListItem; onOpen: () =>
         {d.title}
       </h3>
       {d.query_text && (
-        <p className="text-xs text-slate-500 mb-3 line-clamp-1">
+        <p className="text-xs text-slate-500 mb-2 line-clamp-1">
           <Icon name="Search" size={11} className="inline mr-1" />
           {d.query_text}
         </p>
+      )}
+      {d.published_url && (
+        <a
+          href={d.published_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-indigo-600 hover:text-indigo-800 mb-2 truncate inline-flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+          title={d.published_url}
+        >
+          <Icon name="ExternalLink" size={11} />
+          <span className="truncate">{d.published_url.replace(/^https?:\/\//, '')}</span>
+        </a>
       )}
       <div className="text-xs text-slate-400 mb-3">{formatDate(d.updated_at)}</div>
       <div className="flex gap-2 mt-auto">
@@ -352,16 +380,42 @@ function DraftCard({ d, onOpen, onExport }: { d: GeoDraftListItem; onOpen: () =>
 function DraftEditor({
   draft, onBack, onSave, onDelete, isSaving,
 }: {
-  draft: { id: string; title: string; content_md: string; status: string; word_count: number; query_text: string | null };
+  draft: GeoDraftListItem & { content_md: string };
   onBack: () => void;
-  onSave: (data: { title?: string; content_md?: string; status?: string }) => void;
+  onSave: (data: { title?: string; content_md?: string; status?: string; published_url?: string | null }) => void;
   onDelete: () => void;
   isSaving: boolean;
 }) {
   const [title, setTitle] = useState(draft.title);
   const [content, setContent] = useState(draft.content_md);
   const [status, setStatus] = useState(draft.status);
+  const [publishedUrl, setPublishedUrl] = useState(draft.published_url || '');
   const wc = (content.match(/\w+/g) || []).length;
+
+  const handleSave = () => {
+    if (status === 'published' && !publishedUrl.trim()) {
+      toast({
+        title: 'Укажите URL публикации',
+        description: 'Чтобы отметить статью как опубликованную, нужна ссылка на размещение в интернете.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (status === 'published' && publishedUrl && !/^https?:\/\//i.test(publishedUrl.trim())) {
+      toast({
+        title: 'Некорректный URL',
+        description: 'URL должен начинаться с http:// или https://',
+        variant: 'destructive',
+      });
+      return;
+    }
+    onSave({
+      title,
+      content_md: content,
+      status,
+      published_url: publishedUrl.trim() || null,
+    });
+  };
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -372,16 +426,16 @@ function DraftEditor({
         </Button>
         <div className="flex-1" />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg h-9 px-2 text-sm">
-          <option value="draft">Черновик</option>
-          <option value="ready">Готов</option>
-          <option value="published">Опубликован</option>
-          <option value="archived">В архиве</option>
+          <option value="draft">📝 Черновик</option>
+          <option value="ready">✅ Готов к публикации</option>
+          <option value="published">🚀 Опубликован</option>
+          <option value="archived">📦 В архиве</option>
         </select>
         <Button variant="outline" size="sm" onClick={() => downloadDoc(title, content)}>
           <Icon name="Download" size={14} className="mr-1" />
           Word (.doc)
         </Button>
-        <Button size="sm" onClick={() => onSave({ title, content_md: content, status })} disabled={isSaving}>
+        <Button size="sm" onClick={handleSave} disabled={isSaving}>
           {isSaving ? <Icon name="Loader2" size={14} className="mr-1 animate-spin" /> : <Icon name="Save" size={14} className="mr-1" />}
           Сохранить
         </Button>
@@ -394,6 +448,37 @@ function DraftEditor({
         <div className="text-xs text-slate-500 mb-3">
           <Icon name="Search" size={11} className="inline mr-1" />
           {draft.query_text}
+        </div>
+      )}
+
+      {/* Поле URL — обязательное при статусе "опубликован" */}
+      {(status === 'published' || status === 'ready') && (
+        <div className={`mb-4 p-3 rounded-lg border ${
+          status === 'published'
+            ? 'bg-indigo-50 border-indigo-200'
+            : 'bg-emerald-50 border-emerald-200'
+        }`}>
+          <Label htmlFor="published_url" className="flex items-center gap-2 mb-1.5">
+            <Icon name="Link2" size={14} className={status === 'published' ? 'text-indigo-600' : 'text-emerald-600'} />
+            <span className="font-medium">
+              {status === 'published'
+                ? 'URL опубликованной статьи (обязательно)'
+                : 'URL опубликованной статьи (заполните после публикации)'}
+            </span>
+          </Label>
+          <Input
+            id="published_url"
+            value={publishedUrl}
+            onChange={(e) => setPublishedUrl(e.target.value)}
+            placeholder="https://example.com/blog/article-name"
+            className="bg-white"
+          />
+          {status === 'published' && (
+            <p className="text-[11px] text-slate-600 mt-1.5">
+              💡 После сохранения статья появится в разделе «Публикации»
+              и нейросети (GPT-4o, Perplexity Sonar, YandexGPT) автоматически проверят, что она действительно опубликована.
+            </p>
+          )}
         </div>
       )}
 

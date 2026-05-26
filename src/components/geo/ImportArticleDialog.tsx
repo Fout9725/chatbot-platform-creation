@@ -233,6 +233,7 @@ export default function ImportArticleDialog({
   const [keywords, setKeywords] = useState('');
   const [queryId, setQueryId] = useState<string>('');
   const [status, setStatus] = useState<'draft' | 'ready' | 'published'>('ready');
+  const [publishedUrl, setPublishedUrl] = useState('');
   const [pickedFileName, setPickedFileName] = useState<string>('');
   const [parsing, setParsing] = useState(false);
 
@@ -242,6 +243,7 @@ export default function ImportArticleDialog({
     setKeywords('');
     setQueryId('');
     setStatus('ready');
+    setPublishedUrl('');
     setPickedFileName('');
     setTab('paste');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -252,6 +254,12 @@ export default function ImportArticleDialog({
       const trimmedTitle = title.trim() || 'Без названия';
       const trimmedContent = content.trim();
       if (!trimmedContent) throw new Error('Контент пуст');
+      if (status === 'published' && !publishedUrl.trim()) {
+        throw new Error('Для статуса «Опубликован» обязательно укажите URL публикации');
+      }
+      if (publishedUrl.trim() && !/^https?:\/\//i.test(publishedUrl.trim())) {
+        throw new Error('URL должен начинаться с http:// или https://');
+      }
       const kw = keywords
         .split(',')
         .map((s) => s.trim())
@@ -261,16 +269,26 @@ export default function ImportArticleDialog({
         content_md: trimmedContent,
         query_id: queryId || null,
         target_keywords: kw,
+        status,
+        published_url: publishedUrl.trim() || null,
       });
-      if (status && status !== 'draft') {
-        await geoApi.content.update(created.draft.id, { status });
+      // Если статья сразу опубликована — синхронизация в публикации произошла на бэке, запускаем проверку
+      const pubId = (created.draft as { publication_id?: string | null }).publication_id;
+      if (pubId) {
+        geoApi.publications.check(pubId).catch(() => { /* не критично */ });
       }
-      return created.draft.id;
+      return { draftId: created.draft.id, pubId };
     },
-    onSuccess: (id) => {
+    onSuccess: ({ draftId, pubId }) => {
       qc.invalidateQueries({ queryKey: ['geo-drafts'] });
-      toast({ title: 'Статья добавлена', description: 'Импорт выполнен успешно' });
-      onCreated?.(id);
+      qc.invalidateQueries({ queryKey: ['geo-publications'] });
+      toast({
+        title: pubId ? 'Статья добавлена и опубликована' : 'Статья добавлена',
+        description: pubId
+          ? 'Запустил проверку через 3 нейросети (GPT-4o, Perplexity Sonar, YandexGPT) в разделе «Публикации».'
+          : 'Импорт выполнен успешно',
+      });
+      onCreated?.(draftId);
       reset();
       onOpenChange(false);
     },
@@ -429,12 +447,41 @@ export default function ImportArticleDialog({
                 onChange={(e) => setStatus(e.target.value as 'draft' | 'ready' | 'published')}
                 className="w-full border rounded-lg h-10 px-3 text-sm bg-white"
               >
-                <option value="draft">Черновик</option>
-                <option value="ready">Готов</option>
-                <option value="published">Опубликован</option>
+                <option value="draft">📝 Черновик</option>
+                <option value="ready">✅ Готов к публикации</option>
+                <option value="published">🚀 Опубликован</option>
               </select>
             </div>
           </div>
+
+          {(status === 'published' || status === 'ready') && (
+            <div className={`p-3 rounded-lg border ${
+              status === 'published'
+                ? 'bg-indigo-50 border-indigo-200'
+                : 'bg-emerald-50 border-emerald-200'
+            }`}>
+              <Label htmlFor="imp-url" className="flex items-center gap-2 mb-1.5">
+                <Icon name="Link2" size={14} className={status === 'published' ? 'text-indigo-600' : 'text-emerald-600'} />
+                <span className="font-medium">
+                  {status === 'published'
+                    ? 'URL опубликованной статьи (обязательно)'
+                    : 'URL опубликованной статьи (если уже есть)'}
+                </span>
+              </Label>
+              <Input
+                id="imp-url"
+                value={publishedUrl}
+                onChange={(e) => setPublishedUrl(e.target.value)}
+                placeholder="https://example.com/blog/article-name"
+                className="bg-white"
+              />
+              {status === 'published' && (
+                <p className="text-[11px] text-slate-600 mt-1.5">
+                  💡 После сохранения статья появится в разделе «Публикации» и нейросети (GPT-4o, Perplexity Sonar, YandexGPT) автоматически проверят, что она действительно опубликована.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <Label htmlFor="imp-keywords">Ключевые слова (через запятую)</Label>

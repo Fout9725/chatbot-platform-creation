@@ -18,9 +18,14 @@ from psycopg2.extras import RealDictCursor
 
 
 VSEGPT_BASE = 'https://api.vsegpt.ru/v1/chat/completions'
+YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
 
+# 3 нейросети: GPT-4o mini, Perplexity Sonar (с веб-поиском) и YandexGPT.
+# Для VseGPT прописываем имя модели; YandexGPT вызывается отдельным API.
 PROVIDERS = {
-    'openai_gpt4o': 'openai/gpt-4o-mini',
+    'openai_gpt4o':     'openai/gpt-4o-mini',
+    'perplexity_sonar': 'perplexity/llama-3.1-sonar-large-128k-online',
+    'yandex_gpt':       'yandex/yandexgpt',  # маркер; реальный вызов — call_yandex_gpt
 }
 
 POSITIVE = {'лучший', 'рекоменд', 'надёжн', 'качествен', 'удобн', 'выгодн',
@@ -85,14 +90,63 @@ class BillingError(Exception):
     pass
 
 
-def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 25):
+def call_yandex_gpt(query: str, language: str = 'ru', timeout: int = 20):
+    api_key = os.environ.get('YANDEX_GPT_API_KEY', '')
+    folder_id = os.environ.get('YANDEX_GPT_FOLDER_ID', '')
+    if not api_key or not folder_id:
+        raise RuntimeError('YANDEX_GPT_API_KEY/FOLDER_ID missing')
+    sys_text = (
+        'Ты — поисковый ассистент. Дай развёрнутый, фактический ответ на запрос. '
+        'Указывай конкретные названия брендов, цифры, годы и ссылки на источники.'
+        if language == 'ru' else
+        'You are a search assistant. Provide a detailed factual answer with specific brand names, numbers, and sources.'
+    )
+    payload = {
+        'modelUri': f'gpt://{folder_id}/yandexgpt/latest',
+        'completionOptions': {'stream': False, 'temperature': 0.3, 'maxTokens': 1500},
+        'messages': [
+            {'role': 'system', 'text': sys_text},
+            {'role': 'user', 'text': query},
+        ],
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        YANDEX_GPT_BASE, data=data, method='POST',
+        headers={'Authorization': f'Api-Key {api_key}', 'Content-Type': 'application/json', 'x-folder-id': folder_id},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            body = json.loads(r.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        low = err_body.lower()
+        if e.code in (402, 429) or any(w in low for w in ('insufficient', 'balance', 'quota', 'недостаточно', 'баланс')):
+            raise BillingError(f'YandexGPT HTTP {e.code}: {err_body[:200]}')
+        raise RuntimeError(f'YandexGPT HTTP {e.code}: {err_body[:300]}')
+    alts = (body.get('result') or {}).get('alternatives') or []
+    text = (alts[0].get('message') or {}).get('text', '') if alts else ''
+    return {
+        'text': text,
+        'citations': [],
+        'model': 'yandex/yandexgpt',
+        'usage': (body.get('result') or {}).get('usage', {}),
+    }
+
+
+def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 20):
+    if provider == 'yandex_gpt':
+        return call_yandex_gpt(query, language, timeout)
     api_key = os.environ.get('VSEGPT_API_KEY', '')
     if not api_key:
         raise RuntimeError('VSEGPT_API_KEY missing')
     if provider not in PROVIDERS:
         raise ValueError(f'unknown provider: {provider}')
 
+    is_search = provider == 'perplexity_sonar'
     sys_prompt = (
+        'Ты — поисковый ассистент с доступом к интернету. Дай развёрнутый, фактический ответ на запрос. '
+        'Указывай конкретные названия брендов, цифры, годы и ссылки на источники из реального веба.'
+        if language == 'ru' and is_search else
         'Ты — поисковый ассистент. Дай развёрнутый, фактический ответ на запрос. '
         'Указывай конкретные названия брендов, цифры, годы и ссылки на источники.'
         if language == 'ru' else
@@ -106,7 +160,7 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
             {'role': 'user', 'content': query},
         ],
         'temperature': 0.3,
-        'max_tokens': 700,
+        'max_tokens': 1500 if is_search else 700,
     }
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(
@@ -119,7 +173,6 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='replace')
         low = err_body.lower()
-        # 402, 429 или текст про деньги/баланс — отдельный класс ошибки
         if e.code in (402, 429) or any(w in low for w in (
             'insufficient', 'balance', 'payment', 'credit', 'quota', 'недостаточно', 'баланс'
         )):
@@ -196,8 +249,9 @@ def handler(event, context):
     query_id = body.get('query_id')
     # offset/limit для постраничного опроса всех запросов (защита от таймаута Cloud Function)
     offset = int(body.get('offset', 0) or 0)
-    batch_size = int(body.get('batch_size', 5) or 5)
-    batch_size = max(1, min(batch_size, 20))
+    # Каждый запрос опрашивается тремя нейросетями последовательно — снижаем размер пачки
+    batch_size = int(body.get('batch_size', 2) or 2)
+    batch_size = max(1, min(batch_size, 10))
     try:
         return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
     except Exception as e:
@@ -214,8 +268,10 @@ def handler(event, context):
         })
 
 
-# Безопасный лимит общего времени работы функции (Cloud Function timeout по умолчанию 30 сек)
-MAX_TOTAL_SECONDS = 23
+# Безопасный лимит общего времени работы функции.
+# С 3 провайдерами по 20 сек каждый — должно хватить на 2 запроса в пачке × 3 LLM = 6 вызовов.
+# Если у функции выставлен таймаут 60+ сек — клиент будет вызывать функцию пачками.
+MAX_TOTAL_SECONDS = 110
 
 
 def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int = 5):

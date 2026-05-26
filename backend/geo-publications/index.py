@@ -652,7 +652,46 @@ def check_publication(tenant_id: str, pub_id: str):
             if ddg['found']:
                 any_found = True
 
-        # 4) Search-enabled LLM (Perplexity Sonar, GPT-4o Search) — нейровыдача
+        # 4) YandexGPT — отдельная нейросеть (без веб-поиска, но проверим знает ли она)
+        if query_text or title:
+            try:
+                yag = call_yandex_gpt(query_text or title)
+                text_lc = (yag.get('text') or '').lower()
+                cited_urls_y = find_urls_in_text(yag.get('text') or '')
+                matched_yag = ''
+                for u in all_urls:
+                    if u.lower().rstrip('/') in text_lc:
+                        matched_yag = u
+                        break
+                matched_dom_y = ''
+                if not matched_yag:
+                    for dom in domains:
+                        if dom in text_lc:
+                            matched_dom_y = dom
+                            break
+                found_y = bool(matched_yag or matched_dom_y)
+                if matched_yag:
+                    snip_y = f'YandexGPT процитировал ваш URL: {matched_yag}'
+                elif matched_dom_y:
+                    snip_y = f'YandexGPT упомянул ваш домен {matched_dom_y}'
+                else:
+                    snip_y = 'YandexGPT не упомянул вашу публикацию в ответе по теме'
+                results.append({
+                    'provider': 'yandex_gpt',
+                    'found': found_y,
+                    'snippet': snip_y,
+                    'citations': cited_urls_y[:5],
+                })
+                _save('yandex_gpt', found_y, snip_y, yag.get('text') or '')
+                if found_y:
+                    any_found = True
+            except Exception as e:
+                msg = str(e)[:200]
+                print(f'[pub-check] yandex_gpt: {msg}')
+                results.append({'provider': 'yandex_gpt', 'found': False, 'error': msg})
+                _save('yandex_gpt', False, msg, msg)
+
+        # 5) Search-enabled LLM (Perplexity Sonar, GPT-4o Search) — нейровыдача
         for provider in SEARCH_LLM_PROVIDERS.keys():
             try:
                 r = call_search_llm(provider, query_text or search_query)

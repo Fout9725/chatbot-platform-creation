@@ -283,13 +283,16 @@ export const geoApi = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    create: (data: { title: string; content_md: string; query_id?: string | null; target_keywords?: string[]; status?: string }) =>
-      request<{ draft: GeoDraft }>(GEO_CONTENT_URL, {
+    create: (data: { title: string; content_md: string; query_id?: string | null; target_keywords?: string[]; status?: string; published_url?: string | null }) =>
+      request<{ draft: GeoDraft & { publication_id?: string | null } }>(GEO_CONTENT_URL, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<{ title: string; content_md: string; status: string; target_keywords: string[] }>) =>
-      request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ title: string; content_md: string; status: string; target_keywords: string[]; published_url: string | null }>) =>
+      request<{ ok: true; publication_id?: string | null; status?: string }>(
+        `${GEO_CONTENT_URL}?id=${id}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
     remove: (id: string) =>
       request<{ ok: true }>(`${GEO_CONTENT_URL}?id=${id}`, { method: 'DELETE' }),
   },
@@ -412,6 +415,9 @@ export type GeoDraftListItem = {
   model: string | null;
   query_id: string | null;
   query_text: string | null;
+  published_url: string | null;
+  published_at: string | null;
+  publication_id: string | null;
   created_at: string;
   updated_at: string;
 };
