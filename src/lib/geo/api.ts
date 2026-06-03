@@ -223,11 +223,11 @@ export const geoApi = {
     const totals = { polled: 0, responses: 0, mentions: 0, total: 0 };
     const allErrors: Array<{ query_id: string; provider: string; error: string }> = [];
     let lastNote: string | null | undefined = null;
-    // Защита от бесконечного цикла
-    for (let i = 0; i < 50; i++) {
+    // Защита от бесконечного цикла. По 1 запросу за вызов (3 нейросети на запрос).
+    for (let i = 0; i < 300; i++) {
       const r = await request<GeoPollResponse>(GEO_POLL_URL, {
         method: 'POST',
-        body: JSON.stringify({ offset, batch_size: 5 }),
+        body: JSON.stringify({ offset, batch_size: 1 }),
       });
       totals.polled += r.polled;
       totals.responses += r.responses;
@@ -241,7 +241,7 @@ export const geoApi = {
         responses: totals.responses,
         mentions: totals.mentions,
       });
-      // Если у поставщика закончились деньги — не дёргаем дальше
+      // Если у поставщика реально закончились деньги — не дёргаем дальше
       if (r.note === 'billing_blocked') break;
       if (r.next_offset == null) break;
       offset = r.next_offset;

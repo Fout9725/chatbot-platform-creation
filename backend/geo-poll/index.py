@@ -86,8 +86,78 @@ def get_db():
 
 
 class BillingError(Exception):
-    """Поднимается, когда у поставщика моделей нет денег / лимит исчерпан."""
+    """Поднимается, когда у поставщика моделей реально нет денег / баланс исчерпан."""
     pass
+
+
+class RateLimitError(Exception):
+    """Временный лимит частоты запросов (429) или сбой шлюза (502/503). Можно повторить."""
+    pass
+
+
+# Слова, которые однозначно означают проблему с балансом/оплатой (а НЕ rate-limit)
+BILLING_WORDS = ('insufficient', 'balance', 'payment required', 'not enough',
+                 'недостаточно средств', 'недостаточно баланса', 'пополните',
+                 'no credit', 'out of credit')
+# Слова про лимит частоты (429), которые НЕ являются проблемой с деньгами
+RATE_WORDS = ('rate-limit', 'rate limit', 'too many requests', 'more than',
+              'try later', 'try again', 'per 1.0 second', 'per second')
+
+
+def classify_http_error(code: int, body_text: str) -> Exception:
+    """
+    Корректно классифицирует ошибку провайдера:
+      - реальная нехватка денег → BillingError (останавливаем опрос)
+      - rate-limit (429) / шлюз (500/502/503/504) → RateLimitError (повторяем)
+      - иначе → RuntimeError
+    """
+    low = (body_text or '').lower()
+    is_billing = any(w in low for w in BILLING_WORDS)
+    is_rate = any(w in low for w in RATE_WORDS)
+
+    if is_billing:
+        return BillingError(f'HTTP {code}: {body_text[:200]}')
+    if code == 429 or is_rate:
+        return RateLimitError(f'HTTP {code}: {body_text[:200]}')
+    if code in (500, 502, 503, 504):
+        return RateLimitError(f'HTTP {code}: {body_text[:200]}')
+    # 402 без явных слов про баланс — всё же трактуем как биллинг (Payment Required)
+    if code == 402:
+        return BillingError(f'HTTP {code}: {body_text[:200]}')
+    return RuntimeError(f'HTTP {code}: {body_text[:300]}')
+
+
+def http_post_json(url: str, headers: dict, payload: dict, timeout: int, retries: int = 2):
+    """
+    POST с JSON и авто-повтором при RateLimitError (429/502/503).
+    Между попытками — пауза, чтобы уложиться в лимит «1 запрос в секунду» у VseGPT.
+    """
+    data = json.dumps(payload).encode('utf-8')
+    last_err = None
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, data=data, method='POST', headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='replace')
+            err = classify_http_error(e.code, err_body)
+            if isinstance(err, RateLimitError) and attempt < retries:
+                # экспоненциальная пауза: 1.5с, 3с …
+                time.sleep(1.5 * (attempt + 1))
+                last_err = err
+                continue
+            raise err
+        except urllib.error.URLError as e:
+            # таймаут/сетевой сбой — тоже пробуем повторить
+            last_err = RateLimitError(f'network: {e}')
+            if attempt < retries:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            raise last_err
+    if last_err:
+        raise last_err
+    raise RuntimeError('http_post_json: no response')
 
 
 def call_yandex_gpt(query: str, language: str = 'ru', timeout: int = 20):
@@ -109,20 +179,11 @@ def call_yandex_gpt(query: str, language: str = 'ru', timeout: int = 20):
             {'role': 'user', 'text': query},
         ],
     }
-    data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(
-        YANDEX_GPT_BASE, data=data, method='POST',
-        headers={'Authorization': f'Api-Key {api_key}', 'Content-Type': 'application/json', 'x-folder-id': folder_id},
+    body = http_post_json(
+        YANDEX_GPT_BASE,
+        {'Authorization': f'Api-Key {api_key}', 'Content-Type': 'application/json', 'x-folder-id': folder_id},
+        payload, timeout,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            body = json.loads(r.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8', errors='replace')
-        low = err_body.lower()
-        if e.code in (402, 429) or any(w in low for w in ('insufficient', 'balance', 'quota', 'недостаточно', 'баланс')):
-            raise BillingError(f'YandexGPT HTTP {e.code}: {err_body[:200]}')
-        raise RuntimeError(f'YandexGPT HTTP {e.code}: {err_body[:300]}')
     alts = (body.get('result') or {}).get('alternatives') or []
     text = (alts[0].get('message') or {}).get('text', '') if alts else ''
     return {
@@ -162,23 +223,11 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
         'temperature': 0.3,
         'max_tokens': 1500 if is_search else 700,
     }
-    data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(
-        VSEGPT_BASE, data=data, method='POST',
-        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+    body = http_post_json(
+        VSEGPT_BASE,
+        {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        payload, timeout,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            body = json.loads(r.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8', errors='replace')
-        low = err_body.lower()
-        if e.code in (402, 429) or any(w in low for w in (
-            'insufficient', 'balance', 'payment', 'credit', 'quota', 'недостаточно', 'баланс'
-        )):
-            raise BillingError(f'VseGPT HTTP {e.code}: {err_body[:200]}')
-        raise RuntimeError(f'VseGPT HTTP {e.code}: {err_body[:300]}')
-
     choice = body['choices'][0]['message']
     return {
         'text': choice.get('content', '') or '',
@@ -249,8 +298,9 @@ def handler(event, context):
     query_id = body.get('query_id')
     # offset/limit для постраничного опроса всех запросов (защита от таймаута Cloud Function)
     offset = int(body.get('offset', 0) or 0)
-    # Каждый запрос опрашивается тремя нейросетями последовательно — снижаем размер пачки
-    batch_size = int(body.get('batch_size', 2) or 2)
+    # Каждый запрос опрашивается тремя нейросетями последовательно + паузы между ними
+    # и возможные повторы при rate-limit. Чтобы уложиться в таймаут функции — по 1 запросу за вызов.
+    batch_size = int(body.get('batch_size', 1) or 1)
     batch_size = max(1, min(batch_size, 10))
     try:
         return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
@@ -268,10 +318,9 @@ def handler(event, context):
         })
 
 
-# Безопасный лимит общего времени работы функции.
-# С 3 провайдерами по 20 сек каждый — должно хватить на 2 запроса в пачке × 3 LLM = 6 вызовов.
-# Если у функции выставлен таймаут 60+ сек — клиент будет вызывать функцию пачками.
-MAX_TOTAL_SECONDS = 110
+# Безопасный лимит общего времени работы функции (Cloud Function timeout ~30 сек).
+# 3 провайдера × (вызов + пауза 1.1с + возможный retry) ≈ 15-25 сек на 1 запрос.
+MAX_TOTAL_SECONDS = 25
 
 
 def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int = 5):
@@ -327,6 +376,7 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
             })
 
         billing_blocked = False
+        provider_list = list(PROVIDERS.keys())
         for q in queries:
             if billing_blocked:
                 break
@@ -336,7 +386,10 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                 break
             qid = str(q['id'])
             any_provider_ok = False
-            for provider in PROVIDERS.keys():
+            for pi, provider in enumerate(provider_list):
+                # Пауза между провайдерами: VseGPT ограничивает ~1 запрос в секунду
+                if pi > 0:
+                    time.sleep(1.1)
                 try:
                     res = call_vsegpt(provider, q['text'], q['language'])
                 except BillingError as be:
@@ -345,6 +398,13 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                     billing_blocked = True
                     errors.append({'query_id': qid, 'provider': provider, 'error': msg})
                     break
+                except RateLimitError as rl:
+                    # Временный лимит частоты / сбой шлюза — НЕ блокируем опрос, просто пропускаем провайдера
+                    msg = str(rl)[:200]
+                    print(f'[poll] RATELIMIT {provider} {qid}: {msg}')
+                    errors.append({'query_id': qid, 'provider': provider,
+                                   'error': f'Временный лимит/сбой провайдера: {msg}'})
+                    continue
                 except Exception as e:
                     msg = str(e)[:200]
                     print(f'[poll] {provider} {qid}: {msg}')
@@ -380,16 +440,8 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                     errors.append({'query_id': qid, 'provider': provider, 'error': f'db: {str(db_err)[:160]}'})
 
             if any_provider_ok:
-                # отметим last_polled, чтобы при пагинации опрашивать давно не опрошенные первыми
-                try:
-                    with conn:
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                'UPDATE geo_tracked_queries SET last_polled = NOW() WHERE id = %s AND tenant_id = %s',
-                                (qid, tenant_id)
-                            )
-                except Exception:
-                    pass
+                # last_polled вычисляется при чтении через MAX(polled_at) в geo_llm_responses,
+                # отдельной колонки нет — UPDATE не нужен.
                 polled += 1
 
         next_offset = None
