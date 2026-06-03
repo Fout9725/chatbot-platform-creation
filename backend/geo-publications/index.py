@@ -22,7 +22,7 @@ YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completi
 # Search-enabled LLM с реальным доступом в интернет.
 # Обычные gpt-4o-mini и YandexGPT не умеют гуглить → ничего не находят.
 SEARCH_LLM_PROVIDERS = {
-    'perplexity_sonar': 'perplexity/llama-3.1-sonar-large-128k-online',
+    'perplexity_sonar': 'perplexity/sonar',  # актуальная модель с веб-поиском (старые *-online отключены)
     'gpt4o_search': 'openai/gpt-4o-search-preview',
 }
 

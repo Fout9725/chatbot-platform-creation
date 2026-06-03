@@ -24,7 +24,7 @@ YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completi
 # Для VseGPT прописываем имя модели; YandexGPT вызывается отдельным API.
 PROVIDERS = {
     'openai_gpt4o':     'openai/gpt-4o-mini',
-    'perplexity_sonar': 'perplexity/llama-3.1-sonar-large-128k-online',
+    'perplexity_sonar': 'perplexity/sonar',  # актуальная модель Sonar с веб-поиском (старые *-online отключены)
     'yandex_gpt':       'yandex/yandexgpt',  # маркер; реальный вызов — call_yandex_gpt
 }
 
