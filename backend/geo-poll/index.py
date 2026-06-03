@@ -24,9 +24,25 @@ YANDEX_GPT_BASE = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completi
 # Для VseGPT прописываем имя модели; YandexGPT вызывается отдельным API.
 PROVIDERS = {
     'openai_gpt4o':     'openai/gpt-4o-mini',
-    'perplexity_sonar': 'perplexity/sonar',  # актуальная модель Sonar с веб-поиском (старые *-online отключены)
+    'perplexity_sonar': 'perplexity/latest-online',  # см. PROVIDER_MODEL_CANDIDATES — перебор живых id
     'yandex_gpt':       'yandex/yandexgpt',  # маркер; реальный вызов — call_yandex_gpt
 }
+
+# Имена моделей у VseGPT периодически меняются (Perplexity отключила старые *-online).
+# Пробуем кандидатов по очереди, пока один не сработает. Первый рабочий кешируется в рамках вызова.
+PROVIDER_MODEL_CANDIDATES = {
+    'perplexity_sonar': [
+        'perplexity/latest-online',
+        'perplexity/sonar',
+        'perplexity/sonar-pro',
+        'perplexity/llama-3.1-sonar-large-128k-online',
+        'perplexity/sonar-reasoning',
+    ],
+    'openai_gpt4o': ['openai/gpt-4o-mini'],
+}
+
+# Кеш найденного рабочего id модели в рамках жизни контейнера функции
+_RESOLVED_MODEL: dict = {}
 
 POSITIVE = {'лучший', 'рекоменд', 'надёжн', 'качествен', 'удобн', 'выгодн',
             'best', 'recommended', 'great', 'excellent', 'top'}
@@ -95,6 +111,11 @@ class RateLimitError(Exception):
     pass
 
 
+class ModelNotFoundError(Exception):
+    """Модель не найдена у провайдера (id устарел). Пробуем следующего кандидата."""
+    pass
+
+
 # Слова, которые однозначно означают проблему с балансом/оплатой (а НЕ rate-limit)
 BILLING_WORDS = ('insufficient', 'balance', 'payment required', 'not enough',
                  'недостаточно средств', 'недостаточно баланса', 'пополните',
@@ -115,6 +136,10 @@ def classify_http_error(code: int, body_text: str) -> Exception:
     is_billing = any(w in low for w in BILLING_WORDS)
     is_rate = any(w in low for w in RATE_WORDS)
 
+    is_model_missing = ('not found' in low or 'no such model' in low or 'unknown model' in low
+                        or 'does not exist' in low)
+    if is_model_missing:
+        return ModelNotFoundError(f'HTTP {code}: {body_text[:200]}')
     if is_billing:
         return BillingError(f'HTTP {code}: {body_text[:200]}')
     if code == 429 or is_rate:
@@ -214,27 +239,43 @@ def call_vsegpt(provider: str, query: str, language: str = 'ru', timeout: int = 
         'You are a search assistant. Provide a detailed factual answer with specific brand names, numbers, and sources.'
     )
 
-    payload = {
-        'model': PROVIDERS[provider],
-        'messages': [
-            {'role': 'system', 'content': sys_prompt},
-            {'role': 'user', 'content': query},
-        ],
-        'temperature': 0.3,
-        'max_tokens': 1500 if is_search else 700,
-    }
-    body = http_post_json(
-        VSEGPT_BASE,
-        {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-        payload, timeout,
-    )
-    choice = body['choices'][0]['message']
-    return {
-        'text': choice.get('content', '') or '',
-        'citations': body.get('citations') or choice.get('citations') or [],
-        'model': body.get('model', PROVIDERS[provider]),
-        'usage': body.get('usage', {}),
-    }
+    # Список id-кандидатов: если первый устарел («not found») — пробуем следующий.
+    # Уже найденную рабочую модель кешируем, чтобы не перебирать заново.
+    candidates = _RESOLVED_MODEL.get(provider) and [_RESOLVED_MODEL[provider]] \
+        or PROVIDER_MODEL_CANDIDATES.get(provider, [PROVIDERS[provider]])
+
+    last_model_err = None
+    for model_id in candidates:
+        payload = {
+            'model': model_id,
+            'messages': [
+                {'role': 'system', 'content': sys_prompt},
+                {'role': 'user', 'content': query},
+            ],
+            'temperature': 0.3,
+            'max_tokens': 1500 if is_search else 700,
+        }
+        try:
+            body = http_post_json(
+                VSEGPT_BASE,
+                {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+                payload, timeout,
+            )
+        except ModelNotFoundError as mnf:
+            print(f'[poll] model "{model_id}" not found, trying next candidate')
+            last_model_err = mnf
+            continue
+        # Успех — запоминаем рабочую модель для последующих вызовов
+        _RESOLVED_MODEL[provider] = model_id
+        choice = body['choices'][0]['message']
+        return {
+            'text': choice.get('content', '') or '',
+            'citations': body.get('citations') or choice.get('citations') or [],
+            'model': body.get('model', model_id),
+            'usage': body.get('usage', {}),
+        }
+    # Ни один кандидат не подошёл
+    raise RuntimeError(f'Все модели «{provider}» недоступны у провайдера: {last_model_err}')
 
 
 def find_mentions(text: str, brands):
