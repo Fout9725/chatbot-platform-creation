@@ -78,6 +78,7 @@ def handler(event, context):
 
     qs = event.get('queryStringParameters') or {}
     action = qs.get('action') or 'overview'
+    project_id = qs.get('project_id')
 
     try:
         days = max(1, min(90, int(qs.get('days', '7'))))
@@ -85,47 +86,75 @@ def handler(event, context):
         days = 7
 
     if action == 'overview':
-        return overview(tenant_id, days)
+        return overview(tenant_id, days, project_id)
     if action == 'sov_trend':
-        return sov_trend(tenant_id, days)
+        return sov_trend(tenant_id, days, project_id)
     if action == 'mentions':
         try:
             limit = max(1, min(100, int(qs.get('limit', '20'))))
         except (TypeError, ValueError):
             limit = 20
-        return mentions_feed(tenant_id, days, limit)
+        return mentions_feed(tenant_id, days, limit, project_id)
     if action == 'coverage':
-        return coverage(tenant_id, days)
+        return coverage(tenant_id, days, project_id)
     return resp(400, {'error': 'unknown_action'})
 
 
-def overview(tenant_id: str, days: int):
+def resolve_project(cur, tenant_id: str, project_id):
+    """Возвращает валидный project_id (переданный или дефолтный), гарантирует наличие проекта."""
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row['id'])
+    cur.execute(
+        'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
+        (tenant_id, 'Основной проект')
+    )
+    return str(cur.fetchone()['id'])
+
+
+def overview(tenant_id: str, days: int, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 'SELECT COUNT(*) FILTER (WHERE is_active) AS active, COUNT(*) AS total '
-                'FROM geo_tracked_queries WHERE tenant_id = %s', (tenant_id,)
+                'FROM geo_tracked_queries WHERE tenant_id = %s AND project_id = %s', (tenant_id, pid)
             )
             q = cur.fetchone()
 
             cur.execute(
                 'SELECT COUNT(*) FILTER (WHERE is_own) AS own, COUNT(*) AS total '
-                'FROM geo_brands WHERE tenant_id = %s', (tenant_id,)
+                'FROM geo_brands WHERE tenant_id = %s AND project_id = %s', (tenant_id, pid)
             )
             b = cur.fetchone()
 
             cur.execute(
-                "SELECT COUNT(*) AS cnt FROM geo_mentions "
-                "WHERE tenant_id = %s AND created_at >= NOW() - (%s || ' days')::interval",
-                (tenant_id, days)
+                "SELECT COUNT(*) AS cnt FROM geo_mentions m "
+                "JOIN geo_brands br ON br.id = m.brand_id "
+                "WHERE m.tenant_id = %s AND br.project_id = %s "
+                "AND m.created_at >= NOW() - (%s || ' days')::interval",
+                (tenant_id, pid, days)
             )
             mentions_cnt = cur.fetchone()['cnt']
 
             cur.execute(
-                "SELECT COUNT(*) AS cnt FROM geo_llm_responses "
-                "WHERE tenant_id = %s AND polled_at >= NOW() - (%s || ' days')::interval",
-                (tenant_id, days)
+                "SELECT COUNT(*) AS cnt FROM geo_llm_responses r "
+                "JOIN geo_tracked_queries tq ON tq.id = r.query_id "
+                "WHERE r.tenant_id = %s AND tq.project_id = %s "
+                "AND r.polled_at >= NOW() - (%s || ' days')::interval",
+                (tenant_id, pid, days)
             )
             responses_cnt = cur.fetchone()['cnt']
 
@@ -137,11 +166,11 @@ def overview(tenant_id: str, days: int):
                 LEFT JOIN geo_mentions m
                   ON m.brand_id = b.id AND m.tenant_id = b.tenant_id
                   AND m.created_at >= NOW() - (%s || ' days')::interval
-                WHERE b.tenant_id = %s
+                WHERE b.tenant_id = %s AND b.project_id = %s
                 GROUP BY b.id, b.name, b.is_own
                 ORDER BY mentions DESC
                 """,
-                (days, tenant_id)
+                (days, tenant_id, pid)
             )
             brands_rows = cur.fetchall()
 
@@ -168,10 +197,10 @@ def overview(tenant_id: str, days: int):
                 JOIN geo_llm_responses r ON r.query_id = q.id AND r.tenant_id = q.tenant_id
                 JOIN geo_mentions m ON m.response_id = r.id AND m.tenant_id = q.tenant_id
                 JOIN geo_brands b ON b.id = m.brand_id AND b.tenant_id = q.tenant_id
-                WHERE q.tenant_id = %s AND b.is_own = TRUE
+                WHERE q.tenant_id = %s AND q.project_id = %s AND b.is_own = TRUE
                   AND r.polled_at >= NOW() - (%s || ' days')::interval
                 """,
-                (tenant_id, days)
+                (tenant_id, pid, days)
             )
             covered = cur.fetchone()['covered'] or 0
 
@@ -189,10 +218,12 @@ def overview(tenant_id: str, days: int):
         conn.close()
 
 
-def sov_trend(tenant_id: str, days: int):
+def sov_trend(tenant_id: str, days: int, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 WITH days_series AS (
@@ -208,7 +239,7 @@ def sov_trend(tenant_id: str, days: int):
                          COUNT(*) AS cnt
                   FROM geo_mentions m
                   JOIN geo_brands b ON b.id = m.brand_id AND b.tenant_id = m.tenant_id
-                  WHERE m.tenant_id = %s
+                  WHERE m.tenant_id = %s AND b.project_id = %s
                     AND m.created_at >= CURRENT_DATE - (%s - 1) * INTERVAL '1 day'
                   GROUP BY 1, 2, 3, 4
                 )
@@ -217,7 +248,7 @@ def sov_trend(tenant_id: str, days: int):
                 LEFT JOIN daily d ON d.day = ds.day
                 ORDER BY ds.day, d.brand_id NULLS LAST
                 """,
-                (days, tenant_id, days)
+                (days, tenant_id, pid, days)
             )
             rows = cur.fetchall()
 
@@ -247,10 +278,12 @@ def sov_trend(tenant_id: str, days: int):
         conn.close()
 
 
-def mentions_feed(tenant_id: str, days: int, limit: int):
+def mentions_feed(tenant_id: str, days: int, limit: int, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT m.id, m.sentiment, m.sentiment_score, m.snippet, m.position, m.created_at,
@@ -261,12 +294,12 @@ def mentions_feed(tenant_id: str, days: int, limit: int):
                 JOIN geo_brands b ON b.id = m.brand_id AND b.tenant_id = m.tenant_id
                 JOIN geo_llm_responses r ON r.id = m.response_id AND r.tenant_id = m.tenant_id
                 JOIN geo_tracked_queries q ON q.id = r.query_id AND q.tenant_id = m.tenant_id
-                WHERE m.tenant_id = %s
+                WHERE m.tenant_id = %s AND b.project_id = %s
                   AND m.created_at >= NOW() - (%s || ' days')::interval
                 ORDER BY m.created_at DESC
                 LIMIT %s
                 """,
-                (tenant_id, days, limit)
+                (tenant_id, pid, days, limit)
             )
             rows = cur.fetchall()
         return resp(200, {'mentions': [{
@@ -287,10 +320,12 @@ def mentions_feed(tenant_id: str, days: int, limit: int):
         conn.close()
 
 
-def coverage(tenant_id: str, days: int):
+def coverage(tenant_id: str, days: int, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT q.id, q.text, q.language,
@@ -306,11 +341,11 @@ def coverage(tenant_id: str, days: int):
                   ON m.response_id = r.id AND m.tenant_id = q.tenant_id
                 LEFT JOIN geo_brands b
                   ON b.id = m.brand_id AND b.tenant_id = q.tenant_id
-                WHERE q.tenant_id = %s
+                WHERE q.tenant_id = %s AND q.project_id = %s
                 GROUP BY q.id, q.text, q.language
                 ORDER BY own_mentions DESC, responses DESC
                 """,
-                (days, tenant_id)
+                (days, tenant_id, pid)
             )
             rows = cur.fetchall()
         return resp(200, {'coverage': [{

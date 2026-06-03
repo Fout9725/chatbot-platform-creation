@@ -337,6 +337,7 @@ def handler(event, context):
         return resp(401, {'error': 'unauthorized'})
 
     query_id = body.get('query_id')
+    project_id = body.get('project_id')
     # offset/limit для постраничного опроса всех запросов (защита от таймаута Cloud Function)
     offset = int(body.get('offset', 0) or 0)
     # Каждый запрос опрашивается тремя нейросетями последовательно + паузы между ними
@@ -344,7 +345,7 @@ def handler(event, context):
     batch_size = int(body.get('batch_size', 1) or 1)
     batch_size = max(1, min(batch_size, 10))
     try:
-        return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size)
+        return poll_for_tenant(tenant_id, query_id, offset=offset, batch_size=batch_size, project_id=project_id)
     except Exception as e:
         # Любая необработанная ошибка возвращается как валидный JSON
         import traceback
@@ -364,7 +365,22 @@ def handler(event, context):
 MAX_TOTAL_SECONDS = 25
 
 
-def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int = 5):
+def _resolve_project(cur, tenant_id: str, project_id):
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    return str(row['id']) if row else None
+
+
+def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int = 5, project_id=None):
     conn = get_db()
     polled, total_resp, total_ment = 0, 0, 0
     errors = []
@@ -372,19 +388,22 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             if query_id:
+                # Опрос одного запроса — проект берём из самого запроса
                 cur.execute(
-                    'SELECT id, text, language FROM geo_tracked_queries '
+                    'SELECT id, text, language, project_id FROM geo_tracked_queries '
                     'WHERE tenant_id = %s AND id = %s AND is_active = TRUE',
                     (tenant_id, query_id)
                 )
                 all_queries = cur.fetchall()
                 total_queries = len(all_queries)
                 queries = all_queries
+                pid = str(all_queries[0]['project_id']) if all_queries and all_queries[0].get('project_id') else _resolve_project(cur, tenant_id, project_id)
             else:
+                pid = _resolve_project(cur, tenant_id, project_id)
                 cur.execute(
                     'SELECT COUNT(*) AS c FROM geo_tracked_queries '
-                    'WHERE tenant_id = %s AND is_active = TRUE',
-                    (tenant_id,)
+                    'WHERE tenant_id = %s AND project_id = %s AND is_active = TRUE',
+                    (tenant_id, pid)
                 )
                 total_queries = int(cur.fetchone()['c'])
                 cur.execute(
@@ -393,16 +412,17 @@ def poll_for_tenant(tenant_id: str, query_id, offset: int = 0, batch_size: int =
                     '  SELECT MAX(polled_at) AS last_polled '
                     '  FROM geo_llm_responses r WHERE r.query_id = q.id'
                     ') lp ON TRUE '
-                    'WHERE q.tenant_id = %s AND q.is_active = TRUE '
+                    'WHERE q.tenant_id = %s AND q.project_id = %s AND q.is_active = TRUE '
                     'ORDER BY COALESCE(lp.last_polled, q.created_at) ASC, q.id ASC '
                     'LIMIT %s OFFSET %s',
-                    (tenant_id, batch_size, offset)
+                    (tenant_id, pid, batch_size, offset)
                 )
                 queries = cur.fetchall()
 
+            # Бренды берём только из проекта (свой бренд + конкуренты этого проекта)
             cur.execute(
-                'SELECT id, name, aliases, is_own FROM geo_brands WHERE tenant_id = %s',
-                (tenant_id,)
+                'SELECT id, name, aliases, is_own FROM geo_brands WHERE tenant_id = %s AND project_id = %s',
+                (tenant_id, pid)
             )
             brands = [{
                 'id': str(r['id']), 'name': r['name'],

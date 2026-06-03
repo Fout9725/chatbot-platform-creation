@@ -74,6 +74,28 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def resolve_project(cur, tenant_id: str, project_id):
+    """Возвращает валидный project_id (переданный или дефолтный), гарантирует наличие проекта."""
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row['id'])
+    cur.execute(
+        'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
+        (tenant_id, 'Основной проект')
+    )
+    return str(cur.fetchone()['id'])
+
+
 def handler(event, context):
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
@@ -92,17 +114,18 @@ def handler(event, context):
         body = {}
 
     action = qs.get('action') or body.get('action')
+    project_id = qs.get('project_id') or body.get('project_id')
 
     if method == 'GET':
         if action == 'competitor_gaps':
-            return competitor_gaps(tenant_id, int(qs.get('days', '14')))
-        return list_queries(tenant_id, int(qs.get('days', '14')))
+            return competitor_gaps(tenant_id, int(qs.get('days', '14')), project_id)
+        return list_queries(tenant_id, int(qs.get('days', '14')), project_id)
     if method == 'POST':
         if action == 'suggest':
-            return suggest_queries(tenant_id, body)
+            return suggest_queries(tenant_id, body, project_id)
         if action == 'bulk_create':
-            return bulk_create_queries(tenant_id, body)
-        return create_query(tenant_id, body)
+            return bulk_create_queries(tenant_id, body, project_id)
+        return create_query(tenant_id, body, project_id)
     if method == 'PUT':
         return update_query(tenant_id, qs.get('id', ''), body)
     if method == 'DELETE':
@@ -112,7 +135,7 @@ def handler(event, context):
 
 # ------------------------- LIST с метриками -------------------------
 
-def list_queries(tenant_id: str, days: int = 14):
+def list_queries(tenant_id: str, days: int = 14, project_id=None):
     """
     Отдаёт запросы + per-query метрики за `days` дней:
       - sov: доля голоса бренда по этому запросу
@@ -123,7 +146,9 @@ def list_queries(tenant_id: str, days: int = 14):
     days = max(1, min(int(days or 14), 90))
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT q.id, q.text, q.language, q.is_active, q.category, q.intent, q.notes, q.source,
@@ -131,14 +156,14 @@ def list_queries(tenant_id: str, days: int = 14):
                        (SELECT MAX(polled_at) FROM geo_llm_responses r WHERE r.query_id = q.id) AS last_polled,
                        (SELECT COUNT(*) FROM geo_llm_responses r WHERE r.query_id = q.id) AS responses_count
                 FROM geo_tracked_queries q
-                WHERE q.tenant_id = %s
+                WHERE q.tenant_id = %s AND q.project_id = %s
                 ORDER BY q.is_active DESC, q.created_at DESC
                 """,
-                (tenant_id,)
+                (tenant_id, pid)
             )
             rows = cur.fetchall()
 
-            # Метрики за текущее окно
+            # Метрики за текущее окно (только бренды этого проекта)
             cur.execute(
                 """
                 SELECT r.query_id,
@@ -148,10 +173,11 @@ def list_queries(tenant_id: str, days: int = 14):
                 FROM geo_mentions m
                 JOIN geo_llm_responses r ON r.id = m.response_id
                 JOIN geo_brands b ON b.id = m.brand_id
-                WHERE m.tenant_id = %s AND r.polled_at >= NOW() - (%s || ' days')::interval
+                WHERE m.tenant_id = %s AND b.project_id = %s
+                  AND r.polled_at >= NOW() - (%s || ' days')::interval
                 GROUP BY r.query_id
                 """,
-                (tenant_id, days)
+                (tenant_id, pid, days)
             )
             cur_metrics = {str(r['query_id']): r for r in cur.fetchall()}
 
@@ -164,12 +190,12 @@ def list_queries(tenant_id: str, days: int = 14):
                 FROM geo_mentions m
                 JOIN geo_llm_responses r ON r.id = m.response_id
                 JOIN geo_brands b ON b.id = m.brand_id
-                WHERE m.tenant_id = %s
+                WHERE m.tenant_id = %s AND b.project_id = %s
                   AND r.polled_at >= NOW() - (%s || ' days')::interval
                   AND r.polled_at <  NOW() - (%s || ' days')::interval
                 GROUP BY r.query_id
                 """,
-                (tenant_id, days * 2, days)
+                (tenant_id, pid, days * 2, days)
             )
             prev_metrics = {str(r['query_id']): r for r in cur.fetchall()}
 
@@ -180,13 +206,13 @@ def list_queries(tenant_id: str, days: int = 14):
                 FROM geo_mentions m
                 JOIN geo_llm_responses r ON r.id = m.response_id
                 JOIN geo_brands b ON b.id = m.brand_id
-                WHERE m.tenant_id = %s
+                WHERE m.tenant_id = %s AND b.project_id = %s
                   AND b.is_own = FALSE
                   AND r.polled_at >= NOW() - (%s || ' days')::interval
                 GROUP BY r.query_id, b.name
                 ORDER BY r.query_id, cnt DESC
                 """,
-                (tenant_id, days)
+                (tenant_id, pid, days)
             )
             top_comp = {}
             for r in cur.fetchall():
@@ -254,7 +280,7 @@ def _normalize_intent(it):
     return it if it in ALLOWED_INTENTS else None
 
 
-def create_query(tenant_id: str, body: dict):
+def create_query(tenant_id: str, body: dict, project_id=None):
     text = (body.get('text') or '').strip()
     if not text:
         return resp(400, {'error': 'text_required'})
@@ -271,11 +297,12 @@ def create_query(tenant_id: str, body: dict):
     try:
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                pid = resolve_project(cur, tenant_id, project_id)
                 cur.execute(
                     'INSERT INTO geo_tracked_queries '
-                    '(tenant_id, text, language, is_active, category, intent, notes, source) '
-                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at',
-                    (tenant_id, text, language, is_active, category, intent, notes, source)
+                    '(tenant_id, project_id, text, language, is_active, category, intent, notes, source) '
+                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at',
+                    (tenant_id, pid, text, language, is_active, category, intent, notes, source)
                 )
                 row = cur.fetchone()
         return resp(200, {'query': {
@@ -349,7 +376,7 @@ def delete_query(tenant_id: str, qid: str):
 
 # ------------------------- BULK CREATE -------------------------
 
-def bulk_create_queries(tenant_id: str, body: dict):
+def bulk_create_queries(tenant_id: str, body: dict, project_id=None):
     """
     Принимает items: [{text, language?, category?, intent?, notes?, source?}, ...]
     Или просто массив строк: items: ['запрос 1', 'запрос 2', ...]
@@ -386,10 +413,11 @@ def bulk_create_queries(tenant_id: str, body: dict):
     try:
         with conn:
             with conn.cursor() as cur:
-                # Существующие тексты — чтобы не дублировать
+                pid = resolve_project(cur, tenant_id, project_id)
+                # Существующие тексты в этом проекте — чтобы не дублировать
                 cur.execute(
-                    'SELECT LOWER(text) FROM geo_tracked_queries WHERE tenant_id = %s',
-                    (tenant_id,)
+                    'SELECT LOWER(text) FROM geo_tracked_queries WHERE tenant_id = %s AND project_id = %s',
+                    (tenant_id, pid)
                 )
                 existing = {row[0] for row in cur.fetchall()}
 
@@ -404,9 +432,9 @@ def bulk_create_queries(tenant_id: str, body: dict):
                     seen_in_batch.add(key)
                     cur.execute(
                         'INSERT INTO geo_tracked_queries '
-                        '(tenant_id, text, language, is_active, category, intent, notes, source) '
-                        'VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s)',
-                        (tenant_id, it['text'], it.get('language', 'ru'),
+                        '(tenant_id, project_id, text, language, is_active, category, intent, notes, source) '
+                        'VALUES (%s, %s, %s, %s, TRUE, %s, %s, %s, %s)',
+                        (tenant_id, pid, it['text'], it.get('language', 'ru'),
                          it.get('category'), it.get('intent'), it.get('notes'),
                          it.get('source', 'bulk'))
                     )
@@ -418,19 +446,23 @@ def bulk_create_queries(tenant_id: str, body: dict):
 
 # ------------------------- AI SUGGEST -------------------------
 
-def _fetch_tenant_context(tenant_id: str) -> dict:
-    """Собираем контекст для ИИ: бренды (свои/конкуренты) + примеры существующих запросов."""
+def _fetch_tenant_context(tenant_id: str, project_id=None) -> dict:
+    """Собираем контекст для ИИ: бренды (свои/конкуренты) + примеры существующих запросов проекта."""
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
-                'SELECT name, aliases, is_own FROM geo_brands WHERE tenant_id = %s ORDER BY is_own DESC',
-                (tenant_id,)
+                'SELECT name, aliases, is_own FROM geo_brands '
+                'WHERE tenant_id = %s AND project_id = %s ORDER BY is_own DESC',
+                (tenant_id, pid)
             )
             brands = cur.fetchall()
             cur.execute(
-                'SELECT text, category FROM geo_tracked_queries WHERE tenant_id = %s ORDER BY created_at DESC LIMIT 20',
-                (tenant_id,)
+                'SELECT text, category FROM geo_tracked_queries '
+                'WHERE tenant_id = %s AND project_id = %s ORDER BY created_at DESC LIMIT 20',
+                (tenant_id, pid)
             )
             existing = cur.fetchall()
         own = [b for b in brands if b['is_own']]
@@ -469,7 +501,7 @@ def _call_vsegpt(messages: list, model: str = DEFAULT_MODEL, timeout: int = 60) 
     return body['choices'][0]['message']['content'] or ''
 
 
-def suggest_queries(tenant_id: str, body: dict):
+def suggest_queries(tenant_id: str, body: dict, project_id=None):
     """
     ИИ-генератор. Анализирует бренд и предлагает 15-25 запросов, которые реальные клиенты
     задают LLM в этой нише. Запросы НЕ записываются в БД — пользователь сам выбирает и добавляет.
@@ -480,7 +512,7 @@ def suggest_queries(tenant_id: str, body: dict):
       - focus: 'all' | 'commercial' | 'comparison' | 'informational' | 'branded'
       - extra_context: любые пожелания (свободный текст)
     """
-    ctx = _fetch_tenant_context(tenant_id)
+    ctx = _fetch_tenant_context(tenant_id, project_id)
     own = ctx['own_brand']
     industry = (body.get('industry') or '').strip()
     region = (body.get('region') or 'Россия').strip()
@@ -612,7 +644,7 @@ def suggest_queries(tenant_id: str, body: dict):
 
 # ------------------------- COMPETITOR GAPS -------------------------
 
-def competitor_gaps(tenant_id: str, days: int = 14):
+def competitor_gaps(tenant_id: str, days: int = 14, project_id=None):
     """
     Анализ «где конкуренты выигрывают, а нас нет».
     Возвращает топ-запросы, где own_mentions == 0, но competitor_mentions > 0.
@@ -620,7 +652,9 @@ def competitor_gaps(tenant_id: str, days: int = 14):
     days = max(1, min(int(days or 14), 90))
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT q.id, q.text, q.category, q.intent,
@@ -632,14 +666,14 @@ def competitor_gaps(tenant_id: str, days: int = 14):
                   ON r.query_id = q.id AND r.polled_at >= NOW() - (%s || ' days')::interval
                 LEFT JOIN geo_mentions m ON m.response_id = r.id
                 LEFT JOIN geo_brands b ON b.id = m.brand_id
-                WHERE q.tenant_id = %s
+                WHERE q.tenant_id = %s AND q.project_id = %s
                 GROUP BY q.id
                 HAVING COUNT(DISTINCT r.id) > 0
                 ORDER BY (SUM(CASE WHEN b.is_own THEN 0 ELSE 1 END))::int DESC,
                          (SUM(CASE WHEN b.is_own THEN 1 ELSE 0 END))::int ASC
                 LIMIT 50
                 """,
-                (days, tenant_id)
+                (days, tenant_id, pid)
             )
             rows = cur.fetchall()
 
@@ -653,14 +687,14 @@ def competitor_gaps(tenant_id: str, days: int = 14):
                     FROM geo_mentions m
                     JOIN geo_llm_responses r ON r.id = m.response_id
                     JOIN geo_brands b ON b.id = m.brand_id
-                    WHERE m.tenant_id = %s
+                    WHERE m.tenant_id = %s AND b.project_id = %s
                       AND b.is_own = FALSE
                       AND r.polled_at >= NOW() - (%s || ' days')::interval
                       AND r.query_id::text = ANY(%s)
                     GROUP BY r.query_id, b.name
                     ORDER BY r.query_id, cnt DESC
                     """,
-                    (tenant_id, days, gap_qids)
+                    (tenant_id, pid, days, gap_qids)
                 )
                 for r in cur.fetchall():
                     qid = str(r['query_id'])

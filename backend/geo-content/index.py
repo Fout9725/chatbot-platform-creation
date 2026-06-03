@@ -120,15 +120,16 @@ def handler(event, context):
         body = {}
 
     action = qs.get('action')
+    project_id = qs.get('project_id') or body.get('project_id')
 
     if method == 'GET':
         if qs.get('id'):
             return get_draft(tenant_id, qs['id'])
-        return list_drafts(tenant_id)
+        return list_drafts(tenant_id, project_id)
     if method == 'POST':
         if action == 'generate':
-            return generate_draft(tenant_id, body)
-        return create_draft(tenant_id, body)
+            return generate_draft(tenant_id, body, project_id)
+        return create_draft(tenant_id, body, project_id)
     if method == 'PUT':
         return update_draft(tenant_id, qs.get('id', ''), body)
     if method == 'DELETE':
@@ -136,10 +137,34 @@ def handler(event, context):
     return resp(405, {'error': 'method_not_allowed'})
 
 
-def list_drafts(tenant_id: str):
+def resolve_project(cur, tenant_id: str, project_id):
+    """Возвращает валидный project_id (переданный или дефолтный), гарантирует наличие проекта."""
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row['id'])
+    cur.execute(
+        'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
+        (tenant_id, 'Основной проект')
+    )
+    return str(cur.fetchone()['id'])
+
+
+def list_drafts(tenant_id: str, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT d.id, d.title, d.status, d.word_count, d.target_keywords,
@@ -149,10 +174,10 @@ def list_drafts(tenant_id: str):
                        (SELECT id FROM geo_publications_v2 p WHERE p.draft_id = d.id LIMIT 1) AS publication_id
                 FROM geo_drafts d
                 LEFT JOIN geo_tracked_queries q ON q.id = d.query_id AND q.tenant_id = d.tenant_id
-                WHERE d.tenant_id = %s
+                WHERE d.tenant_id = %s AND d.project_id = %s
                 ORDER BY d.updated_at DESC
                 """,
-                (tenant_id,)
+                (tenant_id, pid)
             )
             rows = cur.fetchall()
         return resp(200, {'drafts': [{
@@ -211,7 +236,7 @@ def _extract_domain(url: str) -> str:
 
 
 def _sync_draft_to_publication(conn, tenant_id: str, draft_id: str,
-                                title: str, url: str | None, query_id) -> str | None:
+                                title: str, url, query_id, project_id=None) -> str | None:
     """
     Если статус черновика стал 'published' и есть URL — создаём (или обновляем)
     запись в geo_publications_v2. Возвращает id публикации либо None.
@@ -224,6 +249,11 @@ def _sync_draft_to_publication(conn, tenant_id: str, draft_id: str,
         return None
     platform = _extract_domain(url) or None
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # project_id берём из черновика, если не передан явно
+        if not project_id:
+            cur.execute('SELECT project_id FROM geo_drafts WHERE id = %s', (draft_id,))
+            dr = cur.fetchone()
+            project_id = str(dr['project_id']) if dr and dr['project_id'] else None
         # Если уже есть публикация по этому черновику — обновляем
         cur.execute(
             'SELECT id FROM geo_publications_v2 WHERE tenant_id = %s AND draft_id = %s LIMIT 1',
@@ -233,23 +263,23 @@ def _sync_draft_to_publication(conn, tenant_id: str, draft_id: str,
         if existing:
             cur.execute(
                 'UPDATE geo_publications_v2 SET title=%s, url=%s, platform=COALESCE(platform, %s), '
-                'updated_at=NOW() WHERE id=%s',
-                (title, url, platform, existing['id'])
+                'project_id=COALESCE(project_id, %s), updated_at=NOW() WHERE id=%s',
+                (title, url, platform, project_id, existing['id'])
             )
             return str(existing['id'])
         cur.execute(
             """
             INSERT INTO geo_publications_v2
-              (tenant_id, draft_id, query_id, title, url, extra_urls, platform, published_at, status)
-            VALUES (%s, %s, %s, %s, %s, '[]'::jsonb, %s, NOW(), 'live')
+              (tenant_id, project_id, draft_id, query_id, title, url, extra_urls, platform, published_at, status)
+            VALUES (%s, %s, %s, %s, %s, %s, '[]'::jsonb, %s, NOW(), 'live')
             RETURNING id
             """,
-            (tenant_id, draft_id, query_id, title, url, platform)
+            (tenant_id, project_id, draft_id, query_id, title, url, platform)
         )
         return str(cur.fetchone()['id'])
 
 
-def create_draft(tenant_id: str, body: dict):
+def create_draft(tenant_id: str, body: dict, project_id=None):
     title = (body.get('title') or '').strip() or 'Без названия'
     content = body.get('content_md') or ''
     keywords = body.get('target_keywords') or []
@@ -266,11 +296,12 @@ def create_draft(tenant_id: str, body: dict):
     try:
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                pid = resolve_project(cur, tenant_id, project_id)
                 cur.execute(
                     'INSERT INTO geo_drafts '
-                    '(tenant_id, query_id, title, content_md, target_keywords, word_count, status, published_url, published_at) '
-                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at, published_at',
-                    (tenant_id, query_id, title, content, keywords, word_count(content),
+                    '(tenant_id, project_id, query_id, title, content_md, target_keywords, word_count, status, published_url, published_at) '
+                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at, published_at',
+                    (tenant_id, pid, query_id, title, content, keywords, word_count(content),
                      status, published_url,
                      'NOW()' if status == 'published' else None)
                 )
@@ -279,7 +310,7 @@ def create_draft(tenant_id: str, body: dict):
             # Если уже опубликована — сразу создаём публикацию
             if status == 'published' and published_url:
                 publication_id = _sync_draft_to_publication(
-                    conn, tenant_id, draft_id, title, published_url, query_id
+                    conn, tenant_id, draft_id, title, published_url, query_id, pid
                 )
                 with conn.cursor() as cur:
                     cur.execute(
@@ -373,7 +404,7 @@ def delete_draft(tenant_id: str, draft_id: str):
         conn.close()
 
 
-def generate_draft(tenant_id: str, body: dict):
+def generate_draft(tenant_id: str, body: dict, project_id=None):
     query_id = body.get('query_id')
     custom_topic = (body.get('topic') or '').strip()
     tone = body.get('tone') or 'expert'
@@ -384,6 +415,7 @@ def generate_draft(tenant_id: str, body: dict):
     try:
         query_text = custom_topic
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            pid = resolve_project(cur, tenant_id, project_id)
             if query_id:
                 cur.execute(
                     'SELECT text FROM geo_tracked_queries WHERE tenant_id = %s AND id = %s',
@@ -396,8 +428,8 @@ def generate_draft(tenant_id: str, body: dict):
                 return resp(400, {'error': 'topic_or_query_required'})
 
             cur.execute(
-                'SELECT name, aliases, is_own FROM geo_brands WHERE tenant_id = %s',
-                (tenant_id,)
+                'SELECT name, aliases, is_own FROM geo_brands WHERE tenant_id = %s AND project_id = %s',
+                (tenant_id, pid)
             )
             brands = cur.fetchall()
 
@@ -453,9 +485,9 @@ def generate_draft(tenant_id: str, body: dict):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     'INSERT INTO geo_drafts '
-                    '(tenant_id, query_id, title, content_md, target_keywords, model, word_count) '
-                    'VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at',
-                    (tenant_id, query_id, title, text, keywords, model, word_count(text))
+                    '(tenant_id, project_id, query_id, title, content_md, target_keywords, model, word_count) '
+                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at, updated_at',
+                    (tenant_id, pid, query_id, title, text, keywords, model, word_count(text))
                 )
                 row = cur.fetchone()
 

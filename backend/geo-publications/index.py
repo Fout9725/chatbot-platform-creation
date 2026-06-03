@@ -171,15 +171,16 @@ def handler(event, context):
         body = {}
 
     action = qs.get('action')
+    project_id = qs.get('project_id') or body.get('project_id')
 
     if method == 'GET':
         if qs.get('id') and action == 'checks':
             return list_checks(tenant_id, qs['id'])
-        return list_publications(tenant_id)
+        return list_publications(tenant_id, project_id)
     if method == 'POST':
         if action == 'check':
             return check_publication(tenant_id, qs.get('id', ''))
-        return create_publication(tenant_id, body)
+        return create_publication(tenant_id, body, project_id)
     if method == 'PUT':
         return update_publication(tenant_id, qs.get('id', ''), body)
     if method == 'DELETE':
@@ -187,10 +188,34 @@ def handler(event, context):
     return resp(405, {'error': 'method_not_allowed'})
 
 
-def list_publications(tenant_id: str):
+def resolve_project(cur, tenant_id: str, project_id):
+    """Возвращает валидный project_id (переданный или дефолтный), гарантирует наличие проекта."""
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row['id'])
+    cur.execute(
+        'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
+        (tenant_id, 'Основной проект')
+    )
+    return str(cur.fetchone()['id'])
+
+
+def list_publications(tenant_id: str, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            proj_id = resolve_project(cur, tenant_id, project_id)
             cur.execute(
                 """
                 SELECT p.id, p.title, p.url, p.extra_urls, p.platform, p.status, p.published_at,
@@ -199,10 +224,10 @@ def list_publications(tenant_id: str):
                        p.created_at, p.updated_at
                 FROM geo_publications_v2 p
                 LEFT JOIN geo_tracked_queries q ON q.id = p.query_id AND q.tenant_id = p.tenant_id
-                WHERE p.tenant_id = %s
+                WHERE p.tenant_id = %s AND p.project_id = %s
                 ORDER BY p.created_at DESC
                 """,
-                (tenant_id,)
+                (tenant_id, proj_id)
             )
             rows = cur.fetchall()
 
@@ -274,7 +299,7 @@ def normalize_urls(body: dict):
     return dedup
 
 
-def create_publication(tenant_id: str, body: dict):
+def create_publication(tenant_id: str, body: dict, project_id=None):
     title = (body.get('title') or '').strip()
     urls = normalize_urls(body)
     if not title or not urls:
@@ -293,14 +318,22 @@ def create_publication(tenant_id: str, body: dict):
     try:
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                proj_id = resolve_project(cur, tenant_id, project_id)
+                # если публикация из черновика — берём проект черновика
+                if draft_id:
+                    cur.execute('SELECT project_id FROM geo_drafts WHERE tenant_id = %s AND id = %s',
+                                (tenant_id, draft_id))
+                    dr = cur.fetchone()
+                    if dr and dr['project_id']:
+                        proj_id = str(dr['project_id'])
                 cur.execute(
                     """
                     INSERT INTO geo_publications_v2
-                      (tenant_id, draft_id, query_id, title, url, extra_urls, platform, published_at, status, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
+                      (tenant_id, project_id, draft_id, query_id, title, url, extra_urls, platform, published_at, status, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
                     RETURNING id, created_at, updated_at, last_check_at, last_check_found, published_at
                     """,
-                    (tenant_id, draft_id, query_id, title, url, json.dumps(extra_urls),
+                    (tenant_id, proj_id, draft_id, query_id, title, url, json.dumps(extra_urls),
                      platform, published_at, status, notes)
                 )
                 row = cur.fetchone()

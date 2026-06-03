@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "OPTIONS", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
+    {"name": "Unauthorized GET", "method": "GET", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"},
+    {"name": "Unauthorized POST", "method": "POST", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"}
+  ]
+}

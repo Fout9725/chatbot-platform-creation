@@ -9,14 +9,52 @@ export const GEO_ANALYTICS_URL = URLS['geo-analytics'];
 export const GEO_CONTENT_URL = URLS['geo-content'];
 export const GEO_PUBS_URL = URLS['geo-publications'];
 export const GEO_SETTINGS_URL = URLS['geo-settings'];
+export const GEO_PROJECTS_URL = URLS['geo-projects'];
 
 const TOKEN_KEY = 'geo_token';
+const PROJECT_KEY = 'geo_project_id';
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
+
+export const projectStore = {
+  get: () => localStorage.getItem(PROJECT_KEY),
+  set: (id: string) => localStorage.setItem(PROJECT_KEY, id),
+  clear: () => localStorage.removeItem(PROJECT_KEY),
+};
+
+// Функции, к запросам которых НЕ нужно добавлять project_id (глобальные/межпроектные)
+const PROJECT_AGNOSTIC = [GEO_AUTH_URL, GEO_PROJECTS_URL, GEO_SETTINGS_URL];
+
+/** Добавляет project_id в URL (query) и в JSON-body, если он ещё не задан явно. */
+function withProject(url: string, init: RequestInit): { url: string; init: RequestInit } {
+  const projectId = projectStore.get();
+  if (!projectId) return { url, init };
+  if (PROJECT_AGNOSTIC.some((u) => u && url.startsWith(u))) return { url, init };
+
+  let nextUrl = url;
+  if (!/[?&]project_id=/.test(url)) {
+    nextUrl += (url.includes('?') ? '&' : '?') + `project_id=${encodeURIComponent(projectId)}`;
+  }
+
+  let nextInit = init;
+  const method = (init.method || 'GET').toUpperCase();
+  if (method !== 'GET' && typeof init.body === 'string') {
+    try {
+      const parsed = JSON.parse(init.body);
+      if (parsed && typeof parsed === 'object' && parsed.project_id == null) {
+        parsed.project_id = projectId;
+        nextInit = { ...init, body: JSON.stringify(parsed) };
+      }
+    } catch {
+      /* тело не JSON — оставляем как есть */
+    }
+  }
+  return { url: nextUrl, init: nextInit };
+}
 
 async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
@@ -25,6 +63,10 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
     ...(init.headers as Record<string, string> | undefined),
   };
   if (token) headers['X-Auth-Token'] = token;
+
+  const withProj = withProject(url, init);
+  url = withProj.url;
+  init = withProj.init;
 
   let res: Response;
   try {
@@ -343,6 +385,27 @@ export const geoApi = {
         { method: 'POST', body: JSON.stringify({ kind }) },
       ),
   },
+
+  projects: {
+    list: () => request<{ projects: GeoProject[] }>(GEO_PROJECTS_URL, { method: 'GET' }),
+    create: (data: { name: string; description?: string }) =>
+      request<{ project: GeoProject }>(GEO_PROJECTS_URL, { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ name: string; description: string }>) =>
+      request<{ ok: true }>(`${GEO_PROJECTS_URL}?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) =>
+      request<{ ok: true }>(`${GEO_PROJECTS_URL}?id=${id}`, { method: 'DELETE' }),
+  },
+};
+
+export type GeoProject = {
+  id: string;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  own_brand: string | null;
+  brands_count: number;
+  queries_count: number;
+  created_at: string;
 };
 
 export type GeoPollResponse = {

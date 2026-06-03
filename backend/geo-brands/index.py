@@ -66,6 +66,31 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def resolve_project(cur, tenant_id: str, project_id):
+    """
+    Возвращает валидный project_id: либо переданный (если принадлежит tenant),
+    либо дефолтный проект tenant'а. Гарантирует наличие хотя бы одного проекта.
+    """
+    if project_id:
+        cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
+                    (tenant_id, project_id))
+        row = cur.fetchone()
+        if row:
+            return str(row['id'])
+    cur.execute(
+        'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
+        (tenant_id,)
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row['id'])
+    cur.execute(
+        'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
+        (tenant_id, 'Основной проект')
+    )
+    return str(cur.fetchone()['id'])
+
+
 def handler(event, context):
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
@@ -83,10 +108,12 @@ def handler(event, context):
     except json.JSONDecodeError:
         body = {}
 
+    project_id = qs.get('project_id') or body.get('project_id')
+
     if method == 'GET':
-        return list_brands(tenant_id)
+        return list_brands(tenant_id, project_id)
     if method == 'POST':
-        return create_brand(tenant_id, body)
+        return create_brand(tenant_id, body, project_id)
     if method == 'PUT':
         return update_brand(tenant_id, qs.get('id', ''), body)
     if method == 'DELETE':
@@ -94,16 +121,18 @@ def handler(event, context):
     return resp(405, {'error': 'method_not_allowed'})
 
 
-def list_brands(tenant_id: str):
+def list_brands(tenant_id: str, project_id=None):
     conn = get_db()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                'SELECT id, name, aliases, is_own, created_at FROM geo_brands '
-                'WHERE tenant_id = %s ORDER BY is_own DESC, created_at ASC',
-                (tenant_id,)
-            )
-            rows = cur.fetchall()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                pid = resolve_project(cur, tenant_id, project_id)
+                cur.execute(
+                    'SELECT id, name, aliases, is_own, created_at FROM geo_brands '
+                    'WHERE tenant_id = %s AND project_id = %s ORDER BY is_own DESC, created_at ASC',
+                    (tenant_id, pid)
+                )
+                rows = cur.fetchall()
         return resp(200, {'brands': [{
             'id': str(r['id']), 'name': r['name'], 'aliases': r['aliases'] or [],
             'is_own': r['is_own'], 'created_at': r['created_at'].isoformat()
@@ -112,7 +141,7 @@ def list_brands(tenant_id: str):
         conn.close()
 
 
-def create_brand(tenant_id: str, body: dict):
+def create_brand(tenant_id: str, body: dict, project_id=None):
     name = (body.get('name') or '').strip()
     if not name:
         return resp(400, {'error': 'name_required'})
@@ -125,15 +154,18 @@ def create_brand(tenant_id: str, body: dict):
     try:
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                pid = resolve_project(cur, tenant_id, project_id)
                 if is_own:
+                    # только один свой бренд в рамках проекта
                     cur.execute(
-                        'UPDATE geo_brands SET is_own = FALSE WHERE tenant_id = %s AND is_own = TRUE',
-                        (tenant_id,)
+                        'UPDATE geo_brands SET is_own = FALSE '
+                        'WHERE tenant_id = %s AND project_id = %s AND is_own = TRUE',
+                        (tenant_id, pid)
                     )
                 cur.execute(
-                    'INSERT INTO geo_brands (tenant_id, name, aliases, is_own) '
-                    'VALUES (%s, %s, %s, %s) RETURNING id, created_at',
-                    (tenant_id, name, aliases, is_own)
+                    'INSERT INTO geo_brands (tenant_id, project_id, name, aliases, is_own) '
+                    'VALUES (%s, %s, %s, %s, %s) RETURNING id, created_at',
+                    (tenant_id, pid, name, aliases, is_own)
                 )
                 row = cur.fetchone()
         return resp(200, {'brand': {
@@ -165,11 +197,14 @@ def update_brand(tenant_id: str, brand_id: str, body: dict):
     conn = get_db()
     try:
         with conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if body.get('is_own') is True:
+                    # отключаем is_own у остальных брендов того же проекта
                     cur.execute(
-                        'UPDATE geo_brands SET is_own = FALSE WHERE tenant_id = %s AND is_own = TRUE AND id <> %s',
-                        (tenant_id, brand_id)
+                        'UPDATE geo_brands SET is_own = FALSE '
+                        'WHERE tenant_id = %s AND id <> %s AND is_own = TRUE '
+                        'AND project_id = (SELECT project_id FROM geo_brands WHERE tenant_id = %s AND id = %s)',
+                        (tenant_id, brand_id, tenant_id, brand_id)
                     )
                 cur.execute(
                     f"UPDATE geo_brands SET {', '.join(fields)} WHERE tenant_id = %s AND id = %s",

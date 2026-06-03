@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useGeoAuth } from '@/contexts/GeoAuthContext';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
+import ProjectSwitcher from './ProjectSwitcher';
 
 const NAV = [
   { to: '/geo', label: 'Дашборд', icon: 'LayoutDashboard', end: true },
@@ -36,6 +37,10 @@ export default function GeoLayout({ children }: { children: ReactNode }) {
               <div className="text-xs text-slate-500">Упоминания в ИИ</div>
             </div>
           </Link>
+        </div>
+
+        <div className="pt-3">
+          <ProjectSwitcher />
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
