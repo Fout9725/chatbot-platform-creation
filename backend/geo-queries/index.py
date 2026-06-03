@@ -74,26 +74,36 @@ def get_db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def _row_id(row):
+    """Достаёт id из строки независимо от типа курсора (dict или tuple)."""
+    if row is None:
+        return None
+    try:
+        return str(row['id'])
+    except (TypeError, KeyError, IndexError):
+        return str(row[0])
+
+
 def resolve_project(cur, tenant_id: str, project_id):
     """Возвращает валидный project_id (переданный или дефолтный), гарантирует наличие проекта."""
     if project_id:
         cur.execute('SELECT id FROM geo_projects WHERE tenant_id = %s AND id = %s',
                     (tenant_id, project_id))
-        row = cur.fetchone()
-        if row:
-            return str(row['id'])
+        rid = _row_id(cur.fetchone())
+        if rid:
+            return rid
     cur.execute(
         'SELECT id FROM geo_projects WHERE tenant_id = %s ORDER BY is_default DESC, created_at ASC LIMIT 1',
         (tenant_id,)
     )
-    row = cur.fetchone()
-    if row:
-        return str(row['id'])
+    rid = _row_id(cur.fetchone())
+    if rid:
+        return rid
     cur.execute(
         'INSERT INTO geo_projects (tenant_id, name, is_default) VALUES (%s, %s, TRUE) RETURNING id',
         (tenant_id, 'Основной проект')
     )
-    return str(cur.fetchone()['id'])
+    return _row_id(cur.fetchone())
 
 
 def handler(event, context):
